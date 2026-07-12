@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1783889710220,
+      "tag": "0000_fantastic_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783889733675,
+      "tag": "0001_append_only_ledger",
+      "breakpoints": true
+    }
+  ]
+}
