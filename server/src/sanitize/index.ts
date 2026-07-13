@@ -77,9 +77,17 @@ function quarantineSpans(text: string, items: QuarantineItem[]): string {
   return result;
 }
 
+const MIN_UNLOCATED_SCRUB_LENGTH = 20;
+
 export function scrubText(text: string, quarantineLog: QuarantineItem[]): string {
   const items = quarantineLog
-    .filter((item) => item.tier >= 2 && item.matchText.length > 0 && !item.matchText.includes('QUARANTINED'))
+    .filter(
+      (item) =>
+        item.tier >= 2 &&
+        item.matchText.length > 0 &&
+        !item.matchText.includes('QUARANTINED') &&
+        (item.start !== null || item.matchText.length >= MIN_UNLOCATED_SCRUB_LENGTH),
+    )
     .sort((a, b) => b.matchText.length - a.matchText.length);
   let result = text;
   for (const item of items) {
