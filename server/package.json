@@ -10,17 +10,26 @@
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.0",
+    "@ai-sdk/anthropic": "4.0.12",
     "@ai-sdk/azure": "4.0.11",
-    "@ai-sdk/google": "^4.0.0",
-    "@ai-sdk/openai": "^4.0.0",
+    "@ai-sdk/google": "4.0.12",
+    "@ai-sdk/openai": "4.0.11",
     "@azure/identity": "4.13.1",
+    "@langfuse/otel": "5.9.1",
+    "@langfuse/tracing": "5.9.1",
+    "@langfuse/vercel-ai-sdk": "5.9.1",
     "@mastra/core": "1.50.1",
     "@mastra/libsql": "1.15.1",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/core": "2.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.220.0",
+    "@opentelemetry/sdk-trace-base": "2.9.0",
+    "@opentelemetry/sdk-trace-node": "2.9.0",
     "ai": "7.0.22",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
-    "zod": "^3.23.8"
+    "ollama-ai-provider-v2": "4.0.1",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
