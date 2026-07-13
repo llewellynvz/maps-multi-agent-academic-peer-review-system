@@ -7,6 +7,7 @@ import { sectionMapSchema } from '@mara/shared';
 import type { MaraDatabase } from '../db/client';
 import { grobidExtractor, type GrobidClient, type IngestDeps, ingestManuscript, kindFromMime } from '../ingest';
 import type { DispatchRunner } from '../providers';
+import { scrubSectionMap } from '../sanitize';
 import { clarifyingQuestionSchema, liteParse } from './lite-parse';
 import {
   getCheckpoint,
@@ -50,6 +51,7 @@ const clarifyOutputSchema = z.object({ reviewId: z.string(), halted: z.boolean()
 const finalizeOutputSchema = z.object({ reviewId: z.string(), halted: z.boolean(), status: z.string() });
 
 const SECTION_MAP_BLOB = 'parse/section-map.json';
+const SANITIZED_SECTION_MAP_BLOB = 'parse/section-map.sanitized.json';
 const LITE_PARSE_BLOB = 'parse/lite-parse.json';
 
 export function createIngestWorkflow(deps: IngestWorkflowDeps) {
@@ -151,6 +153,8 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
 
       const sectionMap = sectionMapSchema.parse(JSON.parse(readManuscriptBlobText(inputData.reviewId, SECTION_MAP_BLOB)));
       const result = await sanitizePhase({ db, reviewId: inputData.reviewId, text: sectionMap.fullText, runDispatch: deps.runDispatch });
+      const sanitizedMap = scrubSectionMap(sectionMap, result.quarantineLog);
+      writeManuscriptBlob(inputData.reviewId, SANITIZED_SECTION_MAP_BLOB, JSON.stringify(sanitizedMap));
 
       const output = { reviewId: inputData.reviewId, halted: result.halted, tier: result.tier };
       upsertCheckpoint(db, {
@@ -176,7 +180,9 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
         return liteParseOutputSchema.parse(done.snapshot);
       }
 
-      const sectionMap = sectionMapSchema.parse(JSON.parse(readManuscriptBlobText(inputData.reviewId, SECTION_MAP_BLOB)));
+      const sectionMap = sectionMapSchema.parse(
+        JSON.parse(readManuscriptBlobText(inputData.reviewId, SANITIZED_SECTION_MAP_BLOB)),
+      );
       const options = getReviewOptions(db, inputData.reviewId);
       const presetDefault = typeof options.preset === 'string' ? options.preset : deps.presetDefault;
       const journalProvided = typeof options.journal === 'string' && options.journal.length > 0;
@@ -256,7 +262,11 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
     inputSchema: clarifyOutputSchema,
     outputSchema: finalizeOutputSchema,
     execute: async ({ inputData }) => {
-      if (inputData.halted) {
+      const done = getCheckpoint(db, inputData.reviewId, 'phase_1');
+      if (done?.status === 'completed') {
+        return { reviewId: inputData.reviewId, halted: false, status: 'ingested' };
+      }
+      if (done?.status === 'failed' || inputData.halted) {
         upsertCheckpoint(db, { reviewId: inputData.reviewId, phase: 'phase_1', status: 'failed', snapshot: { ingestComplete: false } });
         return { reviewId: inputData.reviewId, halted: true, status: 'halted' };
       }

@@ -4,13 +4,17 @@ export const parseQualitySchema = z.enum(['good', 'degraded']);
 
 export const parserSchema = z.enum(['grobid', 'unpdf', 'mammoth']);
 
-export const manuscriptSectionSchema = z.object({
-  index: z.number().int().nonnegative(),
-  heading: z.string().nullable(),
-  text: z.string(),
-  lineStart: z.number().int().positive(),
-  lineEnd: z.number().int().positive(),
-});
+export const manuscriptSectionSchema = z
+  .object({
+    index: z.number().int().nonnegative(),
+    heading: z.string().nullable(),
+    text: z.string(),
+    lineStart: z.number().int().positive(),
+    lineEnd: z.number().int().positive(),
+  })
+  .refine((section) => section.lineEnd >= section.lineStart, {
+    message: 'lineEnd must be at least lineStart',
+  });
 
 export const manuscriptReferenceSchema = z.object({
   index: z.number().int().nonnegative(),

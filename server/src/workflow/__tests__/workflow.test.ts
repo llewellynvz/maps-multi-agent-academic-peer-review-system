@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -142,6 +142,13 @@ describe('ingest workflow', () => {
     };
     expect(teiRecorded.tei_structure_path).not.toBeNull();
 
+    const sanitizedMapPath = join(blobDir(reviewId), 'parse', 'section-map.sanitized.json');
+    expect(existsSync(sanitizedMapPath)).toBe(true);
+
+    const eventsAfterComplete = (
+      sqlite.prepare('SELECT count(*) AS n FROM review_events WHERE review_id = ?').get(reviewId) as { n: number }
+    ).n;
+
     const secondMastra = buildIngestMastra(deps);
     const rerun = await startIngest(secondMastra, {
       reviewId,
@@ -160,5 +167,10 @@ describe('ingest workflow', () => {
       sqlite.prepare('SELECT count(*) AS n FROM dispatches WHERE review_id = ?').get(reviewId) as { n: number }
     ).n;
     expect(dispatchesAfterRerun).toBe(dispatchesAfterFirst);
+
+    const eventsAfterRerun = (
+      sqlite.prepare('SELECT count(*) AS n FROM review_events WHERE review_id = ?').get(reviewId) as { n: number }
+    ).n;
+    expect(eventsAfterRerun).toBe(eventsAfterComplete);
   });
 });

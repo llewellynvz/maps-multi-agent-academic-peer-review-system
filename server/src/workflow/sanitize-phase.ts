@@ -8,7 +8,11 @@ export interface SanitizePhaseOptions {
   reviewId: string;
   text: string;
   runDispatch: DetectDispatch;
-  detect?: (options: { text: string; runDispatch: DetectDispatch; reviewId: string }) => Promise<InjectionVerdict>;
+  detect?: (options: {
+    text: string;
+    runDispatch: DetectDispatch;
+    reviewId: string;
+  }) => Promise<InjectionVerdict & { degraded?: boolean }>;
 }
 
 export async function sanitizePhase(options: SanitizePhaseOptions): Promise<SanitizeResult> {
@@ -26,6 +30,15 @@ export async function sanitizePhase(options: SanitizePhaseOptions): Promise<Sani
     quarantineLogJson: JSON.stringify(result.quarantineLog),
     sanitizedAt: new Date().toISOString(),
   });
+
+  if (result.detectorDegraded) {
+    insertEvent(options.db, {
+      reviewId: options.reviewId,
+      kind: 'error',
+      phase: 'phase_0',
+      payload: { step: 'sanitize', detector: 'pipe25_unavailable', rationale: result.detectorRationale },
+    });
+  }
 
   if (result.halted) {
     insertEvent(options.db, {

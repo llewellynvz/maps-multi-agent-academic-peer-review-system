@@ -1,3 +1,4 @@
+import type { SectionMap } from '@mara/shared';
 import { detectInjection, type DetectDispatch, type InjectionVerdict } from './detector';
 import { screenText, type QuarantineTier } from './patterns';
 
@@ -21,6 +22,7 @@ export interface SanitizeResult {
   sanitizedText: string;
   quarantineLog: QuarantineItem[];
   detectorRationale: string;
+  detectorDegraded: boolean;
 }
 
 export interface SanitizeOptions {
@@ -34,7 +36,7 @@ export interface SanitizeOptions {
     text: string;
     runDispatch: DetectDispatch;
     reviewId: string;
-  }) => Promise<InjectionVerdict>;
+  }) => Promise<InjectionVerdict & { degraded?: boolean }>;
   maxChars?: number;
 }
 
@@ -62,7 +64,9 @@ function quarantineSpans(text: string, items: QuarantineItem[]): string {
   for (const range of ranges) {
     const last = merged[merged.length - 1];
     if (last === undefined || range.start >= last.end) {
-      merged.push(range);
+      merged.push({ ...range });
+    } else if (range.end > last.end) {
+      last.end = range.end;
     }
   }
 
@@ -71,6 +75,26 @@ function quarantineSpans(text: string, items: QuarantineItem[]): string {
     result = `${result.slice(0, range.start)}[[QUARANTINED:${range.id}]]${result.slice(range.end)}`;
   }
   return result;
+}
+
+export function scrubText(text: string, quarantineLog: QuarantineItem[]): string {
+  let result = text;
+  for (const item of quarantineLog) {
+    if (item.tier >= 2 && item.matchText.length > 0) {
+      result = result.split(item.matchText).join(`[[QUARANTINED:${item.id}]]`);
+    }
+  }
+  return result;
+}
+
+export function scrubSectionMap(map: SectionMap, quarantineLog: QuarantineItem[]): SectionMap {
+  return {
+    ...map,
+    title: map.title !== null ? scrubText(map.title, quarantineLog) : null,
+    abstract: map.abstract !== null ? scrubText(map.abstract, quarantineLog) : null,
+    sections: map.sections.map((section) => ({ ...section, text: scrubText(section.text, quarantineLog) })),
+    fullText: scrubText(map.fullText, quarantineLog),
+  };
 }
 
 export async function sanitizeManuscript(options: SanitizeOptions): Promise<SanitizeResult> {
@@ -119,18 +143,35 @@ export async function sanitizeManuscript(options: SanitizeOptions): Promise<Sani
       sequence += 1;
     } else {
       for (const span of verdict.spans) {
-        const start = options.text.indexOf(span.text);
-        quarantineLog.push({
-          id: itemId(sequence),
-          tier: verdictTier as QuarantineTier,
-          source: 'llm',
-          patternId: null,
-          matchText: span.text,
-          start: start >= 0 ? start : null,
-          end: start >= 0 ? start + span.text.length : null,
-          reason: span.reason,
-        });
-        sequence += 1;
+        let start = options.text.indexOf(span.text);
+        if (start < 0) {
+          quarantineLog.push({
+            id: itemId(sequence),
+            tier: verdictTier as QuarantineTier,
+            source: 'llm',
+            patternId: null,
+            matchText: span.text,
+            start: null,
+            end: null,
+            reason: span.reason,
+          });
+          sequence += 1;
+          continue;
+        }
+        while (start >= 0) {
+          quarantineLog.push({
+            id: itemId(sequence),
+            tier: verdictTier as QuarantineTier,
+            source: 'llm',
+            patternId: null,
+            matchText: span.text,
+            start,
+            end: start + span.text.length,
+            reason: span.reason,
+          });
+          sequence += 1;
+          start = options.text.indexOf(span.text, start + span.text.length);
+        }
       }
     }
   }
@@ -150,6 +191,7 @@ export async function sanitizeManuscript(options: SanitizeOptions): Promise<Sani
     sanitizedText,
     quarantineLog,
     detectorRationale: verdict.rationale,
+    detectorDegraded: verdict.degraded ?? false,
   };
 }
 
@@ -157,6 +199,7 @@ export {
   detectInjection,
   type DetectDispatch,
   type DetectInjectionOptions,
+  type DetectorOutcome,
   injectionVerdictSchema,
   type InjectionVerdict,
 } from './detector';
