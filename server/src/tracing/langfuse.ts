@@ -1,5 +1,6 @@
 import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { LangfuseVercelAiSdkIntegration } from '@langfuse/vercel-ai-sdk';
+import { setGlobalErrorHandler } from '@opentelemetry/core';
 import type { SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { registerTelemetry } from 'ai';
@@ -60,6 +61,11 @@ export function initTracing(options: InitTracingOptions = {}): TracingHandle {
       secretKey: config?.secretKey,
       baseUrl: config?.host,
     });
+
+  setGlobalErrorHandler((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`langfuse tracing export failed, run continues without remote traces: ${message}\n`);
+  });
 
   const provider = new NodeTracerProvider({ spanProcessors: [spanProcessor] });
   provider.register();

@@ -9,7 +9,8 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "db:generate": "pnpm --filter server db:generate",
-    "db:migrate": "pnpm --filter server db:migrate"
+    "db:migrate": "pnpm --filter server db:migrate",
+    "exercise:slice-a": "pnpm --filter server exercise:slice-a"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
