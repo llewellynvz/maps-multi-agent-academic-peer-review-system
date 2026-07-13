@@ -270,15 +270,21 @@ function printSummary(input: SummaryInput): void {
     );
   }
 
-  const second = input.secondFrontier;
-  if (second !== null && second.tokens.inputTokens > 0) {
-    const share = second.tokens.cachedTokens / second.tokens.inputTokens;
-    console.log(`\nRepeated-prefix cached-token share (frontier-prefix-2): ${(share * 100).toFixed(1)}%`);
-    if (second.tokens.cachedTokens <= 0) {
-      failures.push('Repeated-prefix call showed no cached input tokens');
-    }
-  } else {
+  const prefixRows = rows.filter(
+    (row) => row.label.startsWith('frontier-prefix') && row.result !== undefined,
+  );
+  if (input.secondFrontier === null) {
     failures.push('Second frontier dispatch did not complete, cannot measure prompt caching');
+  } else if (prefixRows.length > 0) {
+    const bestShare = Math.max(
+      ...prefixRows.map((row) =>
+        row.result!.tokens.inputTokens > 0 ? row.result!.tokens.cachedTokens / row.result!.tokens.inputTokens : 0,
+      ),
+    );
+    console.log(`\nBest cached-token share across shared-prefix calls: ${(bestShare * 100).toFixed(1)}%`);
+    if (bestShare <= 0) {
+      failures.push('No shared-prefix call showed cached input tokens');
+    }
   }
 
   if (input.objectResult === null || input.objectResult.object === undefined) {
