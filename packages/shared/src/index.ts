@@ -11,6 +11,22 @@ export {
   sectionMapSchema,
 } from './section-map';
 
+export * from './agents/finding';
+export * from './agents/recommendation';
+export * from './agents/manuscript-sanitizer';
+export * from './agents/manuscript-analyst';
+export * from './agents/field-context-scout';
+export * from './agents/citation-auditor';
+export * from './agents/specialist-reviewer';
+export * from './agents/integrity-screener';
+export * from './agents/swarm';
+export * from './agents/review-report-writer';
+export * from './agents/review-meta-reviewer';
+export * from './agents/review-final-critic';
+export * from './agents/journal-scope-scorer';
+export * from './agents/quality-metrics-engine';
+export * from './agents/review-calibrator';
+
 export type ReviewStatus =
   | 'created'
   | 'queued'
