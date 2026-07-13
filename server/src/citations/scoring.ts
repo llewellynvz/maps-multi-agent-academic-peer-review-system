@@ -16,6 +16,7 @@ function clamp(value: number): number {
 export function scoreCandidate(reference: Reference, candidate: CitationCandidate): CandidateScore {
   const similarity = titleSimilarity(reference.title, candidate.title);
   const yearMatch = candidate.year !== undefined && Math.abs(candidate.year - reference.year) <= 1;
+  const yearConflict = candidate.year !== undefined && !yearMatch;
   const doiMatch =
     reference.doi !== undefined &&
     candidate.doi !== undefined &&
@@ -24,8 +25,8 @@ export function scoreCandidate(reference: Reference, candidate: CitationCandidat
   if (doiMatch && similarity >= LOOSE_TITLE) {
     return { status: 'verified', confidence: clamp(0.9 + 0.1 * similarity) };
   }
-  if (similarity >= STRONG_TITLE && yearMatch) {
-    return { status: 'verified', confidence: clamp(0.55 + 0.4 * similarity) };
+  if (similarity >= STRONG_TITLE && !yearConflict) {
+    return { status: 'verified', confidence: clamp(0.55 + 0.4 * similarity - (yearMatch ? 0 : 0.1)) };
   }
   if (doiMatch) {
     return { status: 'mismatch', confidence: clamp(0.35 + 0.1 * similarity) };

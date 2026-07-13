@@ -23,7 +23,7 @@ export interface CitationClient {
 }
 
 const globalFetch: FetchLike = async (url, init) => {
-  const response = await fetch(url, init);
+  const response = await fetch(url, { ...init, redirect: 'manual' });
   return { ok: response.ok, status: response.status, json: (): Promise<unknown> => response.json() };
 };
 
@@ -67,11 +67,13 @@ export function createCitationClient(options: CitationClientOptions = {}): Citat
 
       let verified: VerifyReferenceResult | null = null;
       let bestMismatch: VerifyReferenceResult | null = null;
+      let anyBackendResponded = false;
 
       for (const backend of backends) {
         let candidates: CitationCandidate[];
         try {
           candidates = await backend.lookup(reference, guardedFetch);
+          anyBackendResponded = true;
         } catch {
           candidates = [];
         }
@@ -97,7 +99,8 @@ export function createCitationClient(options: CitationClientOptions = {}): Citat
       const result: VerifyReferenceResult =
         verified ?? bestMismatch ?? { status: 'not_found', source: null, confidence: 0 };
 
-      if (cache !== null) {
+      const cacheable = result.status !== 'not_found' || anyBackendResponded;
+      if (cache !== null && cacheable) {
         cache.set(reference, result.source, result);
       }
       return result;

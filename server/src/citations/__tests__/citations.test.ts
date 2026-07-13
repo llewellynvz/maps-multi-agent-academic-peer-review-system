@@ -3,6 +3,7 @@ import { assertAllowedHost, createGuardedFetch } from '../allowlist';
 import { openCitationCache } from '../cache';
 import { createCitationClient } from '../client';
 import { createRateLimiter } from '../rate-limiter';
+import { scoreCandidate } from '../scoring';
 import type { FetchLike, HttpResponse, Reference } from '../types';
 
 function json(body: unknown): HttpResponse {
@@ -107,6 +108,29 @@ describe('verifyReference', () => {
     client.close();
   });
 
+  it('does not cache a not_found produced by a total backend outage', async () => {
+    let mode: 'outage' | 'ok' = 'outage';
+    const fetchImpl: FetchLike = async (url) => {
+      if (mode === 'outage') {
+        throw new Error('network down');
+      }
+      if (url.includes('api.crossref.org/works/')) {
+        return json(crossrefWork('Positive psychology: An introduction', '10.1037/0003-066X.55.1.5', 2000));
+      }
+      return empty;
+    };
+    const cache = openCitationCache({ path: ':memory:' });
+    const client = createCitationClient({ fetchImpl, cache, rateLimiter: fastLimiter });
+
+    const first = await client.verifyReference(seligman);
+    expect(first.status).toBe('not_found');
+
+    mode = 'ok';
+    const second = await client.verifyReference(seligman);
+    expect(second.status).toBe('verified');
+    cache.close();
+  });
+
   it('serves a cache hit without any further network calls', async () => {
     const fetchImpl = vi.fn<FetchLike>(async (url) => {
       if (url.includes('api.crossref.org/works/')) {
@@ -125,6 +149,26 @@ describe('verifyReference', () => {
     expect(second).toEqual(first);
     expect(fetchImpl.mock.calls.length).toBe(callsAfterFirst);
     cache.close();
+  });
+});
+
+describe('scoreCandidate', () => {
+  const reference: Reference = { title: 'Positive psychology: An introduction', authors: ['Seligman'], year: 2000 };
+
+  it('verifies a strong title match when the backend record has no year', () => {
+    const scored = scoreCandidate(reference, { title: 'Positive psychology: An introduction' });
+    expect(scored.status).toBe('verified');
+  });
+
+  it('does not verify a strong title match when the year conflicts', () => {
+    const scored = scoreCandidate(reference, { title: 'Positive psychology: An introduction', year: 1980 });
+    expect(scored.status).not.toBe('verified');
+  });
+
+  it('tokenizes a non-Latin title instead of collapsing it to empty', () => {
+    const cyrillic: Reference = { title: 'Психология благополучия', authors: [], year: 2020 };
+    const scored = scoreCandidate(cyrillic, { title: 'Психология благополучия', year: 2020 });
+    expect(scored.status).toBe('verified');
   });
 });
 

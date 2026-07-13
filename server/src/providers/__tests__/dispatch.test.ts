@@ -179,6 +179,33 @@ describe('dispatch runner', () => {
     expect(result.object).toEqual({ verdict: 'ok' });
   });
 
+  it('drops temperature for a reasoning model but forwards it for a non-reasoning model', async () => {
+    let captured: { temperature?: number } | undefined;
+    const generate: GenerateApi = {
+      generateText: async (options) => {
+        captured = options;
+        return { text: 'x', usage: {} };
+      },
+      generateObject: async (options) => {
+        captured = options;
+        return { object: {}, usage: {} };
+      },
+    };
+    const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
+
+    await run({ ...baseInput(), temperature: 0.5 });
+    expect(captured?.temperature).toBeUndefined();
+
+    const nonReasoning: ModelRef = {
+      providerName: 'openai',
+      model: 'gpt-4o-mini',
+      languageModel: {} as LanguageModel,
+      isReasoning: false,
+    };
+    await run({ ...baseInput(), model: nonReasoning, temperature: 0.5 });
+    expect(captured?.temperature).toBe(0.5);
+  });
+
   it('measures latency from the injected clock', async () => {
     const { generate } = countingGenerate();
     let clock = 100;

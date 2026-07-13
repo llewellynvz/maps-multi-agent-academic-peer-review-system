@@ -225,7 +225,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
     if (input.parts.providerOptions !== undefined) {
       callOptions.providerOptions = input.parts.providerOptions;
     }
-    if (input.temperature !== undefined) {
+    if (input.temperature !== undefined && !modelRef.isReasoning) {
       callOptions.temperature = input.temperature;
     }
 
