@@ -9,11 +9,9 @@ import type {
   SpecialistReviewerOutput,
   SwarmEvaluation,
 } from '@mara/shared';
-import type { CitationClient } from '../citations';
 import type { MaraDatabase } from '../db/client';
 import { getCurrentFindings } from '../ledger';
 import { withPhase } from '../tracing';
-import type { DispatchRunner } from '../providers';
 import { getCheckpoint, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
 import { readArtefact, writeArtefact } from './artefacts';
 import { computeComposite } from './composite';
@@ -27,12 +25,11 @@ import {
 import { selectActiveLenses, selectChallengeLenses, swarmProfile } from './lenses';
 import { runAgent } from './dispatch-agent';
 import { upsertRubricScore } from './rubric';
+import type { EngineDeps } from './phases-shared';
+import { runPhase7 } from './phase7';
+import { runPhase8 } from './phase8';
 
-export interface EngineDeps {
-  db: MaraDatabase;
-  runDispatch: DispatchRunner;
-  citationClient?: CitationClient;
-}
+export type { EngineDeps } from './phases-shared';
 
 function checkpointKey(phase: string): string {
   return `engine_${phase}`;
@@ -688,4 +685,9 @@ export async function runReviewEngine(deps: EngineDeps, reviewId: string): Promi
   await runPhase4(deps, reviewId);
   await runPhase5(deps, reviewId);
   await runPhase6(deps, reviewId);
+  await runPhase7(deps, reviewId);
+  await runPhase8(deps, reviewId);
 }
+
+export { runPhase7 } from './phase7';
+export { runPhase8 } from './phase8';

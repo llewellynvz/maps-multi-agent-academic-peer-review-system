@@ -12,6 +12,8 @@ import {
   runPhase4,
   runPhase5,
   runPhase6,
+  runPhase7,
+  runPhase8,
 } from '../engine';
 import type { DispatchRunner } from '../providers';
 
@@ -50,6 +52,8 @@ export function createReviewEngineWorkflow(deps: ReviewEngineDeps) {
     .then(phaseStep('phase-4-integrity', runPhase4))
     .then(phaseStep('phase-5-swarm', runPhase5))
     .then(phaseStep('phase-6-report', runPhase6))
+    .then(phaseStep('phase-7-release-gate', runPhase7))
+    .then(phaseStep('phase-8-production', runPhase8))
     .commit();
 }
 

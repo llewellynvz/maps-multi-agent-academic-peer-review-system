@@ -1,5 +1,5 @@
 export { CONSTITUTION_FRAME } from './constitution';
-export { hasSchema, PHASE_0_6_ROSTER, schemaFor, type SchemaResolver } from './agents';
+export { FULL_ROSTER, hasSchema, PHASE_0_6_ROSTER, PHASE_7_8_ROSTER, schemaFor, type SchemaResolver } from './agents';
 export {
   type AgentManifest,
   agentDir,

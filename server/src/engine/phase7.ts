@@ -1,0 +1,535 @@
+import type {
+  FullReportEnvelope,
+  Recommendation,
+  ReviewFinalCriticOutput,
+  ReviewMetaReviewerOutput,
+  ShippedReportEnvelope,
+  SpecialistReviewerOutput,
+  SwarmEvaluation,
+  SwarmReportCritique,
+} from '@mara/shared';
+import type { CurrentFinding } from '../ledger';
+import { getCurrentFindings } from '../ledger';
+import { annotatePhase, withPhase } from '../tracing';
+import {
+  getCheckpoint,
+  getReviewOptions,
+  insertEvent,
+  recordGateCheckpoint,
+  updateReview,
+  upsertCheckpoint,
+} from '../workflow/repo';
+import type { EngineDeps } from './phases-shared';
+import { readArtefact, writeArtefact } from './artefacts';
+import { loadEngineContext, manuscriptDigest } from './context';
+import { runAgent } from './dispatch-agent';
+import { arbitrate, type ArbitrationRecord } from './arbitration';
+import { validateGrounding, type GroundingFailureKind } from './grounding';
+import { matchLens } from './lenses';
+import { mergeFindingsOnce } from './merge';
+import { assemblePrivateNotes } from './private-notes';
+import { upsertFinalRubricScore } from './rubric';
+
+const MAX_FIX_CYCLES = 2;
+
+function checkpointKey(phase: string): string {
+  return `engine_${phase}`;
+}
+
+function phaseDone(deps: EngineDeps, reviewId: string): boolean {
+  return getCheckpoint(deps.db, reviewId, checkpointKey('phase_7'))?.status === 'completed';
+}
+
+function journalLabel(options: Record<string, unknown>): string {
+  const answers = (options.answers ?? {}) as Record<string, unknown>;
+  const journal = typeof answers.journal === 'string' ? answers.journal : null;
+  return journal ?? 'not supplied';
+}
+
+function fieldLabel(options: Record<string, unknown>): string {
+  const answers = (options.answers ?? {}) as Record<string, unknown>;
+  const field = typeof answers.field === 'string' ? answers.field : null;
+  return field ?? 'not supplied';
+}
+
+function ledgerForReport(findings: CurrentFinding[]): Array<Record<string, unknown>> {
+  return findings.map((finding) => ({
+    id: finding.id,
+    lens: finding.type,
+    claim: finding.claim,
+    anchor: finding.manuscriptAnchor,
+    severity: finding.severity,
+    fixability: finding.fixability,
+    scope: finding.scope,
+    epistemic: finding.epistemicStatus,
+    confidence: finding.confidence,
+    failureScenario: finding.narrativeContext,
+    leanestFix: finding.recommendedAction,
+  }));
+}
+
+function recommendationPackage(meta: ReviewMetaReviewerOutput): Record<string, unknown> {
+  return {
+    recommendation: meta.recommendation,
+    recommendationConfidence: meta.recommendationConfidence,
+    rubric: meta.rubric,
+    average: meta.average,
+    bottlenecks: meta.bottlenecks,
+    scopeFit: meta.scopeFit,
+    decisionHinges: meta.decisionHinges,
+  };
+}
+
+async function runMetaReviewer(
+  deps: EngineDeps,
+  reviewId: string,
+  cycle: number,
+  digest: string,
+  report: FullReportEnvelope,
+  swarm: SwarmEvaluation,
+  findings: CurrentFinding[],
+  ledgerIds: Set<string>,
+  options: Record<string, unknown>,
+): Promise<ReviewMetaReviewerOutput> {
+  const meta = await runAgent<ReviewMetaReviewerOutput>(deps, {
+    reviewId,
+    phase: 'phase_7',
+    agent: 'review-meta-reviewer',
+    artefactName: `p7-meta-${cycle}`,
+    validate: (value) => {
+      const synthesis = value as ReviewMetaReviewerOutput;
+      const cited = new Set<string>([
+        ...synthesis.rubric.flatMap((row) => [...row.supportingIds, ...row.opposingIds]),
+        ...synthesis.decisionHinges.map((hinge) => hinge.findingId),
+      ]);
+      const ungrounded = [...cited].filter((id) => !ledgerIds.has(id));
+      if (ungrounded.length > 0) {
+        throw new Error(
+          `meta synthesis cites finding ids not present in the ledger: ${ungrounded.join(', ')}. Cite only current ledger ids in rubric supporting/opposing ids and decision hinges.`,
+        );
+      }
+    },
+    assembleInput: {
+      parseQuality: loadEngineContext(deps.db, reviewId).parseQuality,
+      manuscriptExcerpt: digest,
+      artefacts: [
+        {
+          label: 'Merged evidence ledger (current findings, canonical ids)',
+          content: JSON.stringify(ledgerForReport(findings), null, 2),
+        },
+        { label: 'Full internal report (Phase 6)', content: report.bodyMarkdown },
+        { label: 'Swarm summary (Phase 5)', content: JSON.stringify(swarm, null, 2) },
+        { label: 'Brief', content: `Journal: ${journalLabel(options)}. Field: ${fieldLabel(options)}.` },
+        { label: 'Cross-review calibration lessons', content: 'No calibration record yet (early-run condition).' },
+      ],
+      routingNote:
+        'Integrate every lens, integrity, and swarm finding into one editorial synthesis. Score all 15 criteria, each row citing supporting and opposing finding ids that exist in the ledger above. Set the recommendation by the taxonomy and thresholds, pulled down never up by severity and fixability. Give one decision hinge per major finding, each naming a real finding id. Compute the unweighted average to one decimal.',
+    },
+  });
+  for (const row of meta.rubric) {
+    upsertFinalRubricScore(deps.db, reviewId, {
+      criterionIndex: row.criterion,
+      score: row.score,
+      justifyingFindingIds: row.supportingIds,
+    });
+  }
+  writeArtefact(reviewId, 'p7-meta-final', meta);
+  return meta;
+}
+
+export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<void> {
+  const { db } = deps;
+  if (phaseDone(deps, reviewId)) {
+    return;
+  }
+
+  const ctx = loadEngineContext(db, reviewId);
+  const digest = manuscriptDigest(ctx.sectionMap);
+  const options = getReviewOptions(db, reviewId);
+  const report = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
+  const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
+
+  await withPhase('phase_7', async () => {
+    updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
+
+    const findings = getCurrentFindings(db, reviewId);
+    const ledgerIds = new Set(findings.map((finding) => finding.id));
+
+    const [meta0, swarmCritique] = await Promise.all([
+      runMetaReviewer(deps, reviewId, 0, digest, report, swarm, findings, ledgerIds, options),
+      runAgent<SwarmReportCritique>(deps, {
+        reviewId,
+        phase: 'phase_7',
+        agent: 'swarm',
+        mode: 'B',
+        artefactName: 'p7-swarm-b',
+        assembleInput: {
+          mode: 'B',
+          artefacts: [
+            { label: 'Draft internal report', content: report.bodyMarkdown },
+            {
+              label: 'Merged evidence ledger (current findings, canonical ids)',
+              content: JSON.stringify(ledgerForReport(findings), null, 2),
+            },
+          ],
+          routingNote:
+            'Mode B report critique. Run the population against the draft report. Flag statements the ledger does not support or that are harsher than their ledger severity, major concerns present in the ledger but missing from the report, anchoring on dispatch order, and an unfair strengths section. Quote the report line and cite the ledger id each item fails against.',
+        },
+      }),
+    ]);
+
+    let currentMeta = meta0;
+    let fixCycles = 0;
+    let released = false;
+    let releaseVerdict: 'pass' | 'arbitrated' = 'pass';
+    let finalRecommendation: Recommendation = currentMeta.recommendation;
+    const finalConfidence = currentMeta.recommendationConfidence;
+    let arbitration: ArbitrationRecord | null = null;
+    let blocked = false;
+    let blockReason = '';
+    let lastGroundingFailureKind: GroundingFailureKind = null;
+    let lastObjection = '';
+    let priorDefect = '';
+    let lastShipped: ShippedReportEnvelope | null = null;
+    let lastPrivateNotes = '';
+
+    for (let cycle = 0; ; cycle += 1) {
+      const authorFacing = getCurrentFindings(db, reviewId).filter((finding) => finding.scope !== 'editor_only');
+      const currentAll = getCurrentFindings(db, reviewId);
+      const ledgerIdsNow = new Set(currentAll.map((finding) => finding.id));
+      const editorOnlyIds = new Set(
+        currentAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
+      );
+
+      const shipped = await runAgent<ShippedReportEnvelope>(deps, {
+        reviewId,
+        phase: 'phase_7',
+        agent: 'review-report-writer',
+        mode: 'B',
+        artefactName: `p7-shipped-${cycle}`,
+        assembleInput: {
+          mode: 'B',
+          artefacts: [
+            { label: 'Recommendation package (from the meta-reviewer)', content: JSON.stringify(recommendationPackage(currentMeta), null, 2) },
+            { label: 'Swarm report critique (Phase 7 mode B)', content: JSON.stringify(swarmCritique.critique, null, 2) },
+            { label: 'Full internal report (Phase 6, yours)', content: report.bodyMarkdown },
+            {
+              label: 'Author-facing ledger (cite only these ids; editor-only findings are excluded by construction)',
+              content: JSON.stringify(ledgerForReport(authorFacing), null, 2),
+            },
+          ],
+          routingNote:
+            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. Cite only finding ids from the author-facing ledger above; list every id you cite in citedFindingIds and assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
+        },
+      });
+
+      const privateNotes = assemblePrivateNotes({
+        recommendation: currentMeta.recommendation,
+        recommendationConfidence: currentMeta.recommendationConfidence,
+        currentFindings: currentAll,
+        strongestMinorityReport: swarm.strongestMinorityReport,
+      });
+      writeArtefact(reviewId, `p7-private-notes-${cycle}`, privateNotes);
+      lastShipped = shipped;
+      lastPrivateNotes = privateNotes.markdown;
+
+      const grounding = validateGrounding({
+        authorFacingBody: shipped.bodyMarkdown,
+        authorFacingCitedIds: shipped.citedFindingIds,
+        privateNotesBody: privateNotes.markdown,
+        privateNotesReferencedIds: privateNotes.referencedIds,
+        ledgerIds: ledgerIdsNow,
+        editorOnlyIds,
+      });
+
+      if (!grounding.ok) {
+        lastGroundingFailureKind = grounding.kind;
+        lastObjection = grounding.failures.join('; ');
+        priorDefect = `grounding validator: ${lastObjection}`;
+        insertEvent(db, {
+          reviewId,
+          kind: 'gate_verdict',
+          phase: 'phase_7',
+          payload: { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures },
+        });
+        fixCycles += 1;
+        recordGateCheckpoint(db, {
+          reviewId,
+          phase: checkpointKey('phase_7'),
+          status: 'in_progress',
+          gateVerdict: 'revise',
+          fixCycleCount: fixCycles,
+          snapshot: { cycle, source: 'grounding-validator', failures: grounding.failures },
+        });
+        if (fixCycles >= MAX_FIX_CYCLES) {
+          break;
+        }
+        continue;
+      }
+
+      lastGroundingFailureKind = null;
+      const runAudit = `Fix cycles used so far: ${fixCycles}. This is gate cycle ${cycle}.`;
+      const critic = await runAgent<ReviewFinalCriticOutput>(deps, {
+        reviewId,
+        phase: 'phase_7',
+        agent: 'review-final-critic',
+        artefactName: `p7-critic-${cycle}`,
+        assembleInput: {
+          artefacts: [
+            { label: 'Full internal report (Phase 6)', content: report.bodyMarkdown },
+            { label: 'Shipped seven-part report', content: shipped.bodyMarkdown },
+            { label: 'Reviewer\'s private notes', content: privateNotes.markdown },
+            {
+              label: 'Merged evidence ledger (current findings, canonical ids)',
+              content: JSON.stringify(ledgerForReport(currentAll), null, 2),
+            },
+            { label: 'Swarm summary', content: JSON.stringify(swarm, null, 2) },
+            { label: 'Run audit facts', content: runAudit },
+          ],
+          routingNote:
+            'Release gate. Attack the shipped report and the private notes: evidence grounding, confidentiality and signal audit, tone risk, actionability, and mechanical QA. Before conceding pass, attempt to construct one concrete failure and report the attempt. Return exactly one verdict: pass, revise, revise-specialist (naming the lens and the finding id to supersede), or block.',
+        },
+      });
+
+      lastObjection = critic.mostDangerousDefect ?? critic.failureConstructionAttempt;
+
+      insertEvent(db, {
+        reviewId,
+        kind: 'gate_verdict',
+        phase: 'phase_7',
+        payload: { cycle, source: 'final-critic', verdict: critic.verdict, lens: critic.lens },
+      });
+
+      if (critic.verdict === 'pass') {
+        released = true;
+        releaseVerdict = 'pass';
+        recordGateCheckpoint(db, {
+          reviewId,
+          phase: checkpointKey('phase_7'),
+          status: 'in_progress',
+          gateVerdict: 'pass',
+          fixCycleCount: fixCycles,
+          snapshot: { cycle, verdict: 'pass' },
+        });
+        break;
+      }
+
+      if (critic.verdict === 'block') {
+        blocked = true;
+        blockReason = critic.mostDangerousDefect ?? 'Release blocked at the final critic.';
+        recordGateCheckpoint(db, {
+          reviewId,
+          phase: checkpointKey('phase_7'),
+          status: 'completed',
+          gateVerdict: 'block',
+          fixCycleCount: fixCycles,
+          snapshot: { cycle, verdict: 'block', reason: blockReason },
+        });
+        break;
+      }
+
+      priorDefect =
+        critic.verdict === 'revise'
+          ? `final critic revise on sections: ${critic.sectionsToRework.join(', ')}`
+          : `final critic revise-specialist on lens ${critic.lens ?? 'unknown'}`;
+      fixCycles += 1;
+      recordGateCheckpoint(db, {
+        reviewId,
+        phase: checkpointKey('phase_7'),
+        status: 'in_progress',
+        gateVerdict: critic.verdict === 'revise' ? 'revise' : 'revise_specialist',
+        fixCycleCount: fixCycles,
+        snapshot: { cycle, verdict: critic.verdict, lens: critic.lens },
+      });
+
+      if (fixCycles >= MAX_FIX_CYCLES) {
+        break;
+      }
+
+      if (critic.verdict === 'revise-specialist' && critic.lens !== null) {
+        await reDispatchSpecialist(deps, reviewId, digest, critic);
+        const refreshed = getCurrentFindings(db, reviewId);
+        const refreshedIds = new Set(refreshed.map((finding) => finding.id));
+        currentMeta = await runMetaReviewer(
+          deps,
+          reviewId,
+          fixCycles,
+          digest,
+          report,
+          swarm,
+          refreshed,
+          refreshedIds,
+          options,
+        );
+      }
+    }
+
+    if (!released && !blocked) {
+      const currentAll = getCurrentFindings(db, reviewId);
+      const ledgerIdsNow = new Set(currentAll.map((finding) => finding.id));
+      arbitration = arbitrate({
+        objection: lastObjection,
+        lastGroundingFailureKind,
+        confidentialityOrVerdictObjection: false,
+        recommendation: currentMeta.recommendation,
+        decisionHingeIds: currentMeta.decisionHinges.map((hinge) => hinge.findingId),
+        ledgerIds: ledgerIdsNow,
+        openFatalIds: currentAll.filter((finding) => finding.severity === 'fatal').map((finding) => finding.id),
+        openMajorIds: currentAll.filter((finding) => finding.severity === 'major').map((finding) => finding.id),
+      });
+      insertEvent(db, {
+        reviewId,
+        kind: 'arbitration',
+        phase: 'phase_7',
+        payload: {
+          outcome: arbitration.outcome,
+          objection: arbitration.objection,
+          rationale: arbitration.rationale,
+          evidenceIds: arbitration.evidenceIds,
+          narrowedRecommendation: arbitration.narrowedRecommendation,
+        },
+      });
+      if (arbitration.outcome === 'halt') {
+        blocked = true;
+        blockReason = arbitration.rationale;
+      } else {
+        released = true;
+        releaseVerdict = 'arbitrated';
+        if (arbitration.narrowedRecommendation !== null) {
+          finalRecommendation = arbitration.narrowedRecommendation;
+        }
+      }
+      recordGateCheckpoint(db, {
+        reviewId,
+        phase: checkpointKey('phase_7'),
+        status: blocked ? 'completed' : 'in_progress',
+        gateVerdict: 'arbitrated',
+        fixCycleCount: fixCycles,
+        snapshot: { arbitration },
+      });
+    }
+
+    if (blocked) {
+      writeArtefact(reviewId, 'p7-block-summary', { reason: blockReason, fixCycles, arbitration });
+      updateReview(db, reviewId, { status: 'failed', errorClass: 'release_gate_block' });
+      upsertCheckpoint(db, {
+        reviewId,
+        phase: checkpointKey('phase_7'),
+        status: 'completed',
+        snapshot: { released: false, blocked: true, reason: blockReason, fixCycles, arbitration },
+      });
+      annotatePhase({
+        'mara.critic_verdict': releaseVerdict,
+        'mara.released': false,
+        'mara.fix_cycles': fixCycles,
+      });
+      insertEvent(db, {
+        reviewId,
+        kind: 'run_terminal',
+        phase: 'phase_7',
+        payload: { released: false, reason: blockReason },
+      });
+      return;
+    }
+
+    updateReview(db, reviewId, {
+      recommendation: finalRecommendation,
+      recommendationConfidence: finalConfidence,
+    });
+
+    if (lastShipped !== null) {
+      writeArtefact(reviewId, 'p7-shipped-final', lastShipped);
+      writeArtefact(reviewId, 'p7-private-notes-final', { markdown: lastPrivateNotes });
+    }
+
+    const gateRecord = {
+      released: true,
+      verdict: releaseVerdict,
+      fixCycles,
+      recommendation: finalRecommendation,
+      recommendationConfidence: finalConfidence,
+      rubricAverage: currentMeta.average,
+      ...(arbitration !== null ? { arbitration } : {}),
+    };
+    writeArtefact(reviewId, 'p7-gate-record', gateRecord);
+
+    annotatePhase({
+      'mara.critic_verdict': releaseVerdict,
+      'mara.recommendation': finalRecommendation,
+      'mara.rubric_average': currentMeta.average,
+      'mara.fix_cycles': fixCycles,
+      'mara.released': true,
+    });
+
+    insertEvent(db, {
+      reviewId,
+      kind: 'phase_transition',
+      phase: 'phase_7',
+      payload: {
+        verdict: releaseVerdict,
+        fixCycles,
+        recommendation: finalRecommendation,
+        rubricAverage: currentMeta.average,
+      },
+    });
+    upsertCheckpoint(db, {
+      reviewId,
+      phase: checkpointKey('phase_7'),
+      status: 'completed',
+      snapshot: {
+        released: true,
+        verdict: releaseVerdict,
+        fixCycles,
+        recommendation: finalRecommendation,
+        recommendationConfidence: finalConfidence,
+        rubricAverage: currentMeta.average,
+      },
+    });
+  });
+}
+
+async function reDispatchSpecialist(
+  deps: EngineDeps,
+  reviewId: string,
+  digest: string,
+  critic: ReviewFinalCriticOutput,
+): Promise<void> {
+  const lens = matchLens(critic.lens ?? '');
+  if (lens === undefined) {
+    return;
+  }
+  const current = getCurrentFindings(deps.db, reviewId);
+  const mine = current.filter((finding) => finding.id.startsWith(`REV-${lens.prefix}-`));
+  const result = await runAgent<SpecialistReviewerOutput>(deps, {
+    reviewId,
+    phase: 'phase_7',
+    agent: 'specialist-reviewer',
+    artefactName: `p7-respecialist-${lens.prefix}`,
+    assembleInput: {
+      lens: lens.display,
+      manuscriptExcerpt: digest,
+      artefacts: [
+        { label: 'Your prior findings (canonical ledger ids)', content: JSON.stringify(mine, null, 2) },
+        {
+          label: 'Final-critic objection',
+          content: `${critic.mostDangerousDefect ?? ''}\nFinding to supersede: ${critic.findingIdToSupersede ?? 'none'}`,
+        },
+      ],
+      routingNote: `Targeted re-dispatch for ${lens.display} (REV-${lens.prefix}). The final critic judged a finding defective, not merely badly reported. In "findings" return only the corrected or new findings; an update sets supersedes to the existing canonical id ${critic.findingIdToSupersede ?? '(named in the objection)'}. challengeRound may be null.`,
+    },
+  });
+  const knownIds = new Set(getCurrentFindings(deps.db, reviewId).map((finding) => finding.id));
+  const sanitised = result.findings.map((finding) =>
+    finding.supersedes !== null && !knownIds.has(finding.supersedes) ? { ...finding, supersedes: null } : finding,
+  );
+  if (sanitised.length > 0) {
+    mergeFindingsOnce(deps.db, {
+      reviewId,
+      lensPrefix: lens.prefix,
+      phase: 'phase_7',
+      agent: 'specialist-reviewer',
+      fragments: sanitised,
+      marker: `p7-respecialist-${lens.prefix}`,
+    });
+  }
+}

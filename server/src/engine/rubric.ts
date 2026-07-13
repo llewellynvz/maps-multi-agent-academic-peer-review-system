@@ -9,7 +9,12 @@ export interface RubricRowInput {
   justifyingFindingIds: string[];
 }
 
-export function upsertRubricScore(db: MaraDatabase, reviewId: string, input: RubricRowInput): void {
+function upsertRubricScoreWithState(
+  db: MaraDatabase,
+  reviewId: string,
+  input: RubricRowInput,
+  state: 'provisional' | 'final',
+): void {
   const ts = new Date().toISOString();
   const justifyingFindingIds = JSON.stringify(input.justifyingFindingIds);
   const existing = db
@@ -21,7 +26,7 @@ export function upsertRubricScore(db: MaraDatabase, reviewId: string, input: Rub
 
   if (existing !== undefined) {
     db.update(rubricScores)
-      .set({ score: input.score, justifyingFindingIds, state: 'provisional', updatedAt: ts })
+      .set({ score: input.score, justifyingFindingIds, state, updatedAt: ts })
       .where(eq(rubricScores.id, existing.id))
       .run();
     return;
@@ -35,8 +40,16 @@ export function upsertRubricScore(db: MaraDatabase, reviewId: string, input: Rub
       criterionIndex: input.criterionIndex,
       score: input.score,
       justifyingFindingIds,
-      state: 'provisional',
+      state,
       updatedAt: ts,
     })
     .run();
+}
+
+export function upsertRubricScore(db: MaraDatabase, reviewId: string, input: RubricRowInput): void {
+  upsertRubricScoreWithState(db, reviewId, input, 'provisional');
+}
+
+export function upsertFinalRubricScore(db: MaraDatabase, reviewId: string, input: RubricRowInput): void {
+  upsertRubricScoreWithState(db, reviewId, input, 'final');
 }

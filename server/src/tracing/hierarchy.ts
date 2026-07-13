@@ -1,7 +1,14 @@
 import { trace } from '@opentelemetry/api';
-import { propagateAttributes, startActiveObservation } from '@langfuse/tracing';
+import { propagateAttributes, startActiveObservation, updateActiveObservation } from '@langfuse/tracing';
 
 export const SESSION_ID_ATTRIBUTE = 'langfuse.session.id';
+
+export function annotatePhase(metadata: Record<string, unknown>): void {
+  if (trace.getActiveSpan() === undefined) {
+    return;
+  }
+  updateActiveObservation({ metadata });
+}
 
 export function startRun<T>(runId: string, fn: () => Promise<T>): Promise<T> {
   return startActiveObservation(runId, async (root) => {

@@ -5,8 +5,13 @@ import {
   fieldContextScoutSchema,
   fullReportEnvelopeSchema,
   integrityScreenerSchema,
+  journalScopeScorerSchema,
   manuscriptSanitizerSchema,
   manuscriptStructureSchema,
+  qualityMetricsEngineSchema,
+  reviewCalibratorSchema,
+  reviewFinalCriticSchema,
+  reviewMetaReviewerSchema,
   shippedReportEnvelopeSchema,
   specialistReviewerSchema,
   swarmEvaluationSchema,
@@ -40,6 +45,11 @@ const SCHEMA_RESOLVERS: Record<string, SchemaResolver> = {
   'integrity-screener': single(integrityScreenerSchema),
   swarm: byMode({ A: swarmEvaluationSchema, B: swarmReportCritiqueSchema }),
   'review-report-writer': byMode({ A: fullReportEnvelopeSchema, B: shippedReportEnvelopeSchema }),
+  'review-meta-reviewer': single(reviewMetaReviewerSchema),
+  'review-final-critic': single(reviewFinalCriticSchema),
+  'quality-metrics-engine': single(qualityMetricsEngineSchema),
+  'journal-scope-scorer': single(journalScopeScorerSchema),
+  'review-calibrator': single(reviewCalibratorSchema),
 };
 
 export const PHASE_0_6_ROSTER: string[] = [
@@ -52,6 +62,18 @@ export const PHASE_0_6_ROSTER: string[] = [
   'swarm',
   'review-report-writer',
 ];
+
+export const PHASE_7_8_ROSTER: string[] = [
+  'review-meta-reviewer',
+  'review-report-writer',
+  'swarm',
+  'review-final-critic',
+  'quality-metrics-engine',
+  'journal-scope-scorer',
+  'review-calibrator',
+];
+
+export const FULL_ROSTER: string[] = [...PHASE_0_6_ROSTER, 'review-meta-reviewer', 'review-final-critic', 'quality-metrics-engine', 'journal-scope-scorer', 'review-calibrator'];
 
 export function schemaFor(agentName: string, mode?: string): z.ZodType {
   const resolver = SCHEMA_RESOLVERS[agentName];

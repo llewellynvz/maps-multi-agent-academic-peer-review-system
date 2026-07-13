@@ -1,4 +1,4 @@
-export { activeTraceId, SESSION_ID_ATTRIBUTE, startRun, withPhase } from './hierarchy';
+export { activeTraceId, annotatePhase, SESSION_ID_ATTRIBUTE, startRun, withPhase } from './hierarchy';
 export {
   initTracing,
   type InitTracingOptions,

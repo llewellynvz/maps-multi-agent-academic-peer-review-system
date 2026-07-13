@@ -31,6 +31,7 @@
     "@opentelemetry/sdk-trace-node": "2.9.0",
     "ai": "7.0.22",
     "better-sqlite3": "^12.11.1",
+    "docx": "9.7.1",
     "drizzle-orm": "^0.45.2",
     "fast-xml-parser": "^5.2.5",
     "mammoth": "^1.11.0",

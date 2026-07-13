@@ -150,6 +150,57 @@ export function upsertCheckpoint(
     .run();
 }
 
+export function recordGateCheckpoint(
+  db: MaraDatabase,
+  input: {
+    reviewId: string;
+    phase: string;
+    status: CheckpointStatus;
+    gateVerdict: 'pass' | 'revise' | 'revise_specialist' | 'block' | 'arbitrated';
+    fixCycleCount: number;
+    snapshot?: unknown;
+  },
+): void {
+  const ts = nowIso();
+  const snapshotJson = input.snapshot !== undefined ? JSON.stringify(input.snapshot) : undefined;
+  const existing = db
+    .select()
+    .from(phaseCheckpoints)
+    .where(and(eq(phaseCheckpoints.reviewId, input.reviewId), eq(phaseCheckpoints.phase, input.phase)))
+    .limit(1)
+    .all()[0];
+
+  if (existing !== undefined) {
+    db.update(phaseCheckpoints)
+      .set({
+        status: input.status,
+        gateVerdict: input.gateVerdict,
+        fixCycleCount: input.fixCycleCount,
+        ...(snapshotJson !== undefined ? { snapshotJson } : {}),
+        completedAt: input.status === 'completed' ? ts : existing.completedAt,
+        updatedAt: ts,
+      })
+      .where(eq(phaseCheckpoints.id, existing.id))
+      .run();
+    return;
+  }
+
+  db.insert(phaseCheckpoints)
+    .values({
+      id: randomUUID(),
+      reviewId: input.reviewId,
+      phase: input.phase,
+      status: input.status,
+      gateVerdict: input.gateVerdict,
+      fixCycleCount: input.fixCycleCount,
+      snapshotJson: snapshotJson ?? null,
+      startedAt: ts,
+      completedAt: input.status === 'completed' ? ts : null,
+      updatedAt: ts,
+    })
+    .run();
+}
+
 export function insertEvent(
   db: MaraDatabase,
   input: { reviewId: string; kind: EventKind; phase?: string; payload?: unknown },
@@ -190,7 +241,15 @@ export type ReviewStatusValue =
 export function updateReview(
   db: MaraDatabase,
   reviewId: string,
-  patch: Partial<{ status: ReviewStatusValue; currentPhase: string; startedAt: string; errorClass: string }>,
+  patch: Partial<{
+    status: ReviewStatusValue;
+    currentPhase: string;
+    startedAt: string;
+    errorClass: string;
+    recommendation: string;
+    recommendationConfidence: number;
+    completedAt: string;
+  }>,
 ): void {
   db.update(reviews)
     .set({ ...patch, updatedAt: nowIso() })
