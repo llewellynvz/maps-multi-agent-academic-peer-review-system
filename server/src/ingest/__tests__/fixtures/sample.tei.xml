@@ -1,0 +1,690 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader xml:lang="en">
+    <fileDesc>
+      <titleStmt>
+        <title level="a" type="main">Computational positive psychology: advancing the science of wellbeing in the digital era</title>
+        <funder ref="#_XzYqGag">
+          <orgName type="full">Shenzhen Education Science Policy Research Project</orgName>
+        </funder>
+        <funder ref="#_zmHXhgN">
+          <orgName type="full">Social Science Foundation</orgName>
+        </funder>
+        <funder ref="#_pDB5cv5">
+          <orgName type="full">unknown</orgName>
+        </funder>
+        <funder ref="#_4HwHHpy">
+          <orgName type="full">National Natural Science Foundation of China</orgName>
+        </funder>
+      </titleStmt>
+    </fileDesc>
+    <profileDesc>
+      <abstract>
+        <div xmlns="http://www.tei-c.org/ns/1.0">
+          <p>Positive psychology (PP) is in its third wave, evolving towards an interdisciplinary study of wellbeing. This article proposes computational positive psychology (CPP) as an emerging interdisciplinary field that integrates PP with computational science and technology to advance the understanding of wellbeing and develop evidence-based strategies to promote sustainable flourishing. The key features of CPP include addressing novel research questions that have received limited investigation in the existing literature, collecting large-scale and multimodal data, constructing computational models, and utilizing the results to advance theories, research, and the practice of wellbeing. We review CPP research topics such as: (1) advancing theoretical wellbeing models, (2) efficiently measuring wellbeing and positive traits, (3) exploring interdependent dynamics between individual and systemic wellbeing, (4) enhancing positive psychology interventions, and (5) improving collective wellbeing. The transformative potential of CPP for understanding and promoting wellbeing in the digital era is highlighted, and future research directions are discussed.</p>
+        </div>
+      </abstract>
+    </profileDesc>
+  </teiHeader>
+  <text xml:lang="en">
+    <body>
+      <div xmlns="http://www.tei-c.org/ns/1.0">
+        <p>
+          <ref type="bibr" target="#b85">Seligman and Csikszentmihalyi (2000)</ref>
+          <ref type="bibr" target="#b98">(van Zyl et al., 2023)</ref>
+          <ref type="bibr" target="#b105">Yaden et al. (2018)</ref>
+          <ref type="bibr" target="#b46">Kern et al. (2020)</ref>
+          <ref type="bibr" target="#b59">Lomas et al. (2020)</ref>
+          <ref type="bibr" target="#b103">Wissing (2021)</ref>
+Positive psychology (PP) has made significant advancements and profoundly impacted the scientific study of wellbeing sincepublished their foundational paper 20 years ago. However, the field has also faced criticism regarding its theory and measurement, its focusing on the individual and western culture, and its isolation from mainstream psychology. Scholars have recognized the need for PP to evolve and have provided their ideas for improving it.introduced a range of technologies, including big-data methods, psychopharmacology, non-invasive brain stimulation, and virtual reality (VR), to enhance the capability of PP in more effectively measuring wellbeing and intervening to improve it.proposed systems informed positive psychology, which integrates principles and concepts from systems sciences, to facilitate the evolution of PP as a field that promotes both individual and collective wellbeing.identified the present stage of PP as the third wave that seeks to improve the complexity in research scope and methodologies of PP.further describes the third wave of PP as the beginning of a new domain of inter-or transdisciplinary wellbeing studies.        </p>
+        <p>
+          <ref type="bibr" target="#b79">(Sametoglu et al., 2023;</ref>
+          <ref type="bibr" target="#b82">Schwartz et al., 2015;</ref>
+          <ref type="bibr" target="#b105">Yaden et al., 2018)</ref>
+          <ref type="bibr" target="#b26">(Gaggioli et al., 2019;</ref>
+          <ref type="bibr" target="#b31">Grossi et al., 2020;</ref>
+          <ref type="bibr" target="#b73">Riva et al., 2020)</ref>
+Recent explosive growth in computational science and technology (CST) has accelerated the evolvement of PP. By enabling researchers to collect large-scale data from diverse sources such as social media and analyze them using machine learning methods, CST has facilitated an increased understanding of the complexity of wellbeing and the growing accessibility and flexibility of strategies that aid its enhancement. We propose the formalization and development of this emerging field as computational positive psychology (CPP), which integrates PP with principles, methods, and tools derived from CST to advance the understanding of wellbeing and foster evidence-based strategies for sustainable human flourishing in the digital age. CPP goes beyond merely applying computational models in PP for measuring wellbeing through the analysis of social media data. Meanwhile, it is diverges from positive technology and computing, a field that integrates the principles of PP into the human -computer interactive design to promote mental health and wellbeing. We conceive of CPP as a novel approach that foresters the advancement of PP theory, methodologies, and practices through a synergistic collaboration between PP and CST, and thereby contributes to the broader field of wellbeing science.        </p>
+        <p>This paper begins with a contextual background for understanding the primary focus of CPP in advancing the field of PP and wellbeing science. We present our viewpoint on the challenges faced by PP and clarify the scope and role of CST in relation to CPP. Subsequently, we present an overview of CPP, delineating its key features and advancements compared to the traditional approach to PP. Furthermore, we review existing literature that has employed computational approaches to investigate PP and wellbeing, which serves as early exemplars of CPP. Finally, the potential future directions for CPP research and practice are discussed.</p>
+      </div>
+      <div xmlns="http://www.tei-c.org/ns/1.0">
+        <head>Background</head>
+      </div>
+      <div xmlns="http://www.tei-c.org/ns/1.0">
+        <head>The challenges of positive psychology</head>
+        <p>
+          <ref type="bibr" target="#b77">(Rusk &amp; Waters, 2013)</ref>
+          <ref type="bibr" target="#b50">Lambert et al., 2015)</ref>
+          <ref type="bibr" target="#b53">Linton et al., 2016)</ref>
+          <ref type="bibr" target="#b19">Diener et al., 2018)</ref>
+          <ref type="bibr" target="#b97">Agteren et al., 2021)</ref>
+Wellbeing is an appealing topic that has attracted the attention of scholars from various disciplines, including philosophy, economics, and psychology. PP is among the fastest-growing and most fruitful of these fields. Researchers in PP have examined such topics as theories, models, and concepts of wellbeing (e.g.; the measurement of wellbeing (e.g.; the antecedents and consequences of wellbeing (e.g., and how to improve wellbeing (e.g. van.        </p>
+        <p>
+          <ref type="bibr" target="#b13">(Christopher &amp; Hickinbottom, 2008)</ref>
+          <ref type="bibr" target="#b57">(Lomas, 2021)</ref>
+          <ref type="bibr" target="#b49">(Lambert et al., 2022)</ref>
+          <ref type="bibr" target="#b90">Smith et al., 2022)</ref>
+Despite making significant contributions, PP faces challenges in addressing the complexities of theory, methods, and practices that arise from an interconnected society in the digital era. The development of smartphones and other portable devices has enabled individuals to stay constantly connected online, where people with diverse backgrounds influence and are influenced by others in the pursuit of happiness, grounded in their value systems. This pervasive connectivity challenges established theories of wellbeing that have predominantly emerged from a Western individualistic context. Wellbeing has diverse meanings for various cultures, groups, and individuals, and its conceptualization carries substantial implications for mental health outcomes. Moreover, wellbeing may vary over time and across domains, even within a single individual. PP necessitates more sophisticated theories to comprehend the complexity of wellbeing experiences. Computational approaches, as we will elaborate further below, may offer novel perspectives and valuable insights into understanding individual and cultural differences in wellbeing (e.g..        </p>
+        <p>
+          <ref type="bibr" target="#b98">(van Zyl et al., 2023)</ref>
+          <ref type="bibr" target="#b104">(Woo et al., 2023)</ref>
+Moreover, the evolving digital landscape poses methodological challenges for PP as individuals increasingly engage with digital devices, generating extensive psychological and behavioral data. This big data approach holds great promise for measuring wellbeing effectively and unobtrusively and understanding dynamic relations between individual and contextual factors. However, typical methods in PP have yet to effectively utilize these data due to a lack of advanced tools for rapidly collecting, storing, and processing the data. Leveraging computational methods to measure wellbeing through multimodal data could address the longstanding criticism of PP&apos;s reliance on subjective self-report measures. In addition, conventional PP methods have limited capacity to account for individual factors, contextual factors, and their interactions. Most existing research in PP adopts a variable-centered approach, which assumes that the variables function similarly across all individuals because they come from a single population. The gold standard randomized controlled trial method attempts to control for the effects of personal or contextual factors to reveal linear causal effects of the independent variable on wellbeing outcomes. Computational methods can analyze the non-linear dynamics among multiple factors, providing insights into the dynamics between individuals and their contexts.        </p>
+        <p>
+          <ref type="bibr" target="#b100">(Waters et al., 2021)</ref>
+          <ref type="bibr" target="#b14">(Ciarrochi et al., 2016;</ref>
+          <ref type="bibr" target="#b46">Kern et al., 2020)</ref>
+          <ref type="bibr" target="#b28">(Goldstone &amp; Janssen, 2005)</ref>
+Regarding practice, PP faces the challenge of expanding its conventional focus on individual wellbeing to encompass collective wellbeing. This challenge becomes particularly significant in light of the COVID-19 pandemic, which has elevated awareness of global interdependence. Addressing collective wellbeing, however, does not mean applying a one-size-fits-all approach. Instead, it adds a layer of complexity, requiring personalized, contextualized, and culturally sensitive strategies. Meeting the practical demands of a large population requires the development of cost-effective tools and personalized interventions applicable across various contexts. Incorporating computational technologies, such as artificial intelligence, for monitoring, intervention, and real-time feedback is an effective way to tailor interventions to individual needs while simultaneously enhancing wellbeing at the group, community, and population levels. Moreover, computational models of collective behavior may be used to advise organizational design or public policy.        </p>
+        <p>Therefore, it is imperative for PP to incorporate computational approaches to navigate the complexities involved in investigating and enhancing wellbeing.</p>
+      </div>
+      <div xmlns="http://www.tei-c.org/ns/1.0">
+        <head>Roles of computational science and technology</head>
+        <p>The CST field encompasses a vast and diverse range of disciplines. In this article, we provide an overview of some relevant areas of CST that are closely aligned with the advancement of PP. By doing so, we aim to provide readers with a comprehensive understanding of the scope of the computational methods and techniques that are commonly employed in CPP today, and those that potentially will be employed in CPP in the future.</p>
+        <p>
+          <ref type="bibr" target="#b86">(Seligman et al., 2005)</ref>
+          <ref type="bibr" target="#b34">(Haeck et al., 2016)</ref>
+          <ref type="bibr" target="#b67">(Parks et al., 2012</ref>
+          <ref type="bibr" target="#b68">(Parks et al., , 2018))</ref>
+          <ref type="bibr" target="#b55">Liu et al., 2020)</ref>
+          <ref type="bibr" target="#b60">(Lyubomirsky &amp; Kurtz, 2013)</ref>
+          <ref type="bibr" target="#b8">(Carissoli et al., 2015)</ref>
+Applying computers in research on PP is not new. Internet technology has been employed to facilitate data collection and the delivery of interventions in the field of psychological research since the dawn of the new millennium. Researchers have encouraged users to participate in empirically-verified PPIs (for example, that are focused on expressing gratitude or reflecting on one&apos;s best self) through websites. As smartphones and mobile computing gained popularity, investigators in the field of PP have begun to exploit mobile devices as conduits for delivering PPIs, analyzing physiological differences associated with various levels of subjective well-being (I., collecting data with the experience sampling methodor designing mobile applications dedicated to fostering meditation practices. However, these early stages primarily focused on the supportive role of computers and cellphones for data collection and intervention delivery and had limited utility to effect changes to underlying theories and methods of PP.        </p>
+        <p>
+          <ref type="bibr" target="#b48">(Kjell et al., 2023;</ref>
+          <ref type="bibr" target="#b80">Sametoğlu et al., 2023;</ref>
+          <ref type="bibr" target="#b81">Schwartz et al., 2013</ref>
+          <ref type="bibr" target="#b82">Schwartz et al., , 2015))</ref>
+          <ref type="bibr" target="#b42">(Jaques et al., 2015)</ref>
+          <ref type="bibr" target="#b51">Lee et al., 2023;</ref>
+          <ref type="bibr" target="#b72">Redwine et al., 2016;</ref>
+          <ref type="bibr" target="#b87">Servia-Rodríguez et al., 2017)</ref>
+Around 2010, the rise of social media platforms and big data catalyzed research into online language and behavioral data. Researchers employed computational methods such as machine learning (ML), natural language processing (NLP), social network analysis (SNA), to investigate wellbeing on a larger scale. This led to significant methodological advancements in PP. For example, Schwartz et al. used language from social media to forecast happiness levels, providing an unobtrusive measurement tool for wellbeing and other psychological variables. In addition to language analysis, machine learning has further empowered researchers to analyze emotions using diverse information sources. Multimodal emotion recognition technology can automatically evaluate and synthesize data collected from facial expressions, voice, gesture, eye movement, thermal imaging, and physiological signals, enabling continuous monitoring of an individual&apos;s wellbeing. In wellbeing research, the widespread use of wearable devices has also facilitated the efficient collection of physiological indicators, including heart rate and blood pressure, during individuals&apos; daily routines (e.g..        </p>
+        <p>
+          <ref type="bibr" target="#b6">(Beutler et al., 1991)</ref>
+          <ref type="bibr" target="#b83">(Seligman, 2012)</ref>
+          <ref type="bibr" target="#b36">(Heintzelman et al., 2023;</ref>
+          <ref type="bibr" target="#b71">Proyer et al., 2015)</ref>
+          <ref type="bibr" target="#b30">Greer et al., 2019;</ref>
+          <ref type="bibr" target="#b44">Jeong &amp; Breazeal, 2017)</ref>
+          <ref type="bibr" target="#b99">(Wang et al., 2022)</ref>
+          <ref type="bibr" target="#b4">(Baños et al., 2014)</ref>
+          <ref type="bibr" target="#b5">(Bell et al., 2020)</ref>
+          <ref type="bibr" target="#b54">Liu et al., 2024)</ref>
+          <ref type="bibr" target="#b18">(Demszky et al., 2023)</ref>
+          <ref type="figure" target="#fig_0">1</ref>
+In recent years, the rapid development of CST has opened up the potential for fundamental theoretical changes and even paradigm shifts in PP and wellbeing research. Traditional psychological research has often focused on average effects, with less attention being given to individual differences. However, researchers have long advocated for a greater emphasis on matching individuals with appropriate psychological treatments. In PP research, where the conception of happiness varies greatly among individuals, a personalized approach is necessaryand studies have shown that providing personalized positive psychology exercise recommendations through recommendation systems can effectively enhance the effectiveness of psychological interventions. Technological advances have facilitated the development of innovative tools, including recommendation systems and chatbots, for personalized wellbeing interventions (e.g.. Another area of advancement includes VR, augmented reality (AR) and the metaverse. Despite VR being used in psychological interventions for a decade, recent advancements in sensors, machine learning algorithms, and game design have significantly enhanced the applicability of VR/AR in PP and wellbeing research. VR/AR helps increase the ecological validity of highly controlled environments, enhance personalization and engagement, and automatically track multimodal datasuch as participants&apos; movements and heart ratethroughout the ongoing research process. These advantages enable VR/AR to serve as intervention tools and to facilitate assessment and research within the realm of CPP. Furthermore, recent advancements in large language models (LLMs) and artificial intelligence (AI) have significantly enhanced the data collection, analysis, and conversation generation capabilities of computers. PPIs enhanced by LLM-based chatbots have shown to effectively improve wellbeing (I.. Looking ahead, the collaboration between PP and CST holds great promise for transformative changes in the scientific study of wellbeingIn Figure, we provide an illustrative overview of the development of CST and its relationship with PP. Despite the substantial developments in CST over the past two decades and their contributions to PP, until recently, they have been used separately as instruments to measure psychological variables; there has limited integration or collaborating between these fields and PP to advance theoretical understanding or promote paradigm shifts. However, we are currently at the forefront of collaboration between the third wave of PP and the development of CST, and this has the potential to bring about transformative changes in the scientific study of wellbeing.        </p>
+      </div>
+    </body>
+    <back>
+      <div>
+        <listBibl>
+          <biblStruct status="extracted" xml:id="b0">
+            <analytic>
+              <title level="a" type="main">Using wellbeing for public policy: Theory, measurement, and recommendations</title>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Adler</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">M</forename>
+                  <forename type="middle">E P</forename>
+                  <surname>Seligman</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.5502/ijw.v6i1.429</idno>
+              <ptr target="https://doi.org/10.5502/ijw.v6i1.429"/>
+            </analytic>
+            <monogr>
+              <title level="j">International Journal of Wellbeing</title>
+              <imprint>
+                <biblScope unit="volume">6</biblScope>
+                <biblScope unit="issue">1</biblScope>
+                <biblScope unit="page" from="1" to="35"/>
+                <date type="published" when="2016">2016</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b1">
+            <analytic>
+              <title level="a" type="main">Scoping review on the multimodal classification of depression and experimental study on existing multimodal models</title>
+              <author>
+                <persName>
+                  <forename type="first">U</forename>
+                  <surname>Arioz</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">U</forename>
+                  <surname>Smrke</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">N</forename>
+                  <surname>Plohl</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">I</forename>
+                  <surname>Mlakar</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.3390/diagnostics12112683</idno>
+              <ptr target="https://doi.org/10.3390/diagnostics"/>
+            </analytic>
+            <monogr>
+              <title level="j">Diagnostics</title>
+              <imprint>
+                <biblScope unit="volume">12</biblScope>
+                <biblScope unit="issue">11</biblScope>
+                <biblScope unit="page">12112683</biblScope>
+                <date type="published" when="2022">2022</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b2">
+            <analytic>
+              <title level="a" type="main">Agent-based simulations of subjective well-being</title>
+              <author>
+                <persName>
+                  <forename type="first">J</forename>
+                  <forename type="middle">A</forename>
+                  <surname>Baggio</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">E</forename>
+                  <surname>Papyrakis</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1007/s11205-012-0231-5</idno>
+              <ptr target="https://doi.org/10.1007/s11205-012-0231-5"/>
+            </analytic>
+            <monogr>
+              <title level="j">Social Indicators Research</title>
+              <imprint>
+                <biblScope unit="volume">115</biblScope>
+                <biblScope unit="issue">2</biblScope>
+                <biblScope unit="page" from="623" to="635"/>
+                <date type="published" when="2013">2013</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b3">
+            <analytic>
+              <title level="a" type="main">A positive psychological intervention using virtual reality for patients with advanced cancer in a hospital setting: A pilot study to assess feasibility</title>
+              <author>
+                <persName>
+                  <forename type="first">R</forename>
+                  <forename type="middle">M</forename>
+                  <surname>Baños</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">M</forename>
+                  <surname>Espinoza</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Garcia-Palacios</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">J</forename>
+                  <forename type="middle">M</forename>
+                  <surname>Cervera</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">G</forename>
+                  <surname>Esquerdo</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">E</forename>
+                  <surname>Barrajon</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">C</forename>
+                  <surname>Botella</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1007/s00520-012-1520-x</idno>
+              <ptr target="https://doi.org/10.1007/s00520-012-1520-x"/>
+            </analytic>
+            <monogr>
+              <title level="j">Supportive Care in Cancer: Official Journal of the Multinational Association of Supportive Care in Cancer</title>
+              <imprint>
+                <biblScope unit="volume">21</biblScope>
+                <biblScope unit="issue">1</biblScope>
+                <biblScope unit="page" from="263" to="270"/>
+                <date type="published" when="2013-01">2013. January</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b4">
+            <analytic>
+              <title level="a" type="main">EARTH of well-being system: A pilot study of an information and communication technology-based positive psychology intervention</title>
+              <author>
+                <persName>
+                  <forename type="first">R</forename>
+                  <forename type="middle">M</forename>
+                  <surname>Baños</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">E</forename>
+                  <surname>Etchemendy</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">L</forename>
+                  <surname>Farfallini</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>García-Palacios</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">S</forename>
+                  <surname>Quero</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">C</forename>
+                  <surname>Botella</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1080/17439760.2014.927906</idno>
+              <ptr target="https://doi.org/10.1080/17439760.2014.927906"/>
+            </analytic>
+            <monogr>
+              <title level="j">The Journal of Positive Psychology</title>
+              <imprint>
+                <biblScope unit="volume">9</biblScope>
+                <biblScope unit="issue">6</biblScope>
+                <biblScope unit="page" from="482" to="488"/>
+                <date type="published" when="2014">2014</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b5">
+            <analytic>
+              <title level="a" type="main">Virtual reality as a clinical tool in mental health research and practice</title>
+              <author>
+                <persName>
+                  <forename type="first">I</forename>
+                  <forename type="middle">H</forename>
+                  <surname>Bell</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">J</forename>
+                  <surname>Nicholas</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">M</forename>
+                  <surname>Alvarez-Jimenez</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Thompson</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">L</forename>
+                  <surname>Valmaggia</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.31887/DCNS.2020.22.2/lvalmaggia</idno>
+              <ptr target="https://doi.org/10.31887/DCNS.2020.22.2/lvalmaggia"/>
+            </analytic>
+            <monogr>
+              <title level="j">Dialogues in Clinical Neuroscience</title>
+              <imprint>
+                <biblScope unit="volume">22</biblScope>
+                <biblScope unit="issue">2</biblScope>
+                <biblScope unit="page" from="169" to="177"/>
+                <date type="published" when="2020">2020</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b6">
+            <analytic>
+              <title level="a" type="main">Predictors of differential response to cognitive, experiential, and self-directed psychotherapeutic procedures</title>
+              <author>
+                <persName>
+                  <forename type="first">L</forename>
+                  <forename type="middle">E</forename>
+                  <surname>Beutler</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">D</forename>
+                  <surname>Engle</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">D</forename>
+                  <surname>Mohr</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">R</forename>
+                  <forename type="middle">J</forename>
+                  <surname>Daldrup</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">J</forename>
+                  <surname>Bergan</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">K</forename>
+                  <surname>Meredith</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">W</forename>
+                  <surname>Merry</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1037/0022-006X.59.2.333</idno>
+              <ptr target="https://doi.org/10.1037/0022-006X.59.2.333"/>
+            </analytic>
+            <monogr>
+              <title level="j">Journal of Consulting and Clinical Psychology</title>
+              <imprint>
+                <biblScope unit="volume">59</biblScope>
+                <biblScope unit="issue">2</biblScope>
+                <biblScope unit="page" from="333" to="340"/>
+                <date type="published" when="1991">1991</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b7">
+            <analytic>
+              <title level="a" type="main">Agent-based modeling of emotion contagion in groups</title>
+              <author>
+                <persName>
+                  <forename type="first">T</forename>
+                  <surname>Bosse</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">R</forename>
+                  <surname>Duell</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">Z</forename>
+                  <forename type="middle">A</forename>
+                  <surname>Memon</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">J</forename>
+                  <surname>Treur</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">C</forename>
+                  <forename type="middle">N</forename>
+                  <surname>Van Der Wal</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1007/s12559-014-9277-9</idno>
+              <ptr target="https://doi.org/10.1007/s12559-014-9277-9"/>
+            </analytic>
+            <monogr>
+              <title level="j">Cognitive Computation</title>
+              <imprint>
+                <biblScope unit="volume">7</biblScope>
+                <biblScope unit="issue">1</biblScope>
+                <biblScope unit="page" from="111" to="136"/>
+                <date type="published" when="2014">2014</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b8">
+            <analytic>
+              <title level="a" type="main">Does a meditation protocol supported by a mobile application help people reduce stress? Suggestions from a controlled pragmatic trial</title>
+              <author>
+                <persName>
+                  <forename type="first">C</forename>
+                  <surname>Carissoli</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">D</forename>
+                  <surname>Villani</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">G</forename>
+                  <surname>Riva</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1089/cyber.2014.0062</idno>
+              <ptr target="https://doi.org/10.1089/cyber.2014.0062"/>
+            </analytic>
+            <monogr>
+              <title level="j">Cyberpsychology, Behavior, and Social Networking</title>
+              <imprint>
+                <biblScope unit="volume">18</biblScope>
+                <biblScope unit="issue">1</biblScope>
+                <biblScope unit="page" from="46" to="53"/>
+                <date type="published" when="2015">2015</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b9">
+            <analytic>
+              <title level="a" type="main">Effectiveness of positive psychology interventions: A systematic review and meta-analysis</title>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Carr</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">K</forename>
+                  <surname>Cullen</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">C</forename>
+                  <surname>Keeney</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">C</forename>
+                  <surname>Canning</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">O</forename>
+                  <surname>Mooney</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">E</forename>
+                  <surname>Chinseallaigh</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>O&apos;dowd</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1080/17439760.2020.1818807</idno>
+              <ptr target="https://doi.org/10.1080/17439760.2020.1818807"/>
+            </analytic>
+            <monogr>
+              <title level="j">The Journal of Positive Psychology</title>
+              <imprint>
+                <biblScope unit="volume">16</biblScope>
+                <biblScope unit="issue">6</biblScope>
+                <biblScope unit="page" from="749" to="769"/>
+                <date type="published" when="2021">2021</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b10">
+            <analytic>
+              <title level="a" type="main">Measurement of users&apos; well-being through domotic sensors and machine learning algorithms</title>
+              <author>
+                <persName>
+                  <forename type="first">S</forename>
+                  <surname>Casaccia</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">L</forename>
+                  <surname>Romeo</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Calvaresi</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">N</forename>
+                  <surname>Morresi</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Monteriu</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">E</forename>
+                  <surname>Frontoni</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">L</forename>
+                  <surname>Scalise</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">G</forename>
+                  <forename type="middle">M</forename>
+                  <surname>Revel</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1109/JSEN.2020.2981209</idno>
+              <ptr target="https://doi.org/10.1109/JSEN.2020.2981209"/>
+            </analytic>
+            <monogr>
+              <title level="j">IEEE Sensors Journal</title>
+              <imprint>
+                <biblScope unit="volume">20</biblScope>
+                <biblScope unit="issue">14</biblScope>
+                <biblScope unit="page" from="8029" to="8038"/>
+                <date type="published" when="2020">2020</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+          <biblStruct status="extracted" xml:id="b11">
+            <analytic>
+              <title level="a" type="main">Two concepts or two approaches? A bifactor analysis of psychological and subjective well-being</title>
+              <author>
+                <persName>
+                  <forename type="first">F</forename>
+                  <forename type="middle">F</forename>
+                  <surname>Chen</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">Y</forename>
+                  <surname>Jing</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">A</forename>
+                  <surname>Hayes</surname>
+                </persName>
+              </author>
+              <author>
+                <persName>
+                  <forename type="first">J</forename>
+                  <forename type="middle">M</forename>
+                  <surname>Lee</surname>
+                </persName>
+              </author>
+              <idno type="DOI">10.1007/s10902-012-9367-x</idno>
+              <ptr target="https://doi.org/10.1007/s10902-012-9367-x"/>
+            </analytic>
+            <monogr>
+              <title level="j">Journal of Happiness Studies</title>
+              <imprint>
+                <biblScope unit="volume">14</biblScope>
+                <biblScope unit="issue">3</biblScope>
+                <biblScope unit="page" from="1033" to="1068"/>
+                <date type="published" when="2013">2013</date>
+              </imprint>
+            </monogr>
+          </biblStruct>
+        </listBibl>
+      </div>
+    </back>
+  </text>
+</TEI>

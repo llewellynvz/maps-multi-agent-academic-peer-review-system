@@ -1,3 +1,16 @@
+export {
+  type ManuscriptParser,
+  type ManuscriptReference,
+  type ManuscriptSection,
+  manuscriptReferenceSchema,
+  manuscriptSectionSchema,
+  type ParseQuality,
+  parseQualitySchema,
+  parserSchema,
+  type SectionMap,
+  sectionMapSchema,
+} from './section-map';
+
 export type ReviewStatus =
   | 'created'
   | 'queued'

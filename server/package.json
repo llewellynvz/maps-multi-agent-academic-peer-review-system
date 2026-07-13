@@ -19,6 +19,7 @@
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
     "@langfuse/vercel-ai-sdk": "5.9.1",
+    "@mara/shared": "workspace:*",
     "@mastra/core": "1.50.1",
     "@mastra/libsql": "1.15.1",
     "@opentelemetry/api": "1.9.0",
@@ -29,7 +30,10 @@
     "ai": "7.0.22",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
+    "fast-xml-parser": "^5.2.5",
+    "mammoth": "^1.11.0",
     "ollama-ai-provider-v2": "4.0.1",
+    "unpdf": "^1.4.0",
     "zod": "3.25.76"
   },
   "devDependencies": {
