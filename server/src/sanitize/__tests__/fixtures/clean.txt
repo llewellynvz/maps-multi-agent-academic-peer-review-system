@@ -1,0 +1,16 @@
+Flourishing at Work: A Longitudinal Study of Wellbeing Interventions
+
+Abstract
+This study examines whether a brief strengths-based intervention improves employee wellbeing over a twelve-week period. Using a randomised design with 180 participants, we measured flourishing with the PERMA-Profiler at baseline and follow-up.
+
+Introduction
+Positive organisational scholarship has long argued that wellbeing supports performance. We build on this literature by testing a scalable intervention in a field setting.
+
+Methods
+Participants were randomly assigned to an intervention or a waitlist control group. Outcomes were analysed with mixed-effects models and reported with confidence intervals.
+
+Results
+The intervention group reported higher flourishing scores at follow-up than the control group.
+
+Discussion
+The findings suggest that brief strengths interventions can meaningfully support workplace wellbeing, though attrition limits the strength of the conclusions.
