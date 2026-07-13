@@ -11,7 +11,8 @@
     "db:generate": "pnpm --filter server db:generate",
     "db:migrate": "pnpm --filter server db:migrate",
     "exercise:slice-a": "pnpm --filter server exercise:slice-a",
-    "exercise:slice-b": "pnpm --filter server exercise:slice-b"
+    "exercise:slice-b": "pnpm --filter server exercise:slice-b",
+    "exercise:slice-c": "pnpm --filter server exercise:slice-c"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
