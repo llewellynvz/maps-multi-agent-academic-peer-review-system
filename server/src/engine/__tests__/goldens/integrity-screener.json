@@ -1,0 +1,25 @@
+{
+  "cluster": "consistency-and-figures",
+  "checks": [
+    { "rubric": "REV-CON", "outcome": "ran", "missingArtifact": null },
+    { "rubric": "REV-FIG", "outcome": "not-run", "missingArtifact": "raw figure files at publication resolution" }
+  ],
+  "findings": [
+    {
+      "id": "REV-CON-0001",
+      "lens": "REV-CON",
+      "phase": 4,
+      "claim": "A reported mean of 8.40 falls outside the stated 1 to 7 scale range, which the consistency rubric records as an impossible result.",
+      "anchor": "Table 2 / Results, lines 120-180",
+      "epistemic": "Known",
+      "confidence": 0.9,
+      "band": "Yellow",
+      "severity": "major",
+      "fixability": "moderate",
+      "scope": "editor-only",
+      "failureScenario": "An impossible descriptive statistic that reaches print signals a data-handling error the editor should see before a decision.",
+      "leanestFix": "Editor requests the raw data and recomputed descriptive statistics from the authors.",
+      "supersedes": null
+    }
+  ]
+}

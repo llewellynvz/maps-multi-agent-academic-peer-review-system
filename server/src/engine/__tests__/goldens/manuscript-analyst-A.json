@@ -1,0 +1,81 @@
+{
+  "mode": "A",
+  "manuscriptMap": [
+    {
+      "heading": "Abstract",
+      "anchor": "lines 1-8",
+      "statedAim": "Test whether a four-week mindfulness app improves student wellbeing.",
+      "hypotheses": ["The app group reports higher wellbeing than controls at week four."],
+      "designSampleStatement": "Randomised controlled trial of 180 undergraduate students.",
+      "headlineResults": ["The programme raised wellbeing by 0.42 standard deviations relative to control."],
+      "claimedContribution": "First randomised test of this brief app in a student sample."
+    },
+    {
+      "heading": "Results",
+      "anchor": "lines 120-180",
+      "statedAim": null,
+      "hypotheses": [],
+      "designSampleStatement": "Analysed sample of 168 after attrition.",
+      "headlineResults": [
+        "Mean wellbeing in the programme group was 8.40 on the 1 to 7 WEMWBS short scale.",
+        "The between-group difference was statistically significant at p = .03."
+      ],
+      "claimedContribution": null
+    }
+  ],
+  "sectionInventory": [
+    { "section": "Abstract", "status": "present" },
+    { "section": "Introduction", "status": "present" },
+    { "section": "Methods", "status": "present" },
+    { "section": "Results", "status": "present" },
+    { "section": "Discussion", "status": "present" },
+    { "section": "Preregistration", "status": "absent" }
+  ],
+  "metadataDeclarations": {
+    "ethicsApproval": "present",
+    "consent": "present",
+    "funding": "present",
+    "conflictsOfInterest": "present",
+    "dataAvailability": "unclear",
+    "codeAvailability": "absent",
+    "preregistration": "absent",
+    "aiUseDisclosure": "absent"
+  },
+  "figureTableInventory": [
+    {
+      "id": "Table 2",
+      "caption": "Descriptive statistics by condition at week four.",
+      "variableNames": ["wellbeing", "condition"],
+      "sampleSizes": ["84", "84"],
+      "modelLabels": [],
+      "citedInText": true,
+      "mismatch": "numerical-discrepancy",
+      "mismatchSeverity": "major"
+    }
+  ],
+  "ambiguityFindings": [
+    {
+      "type": "scale-ambiguity",
+      "anchor": "lines 120-180",
+      "description": "A reported mean of 8.40 exceeds the stated 1 to 7 scale ceiling, so the scale or the statistic is misreported."
+    }
+  ],
+  "findings": [
+    {
+      "id": "REV-MAP-0001",
+      "lens": "manuscript-map",
+      "phase": 1,
+      "claim": "The Results section reports a programme-group mean of 8.40 on a scale whose stated ceiling is 7.",
+      "anchor": "Table 2 / lines 120-180",
+      "epistemic": "Known",
+      "confidence": 0.9,
+      "band": "Yellow",
+      "severity": "major",
+      "fixability": "moderate",
+      "scope": "both",
+      "failureScenario": "A mean above the scale ceiling means the descriptive statistics cannot be trusted as reported.",
+      "leanestFix": "Recompute the descriptive statistics from the raw responses and reconcile the reported scale range.",
+      "supersedes": null
+    }
+  ]
+}

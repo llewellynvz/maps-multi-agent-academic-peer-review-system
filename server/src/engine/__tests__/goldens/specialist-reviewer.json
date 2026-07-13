@@ -1,0 +1,39 @@
+{
+  "lens": "Statistical",
+  "coreContributionReading": "A randomised test claiming a brief mindfulness app raises student wellbeing.",
+  "findings": [
+    {
+      "id": "REV-STAT-0001",
+      "lens": "statistical",
+      "phase": 3,
+      "claim": "The reported programme-group mean of 8.40 lies outside the declared 1 to 7 WEMWBS scale range, an impossible result.",
+      "anchor": "Table 2 / Results, lines 120-180",
+      "epistemic": "Known",
+      "confidence": 0.9,
+      "band": "Yellow",
+      "severity": "major",
+      "fixability": "moderate",
+      "scope": "both",
+      "failureScenario": "A mean above the scale ceiling means the descriptive statistics and every inference built on them cannot be trusted as printed.",
+      "leanestFix": "Recompute the descriptive statistics from the raw item responses and correct either the scale range or the mean.",
+      "supersedes": null
+    },
+    {
+      "id": "REV-STAT-0002",
+      "lens": "statistical",
+      "phase": 3,
+      "claim": "The significance claim at p = .03 is reported without the test statistic or degrees of freedom, so it cannot be checked.",
+      "anchor": "Results, lines 120-180",
+      "epistemic": "Known",
+      "confidence": 0.8,
+      "band": "Yellow",
+      "severity": "moderate",
+      "fixability": "easy",
+      "scope": "author-facing",
+      "failureScenario": "An unverifiable p-value cannot be screened for consistency against its statistic and degrees of freedom.",
+      "leanestFix": "Report the full test statistic, degrees of freedom, exact p-value, and effect size with its interval.",
+      "supersedes": null
+    }
+  ],
+  "challengeRound": null
+}

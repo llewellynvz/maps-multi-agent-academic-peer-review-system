@@ -1,0 +1,59 @@
+{
+  "mode": "B",
+  "claimEvidenceMatrix": [
+    {
+      "claim": "The mindfulness app improves student wellbeing relative to control.",
+      "claimAnchor": "Abstract, lines 1-8",
+      "evidence": "A between-group difference of 0.42 standard deviations at week four.",
+      "evidenceAnchor": "Results, lines 120-180",
+      "supportLevel": "partial",
+      "material": true,
+      "causal": true
+    },
+    {
+      "claim": "The programme-group mean wellbeing was 8.40 on the WEMWBS short scale.",
+      "claimAnchor": "Results, lines 120-180",
+      "evidence": "Table 2 descriptive statistics.",
+      "evidenceAnchor": "Table 2",
+      "supportLevel": "contradicted",
+      "material": true,
+      "causal": false
+    }
+  ],
+  "peripheralClaims": ["The intervention is low-cost to deliver at scale."],
+  "studyDesign": "randomized-trial",
+  "designConfidence": 0.85,
+  "nearestAlternativeDesign": "cohort",
+  "reportingGuidelines": ["CONSORT"],
+  "reportingChecklist": [
+    { "item": "Randomisation sequence generation", "originStandard": "CONSORT", "status": "partially-present" },
+    { "item": "Participant flow diagram", "originStandard": "CONSORT", "status": "absent" }
+  ],
+  "activationMap": [
+    { "lens": "Novelty (REV-NOV)", "active": true, "rationale": "The paper claims a first randomised test, so novelty must be assessed against nearest work." },
+    { "lens": "Argumentation (REV-ARG)", "active": true, "rationale": "Causal wording appears in the abstract and needs argument auditing." },
+    { "lens": "Theoretical coherence (REV-THEO)", "active": true, "rationale": "The mechanism linking the app to wellbeing is asserted, not modelled." },
+    { "lens": "Methods and design (REV-METH)", "active": true, "rationale": "A trial design requires methods scrutiny." },
+    { "lens": "Practical significance (REV-PRAC)", "active": true, "rationale": "A 0.42 SD effect needs practical framing." },
+    { "lens": "Ethics, equity, and participants (REV-ETH)", "active": true, "rationale": "Human-subjects trial with attrition." },
+    { "lens": "Statistical (REV-STAT)", "active": true, "rationale": "An impossible mean and a significance claim require statistical review." }
+  ],
+  "findings": [
+    {
+      "id": "REV-MAP-0002",
+      "lens": "design-classification",
+      "phase": 1,
+      "claim": "The design is a randomised controlled trial, so CONSORT is the applicable reporting standard.",
+      "anchor": "Methods, lines 60-95",
+      "epistemic": "Inferred",
+      "confidence": 0.85,
+      "band": "Yellow",
+      "severity": "minor",
+      "fixability": "easy",
+      "scope": "author-facing",
+      "failureScenario": "Using the wrong reporting standard would miss trial-specific reporting gaps.",
+      "leanestFix": "Complete the CONSORT checklist and add the participant flow diagram.",
+      "supersedes": null
+    }
+  ]
+}

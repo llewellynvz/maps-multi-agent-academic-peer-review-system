@@ -1,0 +1,32 @@
+{
+  "mode": "A",
+  "bodyMarkdown": "## Brief overview\nThe manuscript reports a randomised test of a brief mindfulness app for student wellbeing. The core contribution rests on a between-group effect that is currently undermined by an impossible descriptive statistic (REV-STAT-0001, REV-CON-0001).\n\n## Developmental feedback\nThe central concern is the reported programme-group mean of 8.40 on a 1 to 7 scale (REV-STAT-0001). Because the consistency screen records the same value as an impossible result (REV-CON-0001), the effect estimate cannot be trusted until the descriptives are recomputed. The significance claim is reported without its test statistic (REV-STAT-0002), and one load-bearing reference could not be located (REV-REF-0001). The effect also sits above the internal benchmark (REV-CTX-0001), and swarm review found the practical framing fragile (REV-SWM-0001). Structurally, the reporting standard is CONSORT and the participant flow diagram is missing (REV-MAP-0001).\n\n## What would change my recommendation\nRecomputing the descriptives from raw data and reconciling REV-STAT-0001 and REV-CON-0001 would move this from major revision toward minor revision.",
+  "provisionalRubric": [
+    { "criterion": 1, "score": 3, "supportingIds": ["REV-MAP-0001"] },
+    { "criterion": 2, "score": 3, "supportingIds": ["REV-CTX-0001"] },
+    { "criterion": 3, "score": 3, "supportingIds": ["REV-MAP-0001"] },
+    { "criterion": 4, "score": 2, "supportingIds": ["REV-STAT-0001", "REV-CON-0001"] },
+    { "criterion": 5, "score": 2, "supportingIds": ["REV-STAT-0001"] },
+    { "criterion": 6, "score": 3, "supportingIds": ["REV-STAT-0002"] },
+    { "criterion": 7, "score": 3, "supportingIds": ["REV-MAP-0001"] },
+    { "criterion": 8, "score": 3, "supportingIds": ["REV-CTX-0001"] },
+    { "criterion": 9, "score": 2, "supportingIds": ["REV-REF-0001"] },
+    { "criterion": 10, "score": 3, "supportingIds": ["REV-SWM-0001"] },
+    { "criterion": 11, "score": 3, "supportingIds": ["REV-MAP-0001"] },
+    { "criterion": 12, "score": 4, "supportingIds": ["REV-MAP-0001"] },
+    { "criterion": 13, "score": 3, "supportingIds": ["REV-CTX-0001"] },
+    { "criterion": 14, "score": 3, "supportingIds": ["REV-STAT-0002"] },
+    { "criterion": 15, "score": 3, "supportingIds": ["REV-SWM-0001"] }
+  ],
+  "provisionalAverage": 2.9,
+  "bottlenecks": [4, 5, 9],
+  "citedFindingIds": [
+    "REV-STAT-0001",
+    "REV-STAT-0002",
+    "REV-CON-0001",
+    "REV-REF-0001",
+    "REV-CTX-0001",
+    "REV-SWM-0001",
+    "REV-MAP-0001"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "mode": "A",
+  "populationSize": 12,
+  "topology": "ring",
+  "recommendationDistribution": [
+    { "recommendation": "accept", "round0Count": 1, "finalCount": 0 },
+    { "recommendation": "minor_revision", "round0Count": 4, "finalCount": 3 },
+    { "recommendation": "major_revision", "round0Count": 5, "finalCount": 7 },
+    { "recommendation": "reject_and_resubmit", "round0Count": 2, "finalCount": 2 },
+    { "recommendation": "reject", "round0Count": 0, "finalCount": 0 }
+  ],
+  "consensusEntropy": 1.38,
+  "decisionStability": 0.75,
+  "stableFindings": [
+    { "findingId": "REV-STAT-0001", "classification": "stable", "roundSupport": [0.83, 0.83, 0.92] }
+  ],
+  "fragileFindings": [
+    { "findingId": "REV-CTX-0001", "classification": "fragile", "roundSupport": [0.75, 0.5, 0.33] }
+  ],
+  "strongestMinorityReport": "A minority held that the impossible mean alone warrants reject-and-resubmit until the raw data are seen, and this position did not weaken under exchange.",
+  "herdingRisk": "moderate",
+  "surfacedFindings": [
+    {
+      "id": "REV-SWM-0001",
+      "lens": "swarm",
+      "phase": 5,
+      "claim": "Support for the practical-significance framing fell sharply once reviewers weighed the impossible mean, marking it a fragile basis for the effect claim.",
+      "anchor": "Discussion, lines 200-230",
+      "epistemic": "Inferred",
+      "confidence": 0.78,
+      "band": "Yellow",
+      "severity": "moderate",
+      "fixability": "moderate",
+      "scope": "editor-only",
+      "failureScenario": "A practical claim resting on a contested statistic collapses if the statistic is corrected downward.",
+      "leanestFix": "Re-derive the effect from corrected descriptives before making any practical-significance claim.",
+      "supersedes": null
+    }
+  ]
+}

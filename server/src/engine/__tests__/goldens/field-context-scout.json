@@ -1,0 +1,45 @@
+{
+  "queryVocabulary": ["brief mindfulness intervention", "student wellbeing", "WEMWBS", "randomised controlled trial effect size"],
+  "retrievalLog": [
+    {
+      "query": "brief mindfulness intervention student wellbeing effect size",
+      "source": "not-performed",
+      "date": "2026-07-13",
+      "resultsReviewed": 0,
+      "resultsIncluded": 0,
+      "rationale": "No web retrieval tool is available in this build, so the comparator search could not be performed. Recorded as not performable rather than invented."
+    }
+  ],
+  "comparators": [
+    {
+      "citation": "Reference [12] in the manuscript reports a comparable brief-intervention effect in a student sample.",
+      "relevance": "Provides an internal benchmark for the reported 0.42 SD effect without external retrieval."
+    }
+  ],
+  "gapMap": "The manuscript positions itself against school-based programmes but does not situate the effect against the broader brief-intervention literature, which the authors can supply.",
+  "biasStatement": "Without external retrieval the comparator base is limited to the manuscript's own references, which may over-represent supportive findings.",
+  "benchmarks": [
+    { "metric": "typical brief-intervention effect", "value": "small (around 0.2 to 0.3 SD)", "source": "manuscript reference [12]", "tension": "The reported 0.42 SD is larger than the internal benchmark and warrants scrutiny." }
+  ],
+  "sourceAvailability": [
+    { "url": "https://osf.io/example-preregistration", "dateAccessed": "2026-07-13", "summary": "Preregistration link cited in the manuscript could not be verified in this build.", "stability": "fragile", "broken": false }
+  ],
+  "findings": [
+    {
+      "id": "REV-CTX-0001",
+      "lens": "field-context",
+      "phase": 2,
+      "claim": "The reported effect exceeds the manuscript's own internal benchmark for brief interventions.",
+      "anchor": "Discussion, lines 200-230",
+      "epistemic": "Inferred",
+      "confidence": 0.75,
+      "band": "Yellow",
+      "severity": "moderate",
+      "fixability": "moderate",
+      "scope": "author-facing",
+      "failureScenario": "An unexplained above-benchmark effect can signal an analysis or measurement artefact rather than a real gain.",
+      "leanestFix": "Situate the 0.42 SD effect against comparable brief-intervention studies and discuss why it is larger.",
+      "supersedes": null
+    }
+  ]
+}

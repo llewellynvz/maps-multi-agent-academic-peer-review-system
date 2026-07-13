@@ -1,0 +1,42 @@
+{
+  "samplingStrategy": "Verified the first twenty references carrying enough metadata against the verification client, then judged claim support for each.",
+  "totalCoverage": 0.6,
+  "verifications": [
+    {
+      "referenceIndex": 3,
+      "citation": "Seligman, M. E. P. (2011). Flourish. Free Press.",
+      "toolsChecked": ["crossref", "openalex"],
+      "classification": "confirmed",
+      "supportNote": "The client verified existence and the reference supports the cited wellbeing-framework claim."
+    },
+    {
+      "referenceIndex": 17,
+      "citation": "Vandenberg, R. (2023). A brief app trial that raised wellbeing by two points. Journal of Imaginary Studies.",
+      "toolsChecked": ["crossref", "openalex", "semantic_scholar"],
+      "classification": "possible-fabrication",
+      "supportNote": "The verification client returned not_found across all three backends, so existence is unconfirmed and this is routed as an editor-only signal."
+    }
+  ],
+  "weakSourceFlags": [
+    { "referenceIndex": 9, "reason": "Non-peer-reviewed blog post used to support an empirical claim.", "strongerAlternative": "Cite a peer-reviewed trial for the same effect." }
+  ],
+  "hygieneFindings": ["Two references are missing DOIs.", "Reference [17] has an inconsistent journal name."],
+  "findings": [
+    {
+      "id": "REV-REF-0001",
+      "lens": "citation-audit",
+      "phase": 2,
+      "claim": "Reference [17] could not be located by the verification client across Crossref, OpenAlex, or Semantic Scholar.",
+      "anchor": "Reference list, entry 17",
+      "epistemic": "Known",
+      "confidence": 0.9,
+      "band": "Yellow",
+      "severity": "major",
+      "fixability": "moderate",
+      "scope": "editor-only",
+      "failureScenario": "A load-bearing citation that cannot be located undermines the empirical claim it supports.",
+      "leanestFix": "Provide a resolvable DOI or replace the reference with a verifiable source.",
+      "supersedes": null
+    }
+  ]
+}
