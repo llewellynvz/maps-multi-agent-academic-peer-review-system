@@ -1,0 +1,14 @@
+{
+  "name": "review-final-critic",
+  "promptVersion": "1.0.0",
+  "phase": [7],
+  "role": "frontier",
+  "knowledge": [
+    "01_REVIEW_GOVERNANCE.md",
+    "02_REVIEW_LENSES.md",
+    "03_REVIEW_DECISION.md",
+    "04_DEVELOPMENTAL_VOICE.md",
+    "05_REVIEW_TEMPLATES.md",
+    "06_WRITING_CRAFT.md"
+  ]
+}

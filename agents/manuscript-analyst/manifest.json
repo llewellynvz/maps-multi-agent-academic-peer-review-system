@@ -1,0 +1,8 @@
+{
+  "name": "manuscript-analyst",
+  "promptVersion": "1.0.0",
+  "phase": [1],
+  "role": { "A": "cheap", "B": "frontier" },
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md", "05_REVIEW_TEMPLATES.md"],
+  "modes": ["A", "B"]
+}

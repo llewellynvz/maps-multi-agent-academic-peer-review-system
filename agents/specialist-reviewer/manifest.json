@@ -1,0 +1,20 @@
+{
+  "name": "specialist-reviewer",
+  "promptVersion": "1.0.0",
+  "phase": [3],
+  "role": "frontier",
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md", "05_REVIEW_TEMPLATES.md"],
+  "lenses": [
+    "REV-NOV",
+    "REV-ARG",
+    "REV-THEO",
+    "REV-METH",
+    "REV-STAT",
+    "REV-MEAS",
+    "REV-QUAL",
+    "REV-MIX",
+    "REV-CAUS",
+    "REV-PRAC",
+    "REV-ETH"
+  ]
+}
