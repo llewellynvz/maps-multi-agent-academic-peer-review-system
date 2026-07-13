@@ -78,11 +78,12 @@ function quarantineSpans(text: string, items: QuarantineItem[]): string {
 }
 
 export function scrubText(text: string, quarantineLog: QuarantineItem[]): string {
+  const items = quarantineLog
+    .filter((item) => item.tier >= 2 && item.matchText.length > 0 && !item.matchText.includes('QUARANTINED'))
+    .sort((a, b) => b.matchText.length - a.matchText.length);
   let result = text;
-  for (const item of quarantineLog) {
-    if (item.tier >= 2 && item.matchText.length > 0) {
-      result = result.split(item.matchText).join(`[[QUARANTINED:${item.id}]]`);
-    }
+  for (const item of items) {
+    result = result.split(item.matchText).join(`[[QUARANTINED:${item.id}]]`);
   }
   return result;
 }
@@ -93,7 +94,7 @@ export function scrubSectionMap(map: SectionMap, quarantineLog: QuarantineItem[]
     title: map.title !== null ? scrubText(map.title, quarantineLog) : null,
     abstract: map.abstract !== null ? scrubText(map.abstract, quarantineLog) : null,
     sections: map.sections.map((section) => ({ ...section, text: scrubText(section.text, quarantineLog) })),
-    fullText: scrubText(map.fullText, quarantineLog),
+    fullText: quarantineSpans(map.fullText, quarantineLog),
   };
 }
 
@@ -143,7 +144,7 @@ export async function sanitizeManuscript(options: SanitizeOptions): Promise<Sani
       sequence += 1;
     } else {
       for (const span of verdict.spans) {
-        let start = options.text.indexOf(span.text);
+        let start = span.text.length === 0 ? -1 : options.text.indexOf(span.text);
         if (start < 0) {
           quarantineLog.push({
             id: itemId(sequence),

@@ -27,6 +27,7 @@ export interface ManuscriptRow {
   teiStructurePath: string | null;
   sanitizedText: string | null;
   quarantineTier: number | null;
+  quarantineLogJson: string | null;
 }
 
 export function getManuscript(db: MaraDatabase, reviewId: string): ManuscriptRow | undefined {
@@ -41,6 +42,7 @@ export function getManuscript(db: MaraDatabase, reviewId: string): ManuscriptRow
     teiStructurePath: row.teiStructurePath,
     sanitizedText: row.sanitizedText,
     quarantineTier: row.quarantineTier,
+    quarantineLogJson: row.quarantineLogJson,
   };
 }
 

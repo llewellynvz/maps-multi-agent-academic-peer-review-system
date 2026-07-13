@@ -1,13 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { Mastra } from '@mastra/core';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { LibSQLStore } from '@mastra/libsql';
 import { z } from 'zod';
-import { sectionMapSchema } from '@mara/shared';
+import { type SectionMap, sectionMapSchema } from '@mara/shared';
 import type { MaraDatabase } from '../db/client';
 import { grobidExtractor, type GrobidClient, type IngestDeps, ingestManuscript, kindFromMime } from '../ingest';
 import type { DispatchRunner } from '../providers';
-import { scrubSectionMap } from '../sanitize';
+import { type QuarantineItem, scrubSectionMap } from '../sanitize';
 import { clarifyingQuestionSchema, liteParse } from './lite-parse';
 import {
   getCheckpoint,
@@ -21,7 +21,7 @@ import {
   upsertCheckpoint,
 } from './repo';
 import { sanitizePhase } from './sanitize-phase';
-import { readManuscriptBlobText, resolveRepoPath, sha256Hex, writeManuscriptBlob } from './storage';
+import { manuscriptBlobPath, readManuscriptBlobText, resolveRepoPath, sha256Hex, writeManuscriptBlob } from './storage';
 
 export interface IngestWorkflowDeps {
   db: MaraDatabase;
@@ -56,6 +56,21 @@ const LITE_PARSE_BLOB = 'parse/lite-parse.json';
 
 export function createIngestWorkflow(deps: IngestWorkflowDeps) {
   const { db } = deps;
+
+  const loadSanitizedSectionMap = (reviewId: string): SectionMap => {
+    if (existsSync(manuscriptBlobPath(reviewId, SANITIZED_SECTION_MAP_BLOB))) {
+      return sectionMapSchema.parse(JSON.parse(readManuscriptBlobText(reviewId, SANITIZED_SECTION_MAP_BLOB)));
+    }
+    const rawMap = sectionMapSchema.parse(JSON.parse(readManuscriptBlobText(reviewId, SECTION_MAP_BLOB)));
+    const manuscript = getManuscript(db, reviewId);
+    const quarantineLog =
+      manuscript?.quarantineLogJson !== null && manuscript?.quarantineLogJson !== undefined
+        ? (JSON.parse(manuscript.quarantineLogJson) as QuarantineItem[])
+        : [];
+    const sanitizedMap = scrubSectionMap(rawMap, quarantineLog);
+    writeManuscriptBlob(reviewId, SANITIZED_SECTION_MAP_BLOB, JSON.stringify(sanitizedMap));
+    return sanitizedMap;
+  };
 
   const uploadIngest = createStep({
     id: 'upload-ingest',
@@ -180,9 +195,7 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
         return liteParseOutputSchema.parse(done.snapshot);
       }
 
-      const sectionMap = sectionMapSchema.parse(
-        JSON.parse(readManuscriptBlobText(inputData.reviewId, SANITIZED_SECTION_MAP_BLOB)),
-      );
+      const sectionMap = loadSanitizedSectionMap(inputData.reviewId);
       const options = getReviewOptions(db, inputData.reviewId);
       const presetDefault = typeof options.preset === 'string' ? options.preset : deps.presetDefault;
       const journalProvided = typeof options.journal === 'string' && options.journal.length > 0;

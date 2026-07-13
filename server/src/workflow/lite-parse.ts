@@ -68,14 +68,7 @@ export async function liteParse(options: LiteParseOptions): Promise<LiteParseRes
     hasAbstract: sectionMap.abstract !== null && sectionMap.abstract.length > 0,
   };
 
-  const excerpt = [
-    sectionMap.title ?? '',
-    sectionMap.abstract ?? '',
-    sectionMap.sections[0]?.text ?? '',
-  ]
-    .filter((part) => part.length > 0)
-    .join('\n\n')
-    .slice(0, 6000);
+  const excerpt = sectionMap.fullText.slice(0, 6000);
 
   const dispatchResult = await options.runDispatch({
     reviewId: options.reviewId,

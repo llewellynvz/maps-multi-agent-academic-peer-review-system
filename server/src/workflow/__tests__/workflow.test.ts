@@ -172,5 +172,19 @@ describe('ingest workflow', () => {
       sqlite.prepare('SELECT count(*) AS n FROM review_events WHERE review_id = ?').get(reviewId) as { n: number }
     ).n;
     expect(eventsAfterRerun).toBe(eventsAfterComplete);
+
+    rmSync(sanitizedMapPath);
+    sqlite
+      .prepare("DELETE FROM phase_checkpoints WHERE review_id = ? AND phase IN ('lite-parse', 'clarify', 'phase_1')")
+      .run(reviewId);
+    const thirdMastra = buildIngestMastra(deps);
+    const recovered = await startIngest(thirdMastra, {
+      reviewId,
+      filePath: pdfPath,
+      originalFilename: 'sample.pdf',
+      mimeType: 'application/pdf',
+    });
+    expect(recovered.status).toBe('suspended');
+    expect(existsSync(sanitizedMapPath)).toBe(true);
   });
 });
