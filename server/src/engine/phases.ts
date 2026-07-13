@@ -11,12 +11,13 @@ import type {
 } from '@mara/shared';
 import type { CitationClient } from '../citations';
 import type { MaraDatabase } from '../db/client';
-import { getCurrentFindings, mergeFindings } from '../ledger';
+import { getCurrentFindings } from '../ledger';
 import { withPhase } from '../tracing';
 import type { DispatchRunner } from '../providers';
 import { getCheckpoint, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
 import { readArtefact, writeArtefact } from './artefacts';
 import { computeComposite } from './composite';
+import { mergeFindingsOnce } from './merge';
 import {
   loadEngineContext,
   manuscriptDigest,
@@ -33,8 +34,12 @@ export interface EngineDeps {
   citationClient?: CitationClient;
 }
 
+function checkpointKey(phase: string): string {
+  return `engine_${phase}`;
+}
+
 function phaseDone(db: MaraDatabase, reviewId: string, phase: string): boolean {
-  return getCheckpoint(db, reviewId, phase)?.status === 'completed';
+  return getCheckpoint(db, reviewId, checkpointKey(phase))?.status === 'completed';
 }
 
 function enterPhase(db: MaraDatabase, reviewId: string, phase: string): void {
@@ -66,12 +71,13 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
           'Mode A: extract the manuscript map, section inventory, metadata declarations, figure and table inventory, and ambiguity findings. Prefix any findings REV-MAP.',
       },
     });
-    mergeFindings(db, {
+    mergeFindingsOnce(db, {
       reviewId,
       lensPrefix: 'MAP',
       phase: 'phase_1',
       agent: 'manuscript-analyst',
       fragments: analystA.findings,
+      marker: 'p1-analyst-a',
     });
 
     const analystB = await runAgent<ClaimDesignAnalysis>(deps, {
@@ -89,12 +95,13 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
           'Mode B: build the claim-evidence matrix, classify the study design, route the reporting guideline, and produce the specialist activation map with a one-line rationale per lens. Prefix any findings REV-MAP.',
       },
     });
-    mergeFindings(db, {
+    mergeFindingsOnce(db, {
       reviewId,
       lensPrefix: 'MAP',
       phase: 'phase_1',
       agent: 'manuscript-analyst',
       fragments: analystB.findings,
+      marker: 'p1-analyst-b',
     });
 
     insertEvent(db, {
@@ -108,7 +115,7 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
     });
     upsertCheckpoint(db, {
       reviewId,
-      phase: 'phase_1',
+      phase: checkpointKey('phase_1'),
       status: 'completed',
       snapshot: { studyDesign: analystB.studyDesign, activationMap: analystB.activationMap },
     });
@@ -215,19 +222,21 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
 
     const reconciled = citation.verifications.map((verification) => reconcileExistence(verification, clientVerdicts));
 
-    mergeFindings(db, {
+    mergeFindingsOnce(db, {
       reviewId,
       lensPrefix: 'CTX',
       phase: 'phase_2',
       agent: 'field-context-scout',
       fragments: scout.findings,
+      marker: 'p2-context',
     });
-    mergeFindings(db, {
+    mergeFindingsOnce(db, {
       reviewId,
       lensPrefix: 'REF',
       phase: 'phase_2',
       agent: 'citation-auditor',
       fragments: citation.findings,
+      marker: 'p2-citations',
     });
     writeArtefact(reviewId, 'p2-citations', { ...citation, verifications: reconciled, clientVerdicts });
 
@@ -239,7 +248,7 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
     });
     upsertCheckpoint(db, {
       reviewId,
-      phase: 'phase_2',
+      phase: checkpointKey('phase_2'),
       status: 'completed',
       snapshot: { referencesChecked: clientVerdicts.length },
     });
@@ -301,12 +310,13 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
 
     const severitiesByPrefix = new Map<string, string[]>();
     for (const { lens, result } of firstPass) {
-      mergeFindings(db, {
+      mergeFindingsOnce(db, {
         reviewId,
         lensPrefix: lens.prefix,
         phase: 'phase_3',
         agent: 'specialist-reviewer',
         fragments: result.findings,
+        marker: `p3-${lens.prefix}-first`,
       });
       severitiesByPrefix.set(
         lens.prefix,
@@ -357,12 +367,13 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
       const knownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
       const sanitised = sanitiseSupersedes(result.findings, knownIds);
       if (sanitised.length > 0) {
-        mergeFindings(db, {
+        mergeFindingsOnce(db, {
           reviewId,
           lensPrefix: lens.prefix,
           phase: 'phase_3',
           agent: 'specialist-reviewer',
           fragments: sanitised,
+          marker: `p3-${lens.prefix}-challenge`,
         });
       }
       for (const dissent of result.challengeRound?.dissentPreserved ?? []) {
@@ -382,7 +393,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
     });
     upsertCheckpoint(db, {
       reviewId,
-      phase: 'phase_3',
+      phase: checkpointKey('phase_3'),
       status: 'completed',
       snapshot: {
         activeLenses: active.map((lens) => lens.prefix),
@@ -466,12 +477,13 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
         groups.set(prefix, bucket);
       }
       for (const [prefix, fragments] of groups) {
-        mergeFindings(db, {
+        mergeFindingsOnce(db, {
           reviewId,
           lensPrefix: prefix,
           phase: 'phase_4',
           agent: 'integrity-screener',
           fragments,
+          marker: `p4-${cluster.name}-${prefix}`,
         });
       }
     }
@@ -484,7 +496,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
     });
     upsertCheckpoint(db, {
       reviewId,
-      phase: 'phase_4',
+      phase: checkpointKey('phase_4'),
       status: 'completed',
       snapshot: { clusters: INTEGRITY_CLUSTERS.map((cluster) => cluster.name) },
     });
@@ -539,12 +551,13 @@ export async function runPhase5(deps: EngineDeps, reviewId: string): Promise<voi
     const knownIds = new Set(current.map((finding) => finding.id));
     const surfaced = sanitiseSupersedes(swarm.surfacedFindings, knownIds);
     if (surfaced.length > 0) {
-      mergeFindings(db, {
+      mergeFindingsOnce(db, {
         reviewId,
         lensPrefix: 'SWM',
         phase: 'phase_5',
         agent: 'swarm',
         fragments: surfaced,
+        marker: 'p5-swarm',
       });
     }
 
@@ -560,7 +573,7 @@ export async function runPhase5(deps: EngineDeps, reviewId: string): Promise<voi
     });
     upsertCheckpoint(db, {
       reviewId,
-      phase: 'phase_5',
+      phase: checkpointKey('phase_5'),
       status: 'completed',
       snapshot: {
         consensusEntropy: swarm.consensusEntropy,
@@ -657,7 +670,7 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
     });
     upsertCheckpoint(db, {
       reviewId,
-      phase: 'phase_6',
+      phase: checkpointKey('phase_6'),
       status: 'completed',
       snapshot: {
         provisionalAverage: report.provisionalAverage,

@@ -134,6 +134,32 @@ describe('ledger merge', () => {
     expect(current[0]?.severity).toBe('minor');
   });
 
+  it('keeps finding ids globally unique across reviews sharing one findings table', () => {
+    const now = new Date().toISOString();
+    const secondReview = 'review-ledger-test-2';
+    sqlite
+      .prepare('INSERT INTO reviews (id, slug, created_at, updated_at) VALUES (?, ?, ?, ?)')
+      .run(secondReview, secondReview, now, now);
+
+    const first = mergeFindings(db, {
+      reviewId: REVIEW,
+      lensPrefix: 'STAT',
+      phase: 'phase_3',
+      agent: 'specialist-reviewer',
+      fragments: [finding()],
+    });
+    const second = mergeFindings(db, {
+      reviewId: secondReview,
+      lensPrefix: 'STAT',
+      phase: 'phase_3',
+      agent: 'specialist-reviewer',
+      fragments: [finding()],
+    });
+    expect(first.map((f) => f.id)).toEqual(['REV-STAT-0001']);
+    expect(second.map((f) => f.id)).toEqual(['REV-STAT-0002']);
+    expect(getCurrentFindings(db, secondReview).map((f) => f.id)).toEqual(['REV-STAT-0002']);
+  });
+
   it('maps hyphenated enum values to the underscored ledger columns', () => {
     mergeFindings(db, {
       reviewId: REVIEW,

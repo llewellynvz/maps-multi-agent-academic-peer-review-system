@@ -12,6 +12,7 @@ export {
   swarmProfile,
 } from './lenses';
 export { runAgent, type RunAgentDeps, type RunAgentParams } from './dispatch-agent';
+export { mergeFindingsOnce, type MergeOnceInput } from './merge';
 export {
   type EngineDeps,
   runPhase1,

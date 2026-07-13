@@ -56,11 +56,9 @@ function pad(seq: number): string {
   return seq.toString().padStart(4, '0');
 }
 
-function maxSequenceForPrefix(db: MaraDatabase, reviewId: string, prefix: string): number {
+function maxSequenceForPrefix(db: MaraDatabase, prefix: string): number {
   const like = `REV-${prefix}-%`;
-  const rows = db.all(
-    sql`SELECT id FROM findings WHERE review_id = ${reviewId} AND id LIKE ${like}`,
-  ) as Array<{ id: string }>;
+  const rows = db.all(sql`SELECT id FROM findings WHERE id LIKE ${like}`) as Array<{ id: string }>;
   let max = 0;
   for (const row of rows) {
     const match = /-(\d{4,})$/.exec(row.id);
@@ -98,7 +96,7 @@ export function mergeFindings(db: MaraDatabase, input: MergeFindingsInput): Merg
 
   return db.transaction((tx) => {
     const known = existingIds(tx, input.reviewId);
-    let seq = maxSequenceForPrefix(tx, input.reviewId, input.lensPrefix);
+    let seq = maxSequenceForPrefix(tx, input.lensPrefix);
     const merged: MergedFinding[] = [];
     const createdAt = new Date().toISOString();
 
