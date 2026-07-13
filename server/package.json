@@ -8,7 +8,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "exercise:slice-a": "tsx ./scripts/exercise-slice-a.ts"
+    "exercise:slice-a": "tsx ./scripts/exercise-slice-a.ts",
+    "exercise:slice-b": "tsx ./scripts/exercise-slice-b.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.12",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "drizzle-kit": "^0.31.10",
+    "jszip": "^3.10.1",
     "tsx": "^4.23.0",
     "vitest": "^4.1.10"
   }

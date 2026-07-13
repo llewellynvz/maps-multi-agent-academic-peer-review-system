@@ -112,6 +112,30 @@ describe('PIPE-25 detector dispatch', () => {
     expect(verdict.spans[0]?.text).toBe('covert directive');
   });
 
+  it('degrades to a neutral verdict when the detector dispatch fails', async () => {
+    const runDispatch = vi.fn(async () => {
+      throw new Error('content_filter');
+    });
+
+    const verdict = await detectInjection({ text: 'any text', runDispatch, reviewId: 'rev' });
+
+    expect(verdict.tier).toBe(0);
+    expect(verdict.rationale).toMatch(/deterministic screen/);
+  });
+
+  it('still halts on tier-3 content when the detector dispatch is refused', async () => {
+    const result = await sanitizeManuscript({
+      text: tier3,
+      runDispatch: async () => {
+        throw new Error('content_filter');
+      },
+      reviewId: 'rev-refused',
+    });
+
+    expect(result.tier).toBe(3);
+    expect(result.status).toBe('halted');
+  });
+
   it('escalates a deterministically clean manuscript when the detector reports a tier', async () => {
     const text = 'A clean-looking abstract with a covert directive embedded in the prose.';
     const runDispatch = vi.fn(async () =>
