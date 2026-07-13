@@ -41,13 +41,14 @@ describe('quality composite', () => {
       currentFindings: [finding()],
       ledgerIds: new Set(['REV-STAT-0001']),
       citedFindingIds: ['REV-STAT-0001'],
-      bodyMarkdown: 'A clean developmental report that names the validity threat and its leanest fix.',
+      bodyMarkdown: 'Finding REV-STAT-0001 names the validity threat, and its leanest fix is to recompute the descriptives.',
       decisionStability: 1,
     });
     expect(result.components.evidenceGrounding).toBe(1);
     expect(result.components.actionability).toBe(1);
     expect(result.components.unsupportedClaim).toBe(0);
     expect(result.toneRiskHits).toBe(0);
+    expect(result.positiveCeiling).toBeCloseTo(0.9, 6);
     expect(result.composite).toBeCloseTo(0.9, 6);
   });
 
@@ -56,7 +57,7 @@ describe('quality composite', () => {
       currentFindings: [finding()],
       ledgerIds: new Set(['REV-STAT-0001']),
       citedFindingIds: ['REV-STAT-0001'],
-      bodyMarkdown: 'The authors fail to address the confound and the work is poorly written.',
+      bodyMarkdown: 'Per REV-STAT-0001 the authors fail to address the confound and the work is poorly written throughout.',
       decisionStability: 1,
     });
     expect(result.toneRiskHits).toBeGreaterThanOrEqual(1);
@@ -64,16 +65,38 @@ describe('quality composite', () => {
     expect(result.composite).toBeLessThan(0.9);
   });
 
-  it('drops grounding and applies the penalty for a claim with no ledger id', () => {
+  it('keeps the unsupported-claim penalty independent of the grounding rate', () => {
+    const grounded = new Set(['REV-STAT-0001']);
+    const citesEveryClaim = computeComposite({
+      currentFindings: [finding()],
+      ledgerIds: grounded,
+      citedFindingIds: ['REV-STAT-0001'],
+      bodyMarkdown: 'The central concern is captured by REV-STAT-0001 and its recomputation fix resolves the threat.',
+      decisionStability: 1,
+    });
+    const uncitedProse = computeComposite({
+      currentFindings: [finding()],
+      ledgerIds: grounded,
+      citedFindingIds: ['REV-STAT-0001'],
+      bodyMarkdown:
+        'The manuscript reports a strong effect on wellbeing that the discussion treats as decisive across the board.',
+      decisionStability: 1,
+    });
+    expect(citesEveryClaim.components.evidenceGrounding).toBe(1);
+    expect(uncitedProse.components.evidenceGrounding).toBe(1);
+    expect(citesEveryClaim.components.unsupportedClaim).toBe(0);
+    expect(uncitedProse.components.unsupportedClaim).toBeGreaterThan(0);
+  });
+
+  it('drops the grounding rate when a cited id is not in the ledger', () => {
     const result = computeComposite({
       currentFindings: [finding()],
       ledgerIds: new Set(['REV-STAT-0001']),
       citedFindingIds: ['REV-STAT-0001', 'REV-GHOST-0001'],
-      bodyMarkdown: 'A report citing a ghost id.',
+      bodyMarkdown: 'A report citing REV-STAT-0001 and a ghost id.',
       decisionStability: 0.5,
     });
     expect(result.components.evidenceGrounding).toBeCloseTo(0.5, 6);
-    expect(result.components.unsupportedClaim).toBeCloseTo(0.5, 6);
   });
 
   it('loads the banned phrasing list from knowledge/04', () => {

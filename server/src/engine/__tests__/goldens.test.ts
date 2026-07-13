@@ -178,4 +178,21 @@ describe('AGENT-30 golden fixtures', () => {
       expect(bound.has(agent)).toBe(true);
     }
   });
+
+  it('binds a golden fixture to every mode the phase 1-6 engine dispatches', () => {
+    const boundModes = new Set(bindings.map((binding) => `${binding.agent}:${binding.mode ?? 'default'}`));
+    const engineConsumed = [
+      'manuscript-analyst:A',
+      'manuscript-analyst:B',
+      'field-context-scout:default',
+      'citation-auditor:default',
+      'specialist-reviewer:default',
+      'integrity-screener:default',
+      'swarm:A',
+      'review-report-writer:A',
+    ];
+    for (const pair of engineConsumed) {
+      expect(boundModes.has(pair)).toBe(true);
+    }
+  });
 });

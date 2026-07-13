@@ -44,6 +44,23 @@ function clamp01(value: number): number {
   return value;
 }
 
+const FINDING_ID_TOKEN = /REV-[A-Z]{3,4}-\d{4}/;
+
+function countUncitedClaims(body: string): { total: number; uncited: number } {
+  const sentences = body
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length >= 40 && !sentence.startsWith('#'));
+  let uncited = 0;
+  for (const sentence of sentences) {
+    if (!FINDING_ID_TOKEN.test(sentence)) {
+      uncited += 1;
+    }
+  }
+  return { total: sentences.length, uncited };
+}
+
 export interface CompositeInput {
   currentFindings: CurrentFinding[];
   ledgerIds: Set<string>;
@@ -55,6 +72,7 @@ export interface CompositeInput {
 export interface CompositeResult {
   weights: typeof COMPOSITE_WEIGHTS;
   weightsSum: number;
+  positiveCeiling: number;
   components: {
     evidenceGrounding: number;
     actionability: number;
@@ -88,8 +106,8 @@ export function computeComposite(input: CompositeInput): CompositeResult {
   }
   const toneRisk = 1 - Math.min(1, toneRiskHits / TONE_RISK_CAP);
 
-  const unsupportedCount = cited.filter((id) => !input.ledgerIds.has(id)).length;
-  const unsupportedClaim = cited.length === 0 ? 0 : Math.min(1, unsupportedCount / cited.length);
+  const claims = countUncitedClaims(input.bodyMarkdown);
+  const unsupportedClaim = claims.total === 0 ? 0 : Math.min(1, claims.uncited / claims.total);
 
   const composite = clamp01(
     COMPOSITE_WEIGHTS.evidenceGrounding * evidenceGrounding +
@@ -106,9 +124,16 @@ export function computeComposite(input: CompositeInput): CompositeResult {
     COMPOSITE_WEIGHTS.toneRisk +
     COMPOSITE_WEIGHTS.unsupportedClaim;
 
+  const positiveCeiling =
+    COMPOSITE_WEIGHTS.evidenceGrounding +
+    COMPOSITE_WEIGHTS.actionability +
+    COMPOSITE_WEIGHTS.decisionStability +
+    COMPOSITE_WEIGHTS.toneRisk;
+
   return {
     weights: COMPOSITE_WEIGHTS,
     weightsSum,
+    positiveCeiling,
     components: { evidenceGrounding, actionability, decisionStability, toneRisk, unsupportedClaim },
     toneRiskHits,
     composite,

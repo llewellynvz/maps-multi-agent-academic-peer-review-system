@@ -20,6 +20,11 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const OUTPUT_DISCIPLINE =
+  'Output discipline: return one object that satisfies the response schema exactly. Use the exact enum spellings the schema lists for severity, fixability, scope, band, and epistemic status. Set each finding band from its numeric confidence exactly as the governance module confidence-band rule requires; a band inconsistent with its confidence is rejected and wastes a retry. Every finding needs a non-empty manuscript anchor.';
+
+const MAX_ATTEMPTS = 3;
+
 export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgentParams): Promise<T> {
   const schema = schemaFor(params.agent, params.mode);
 
@@ -27,19 +32,30 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
     const cached = readArtefact(params.reviewId, params.artefactName);
     const parsed = schema.safeParse(cached);
     if (parsed.success) {
+      let contractSatisfied = true;
       if (params.validate !== undefined) {
-        params.validate(parsed.data);
+        try {
+          params.validate(parsed.data);
+        } catch {
+          contractSatisfied = false;
+        }
       }
-      return parsed.data as T;
+      if (contractSatisfied) {
+        return parsed.data as T;
+      }
     }
   }
 
   const manifest = readManifest(params.agent);
   const role = roleFor(manifest, params.mode);
-  let input = params.assembleInput;
+  const baseNote = params.assembleInput.routingNote ?? '';
+  let input: AssembleInput = {
+    ...params.assembleInput,
+    routingNote: baseNote.length > 0 ? `${baseNote}\n${OUTPUT_DISCIPLINE}` : OUTPUT_DISCIPLINE,
+  };
   let lastError: unknown;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const { system, user } = assemble(params.agent, input);
     try {
       const result = await deps.runDispatch({

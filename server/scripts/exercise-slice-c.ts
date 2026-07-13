@@ -226,11 +226,15 @@ async function main(): Promise<void> {
   const challengeLenses = Array.isArray(phase3?.challengeLenses) ? (phase3?.challengeLenses as string[]) : [];
   let blindThenChallenged = 0;
   for (const prefix of challengeLenses) {
-    if (artefactExists(reviewId, `p3-${prefix}-first`) && artefactExists(reviewId, `p3-${prefix}-challenge`)) {
+    if (!artefactExists(reviewId, `p3-${prefix}-first`) || !artefactExists(reviewId, `p3-${prefix}-challenge`)) {
+      continue;
+    }
+    const firstPass = readArtefact<{ challengeRound: unknown }>(reviewId, `p3-${prefix}-first`);
+    if (firstPass.challengeRound === null) {
       blindThenChallenged += 1;
     }
   }
-  check('phase3.blindThenChallenge', blindThenChallenged >= 2, `${blindThenChallenged} lenses ran blind then challenged`);
+  check('phase3.blindThenChallenge', blindThenChallenged >= 2, `${blindThenChallenged} lenses ran a blind first pass then a challenge round`);
 
   const rubricCount = (
     sqlite.prepare('SELECT count(*) AS n FROM rubric_scores WHERE review_id = ?').get(reviewId) as { n: number }
@@ -255,10 +259,14 @@ async function main(): Promise<void> {
       composite.weights.toneRisk +
       composite.weights.unsupportedClaim;
     compositeValue = composite.composite.toFixed(3);
+    const inRange =
+      Number.isFinite(composite.composite) &&
+      composite.composite >= -0.1 &&
+      composite.composite <= composite.positiveCeiling + 1e-9;
     check(
       'composite.present',
-      Math.abs(weightsSum - 1) < 1e-9 && typeof composite.composite === 'number',
-      `composite ${compositeValue}, weights sum ${weightsSum.toFixed(2)}`,
+      Math.abs(weightsSum - 1) < 1e-9 && inRange,
+      `composite ${compositeValue} (ceiling ${composite.positiveCeiling.toFixed(2)}), weights sum ${weightsSum.toFixed(2)}`,
     );
   } else {
     check('composite.present', false, 'p6-quality-composite artefact missing');
@@ -268,7 +276,11 @@ async function main(): Promise<void> {
     const report = readArtefact<{ citedFindingIds: string[] }>(reviewId, 'p6-report');
     const ledgerIds = new Set(findings.map((finding) => finding.id));
     const unresolved = report.citedFindingIds.filter((id) => !ledgerIds.has(id));
-    check('report.grounded', unresolved.length === 0, `${unresolved.length} cited ids not in the ledger`);
+    check(
+      'report.grounded',
+      report.citedFindingIds.length > 0 && unresolved.length === 0,
+      `${report.citedFindingIds.length} cited ids, ${unresolved.length} not in the ledger`,
+    );
   } else {
     check('report.grounded', false, 'p6-report artefact missing');
   }
