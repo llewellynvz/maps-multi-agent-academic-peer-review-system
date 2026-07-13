@@ -34,7 +34,7 @@ export const findingStabilitySchema = z.object({
 
 export const swarmEvaluationSchema = z.object({
   mode: z.literal('A'),
-  populationSize: z.number().int().min(24).max(48),
+  populationSize: z.number().int().min(12).max(48),
   topology: z.enum(['ring', 'small-world', 'stratified', 'adversarial']),
   recommendationDistribution: z.array(recommendationDistributionRowSchema),
   consensusEntropy: z.number().min(0),
