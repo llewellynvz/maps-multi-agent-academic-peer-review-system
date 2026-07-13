@@ -1,0 +1,9 @@
+{
+  "mode": "cross-journal-fallback",
+  "completedReviewsForJournal": 3,
+  "journalSpecificThresholdMet": false,
+  "benchmarkComparison": "The major-revision recommendation and the 2.9 rubric average sit within the range of published peer-review and LLM-review benchmarks for brief-intervention trials.",
+  "drift": [
+    { "metric": "rubric-average", "observed": "2.9", "benchmark": "3.1 cross-journal median" }
+  ]
+}

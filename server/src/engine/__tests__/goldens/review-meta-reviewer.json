@@ -1,0 +1,28 @@
+{
+  "rubric": [
+    { "criterion": 1, "score": 3, "supportingIds": ["REV-MAP-0001"], "opposingIds": [] },
+    { "criterion": 2, "score": 3, "supportingIds": ["REV-CTX-0001"], "opposingIds": [] },
+    { "criterion": 3, "score": 3, "supportingIds": ["REV-MAP-0001"], "opposingIds": [] },
+    { "criterion": 4, "score": 2, "supportingIds": ["REV-STAT-0001", "REV-CON-0001"], "opposingIds": [] },
+    { "criterion": 5, "score": 2, "supportingIds": ["REV-STAT-0001"], "opposingIds": ["REV-THEO-0001"] },
+    { "criterion": 6, "score": 3, "supportingIds": ["REV-STAT-0002"], "opposingIds": [] },
+    { "criterion": 7, "score": 3, "supportingIds": ["REV-MAP-0001"], "opposingIds": [] },
+    { "criterion": 8, "score": 3, "supportingIds": ["REV-CTX-0001"], "opposingIds": [] },
+    { "criterion": 9, "score": 2, "supportingIds": ["REV-REF-0001"], "opposingIds": [] },
+    { "criterion": 10, "score": 3, "supportingIds": ["REV-SWM-0001"], "opposingIds": [] },
+    { "criterion": 11, "score": 3, "supportingIds": ["REV-MAP-0001"], "opposingIds": [] },
+    { "criterion": 12, "score": 4, "supportingIds": ["REV-MAP-0001"], "opposingIds": [] },
+    { "criterion": 13, "score": 3, "supportingIds": ["REV-CTX-0001"], "opposingIds": [] },
+    { "criterion": 14, "score": 3, "supportingIds": ["REV-STAT-0002"], "opposingIds": [] },
+    { "criterion": 15, "score": 3, "supportingIds": ["REV-SWM-0001"], "opposingIds": [] }
+  ],
+  "average": 2.9,
+  "bottlenecks": [4, 5, 9],
+  "recommendation": "major_revision",
+  "recommendationConfidence": 0.78,
+  "scopeFit": { "score": 0.72, "factorsUsed": ["topic-fit", "methodological-approach-match"] },
+  "decisionHinges": [
+    { "findingId": "REV-STAT-0001", "hinge": "If the impossible descriptive is not reconciled, the recommendation cannot advance beyond major revision." },
+    { "findingId": "REV-REF-0001", "hinge": "If the unlocated reference is not replaced, the evidence base cannot support the central claim." }
+  ]
+}

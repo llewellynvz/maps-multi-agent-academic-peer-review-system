@@ -1,0 +1,15 @@
+{
+  "evidenceGroundingRate": 0.92,
+  "actionabilityIndex": 0.8,
+  "decisionStability": 0.7,
+  "toneRiskScore": 0.1,
+  "unsupportedClaimCount": 1,
+  "weights": {
+    "evidenceGroundingRate": 0.3,
+    "actionabilityIndex": 0.25,
+    "decisionStability": 0.2,
+    "toneRiskScore": 0.15,
+    "unsupportedClaimPenalty": 0.1
+  },
+  "composite": 0.82
+}

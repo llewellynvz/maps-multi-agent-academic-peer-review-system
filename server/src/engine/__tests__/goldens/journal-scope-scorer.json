@@ -1,0 +1,8 @@
+{
+  "score": 0.72,
+  "factorsUsed": ["topic-fit", "methodological-approach-match", "contribution-type-alignment"],
+  "confidence": 0.55,
+  "scopeTextAvailable": false,
+  "noveltyPenaltyApplied": false,
+  "rationale": "The wellbeing-intervention topic fits the journal aims and the trial design matches its stated methodological preferences. The full scope text was unavailable, so confidence is lowered rather than the score."
+}

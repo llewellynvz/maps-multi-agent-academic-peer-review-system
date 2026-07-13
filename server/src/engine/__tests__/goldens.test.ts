@@ -8,15 +8,24 @@ import type {
   FieldContextScoutOutput,
   FullReportEnvelope,
   IntegrityScreenerOutput,
+  JournalScopeScorerOutput,
   ManuscriptSanitizerOutput,
   ManuscriptStructure,
+  QualityMetricsEngineOutput,
+  ReviewCalibratorOutput,
+  ReviewFinalCriticOutput,
+  ReviewMetaReviewerOutput,
+  ShippedReportEnvelope,
   SpecialistReviewerOutput,
   SwarmEvaluation,
+  SwarmReportCritique,
 } from '@mara/shared';
 import {
   assemble,
   CONSTITUTION_FRAME,
+  FULL_ROSTER,
   PHASE_0_6_ROSTER,
+  PHASE_7_8_ROSTER,
   readKnowledgeModules,
   readManifest,
   readPrompt,
@@ -149,6 +158,97 @@ const bindings: GoldenBinding[] = [
       expect(value.bodyMarkdown).toContain('REV-STAT-0001');
     },
   },
+  {
+    label: 'meta-reviewer scores 15 grounded criteria and a down-only recommendation',
+    agent: 'review-meta-reviewer',
+    file: 'review-meta-reviewer.json',
+    assert: (output) => {
+      const value = output as ReviewMetaReviewerOutput;
+      expect(value.rubric).toHaveLength(15);
+      expect(value.rubric.every((row) => row.supportingIds.length >= 1)).toBe(true);
+      expect(value.recommendation).toBe('major_revision');
+      expect(value.decisionHinges.some((hinge) => hinge.findingId === 'REV-STAT-0001')).toBe(true);
+    },
+  },
+  {
+    label: 'report writer mode B ships the seven-part report with no editor-only leak',
+    agent: 'review-report-writer',
+    mode: 'B',
+    file: 'review-report-writer-B.json',
+    assert: (output) => {
+      const value = output as ShippedReportEnvelope;
+      expect(value.editorOnlyLeak).toBe(false);
+      expect(value.rubricTable).toHaveLength(15);
+      expect(value.citedFindingIds).toContain('REV-STAT-0001');
+      expect(value.bodyMarkdown).toContain('REV-STAT-0001');
+    },
+  },
+  {
+    label: 'swarm mode B critiques the report against the ledger',
+    agent: 'swarm',
+    mode: 'B',
+    file: 'swarm-B.json',
+    assert: (output) => {
+      const value = output as SwarmReportCritique;
+      expect(value.critique.length).toBeGreaterThan(0);
+      expect(value.critique.some((item) => item.findingId === 'REV-STAT-0001')).toBe(true);
+    },
+  },
+  {
+    label: 'final critic routes a defective finding to revise-specialist with the lens named',
+    agent: 'review-final-critic',
+    file: 'review-final-critic.json',
+    assert: (output) => {
+      const value = output as ReviewFinalCriticOutput;
+      expect(value.verdict).toBe('revise-specialist');
+      expect(value.lens).not.toBeNull();
+      expect(value.findingIdToSupersede).toBe('REV-STAT-0001');
+    },
+  },
+  {
+    label: 'quality-metrics engine reports the fixed weights and a composite in range',
+    agent: 'quality-metrics-engine',
+    file: 'quality-metrics-engine.json',
+    assert: (output) => {
+      const value = output as QualityMetricsEngineOutput;
+      const weightSum =
+        value.weights.evidenceGroundingRate +
+        value.weights.actionabilityIndex +
+        value.weights.decisionStability +
+        value.weights.toneRiskScore +
+        value.weights.unsupportedClaimPenalty;
+      expect(Math.abs(weightSum - 1)).toBeLessThan(1e-9);
+      expect(value.composite).toBeGreaterThanOrEqual(0);
+      expect(value.composite).toBeLessThanOrEqual(1);
+    },
+  },
+  {
+    label: 'journal-scope scorer uses legitimate factors only',
+    agent: 'journal-scope-scorer',
+    file: 'journal-scope-scorer.json',
+    assert: (output) => {
+      const value = output as JournalScopeScorerOutput;
+      const legitimate = new Set([
+        'topic-fit',
+        'article-type-compatibility',
+        'methodological-approach-match',
+        'contribution-type-alignment',
+      ]);
+      expect(value.factorsUsed.every((factor) => legitimate.has(factor))).toBe(true);
+      expect(value.noveltyPenaltyApplied).toBe(false);
+    },
+  },
+  {
+    label: 'review calibrator falls back to cross-journal below the ten-review threshold',
+    agent: 'review-calibrator',
+    file: 'review-calibrator.json',
+    assert: (output) => {
+      const value = output as ReviewCalibratorOutput;
+      expect(value.mode).toBe('cross-journal-fallback');
+      expect(value.journalSpecificThresholdMet).toBe(false);
+      expect(value.completedReviewsForJournal).toBeLessThan(10);
+    },
+  },
 ];
 
 describe('AGENT-30 golden fixtures', () => {
@@ -176,6 +276,36 @@ describe('AGENT-30 golden fixtures', () => {
     const bound = new Set(bindings.map((binding) => binding.agent));
     for (const agent of PHASE_0_6_ROSTER) {
       expect(bound.has(agent)).toBe(true);
+    }
+  });
+
+  it('binds a golden fixture to every phase 7-8 roster agent', () => {
+    const bound = new Set(bindings.map((binding) => binding.agent));
+    for (const agent of PHASE_7_8_ROSTER) {
+      expect(bound.has(agent)).toBe(true);
+    }
+  });
+
+  it('binds a golden fixture to every agent in the full roster', () => {
+    const bound = new Set(bindings.map((binding) => binding.agent));
+    for (const agent of FULL_ROSTER) {
+      expect(bound.has(agent)).toBe(true);
+    }
+  });
+
+  it('binds a golden fixture to every mode the phase 7-8 engine dispatches', () => {
+    const boundModes = new Set(bindings.map((binding) => `${binding.agent}:${binding.mode ?? 'default'}`));
+    const engineConsumed = [
+      'review-meta-reviewer:default',
+      'review-report-writer:B',
+      'swarm:B',
+      'review-final-critic:default',
+      'quality-metrics-engine:default',
+      'journal-scope-scorer:default',
+      'review-calibrator:default',
+    ];
+    for (const pair of engineConsumed) {
+      expect(boundModes.has(pair)).toBe(true);
     }
   });
 

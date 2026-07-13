@@ -1,0 +1,17 @@
+{
+  "mode": "B",
+  "critique": [
+    {
+      "defectType": "unsupported-or-overstated",
+      "reportLine": "The intervention delivers a transformative and unprecedented improvement in wellbeing.",
+      "findingId": "REV-STAT-0001",
+      "recommendation": "Soften to the effect the ledger supports and anchor it to the corrected descriptive."
+    },
+    {
+      "defectType": "missing-major-concern",
+      "reportLine": "(absent)",
+      "findingId": "REV-REF-0001",
+      "recommendation": "Add the unlocated-reference concern to the developmental feedback."
+    }
+  ]
+}

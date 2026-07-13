@@ -1,0 +1,26 @@
+{
+  "mode": "B",
+  "recommendation": "major_revision",
+  "recommendationConfidence": 0.78,
+  "bodyMarkdown": "Dear Editor and Authors,\n\nThank you for the chance to read this manuscript. I recommend major revision, and my comments concentrate on the descriptive statistics and the reference apparatus.\n\n# 1. Brief overview\nThe manuscript reports a brief wellbeing trial and its central between-group effect.\n\n# 2. Overall recommendation\nMajor revision at confidence 0.78. The decision hinges on REV-STAT-0001, REV-STAT-0002, and REV-REF-0001.\n\n# 3. Executive summary\nThe design is registered and the writing is clear. The central concern is the impossible programme-group mean in REV-STAT-0001.\n\n# 4. Developmental feedback\n**Impossible descriptive statistic.** The reported mean in REV-STAT-0001 sits above the scale ceiling. The leanest fix is to recompute the descriptives from raw data. Until this is resolved, the recommendation cannot advance beyond major revision.\n\n# 5. Rubric scores\nThe average is 2.9, with criteria 4, 5, and 9 as the bottlenecks.\n\n# 6. What would change my recommendation\n1. Reconcile REV-STAT-0001 with the raw data, which would move the decision toward minor revision.\n\n# 7. Closing\nThe defensible paper inside this submission is a clean brief-intervention trial once the descriptives are corrected.\n\nThe Reviewer",
+  "rubricTable": [
+    { "criterion": 1, "score": 3, "justification": "Contribution is clear (REV-MAP-0001)." },
+    { "criterion": 2, "score": 3, "justification": "Positioned against the field (REV-CTX-0001)." },
+    { "criterion": 3, "score": 3, "justification": "Design matches claims (REV-MAP-0001)." },
+    { "criterion": 4, "score": 2, "justification": "Impossible descriptive (REV-STAT-0001)." },
+    { "criterion": 5, "score": 2, "justification": "Effect estimate untrustworthy (REV-STAT-0001)." },
+    { "criterion": 6, "score": 3, "justification": "Test statistic missing (REV-STAT-0002)." },
+    { "criterion": 7, "score": 3, "justification": "Reporting mostly complete (REV-MAP-0001)." },
+    { "criterion": 8, "score": 3, "justification": "Benchmarked (REV-CTX-0001)." },
+    { "criterion": 9, "score": 2, "justification": "Unlocated reference (REV-REF-0001)." },
+    { "criterion": 10, "score": 3, "justification": "Practical framing fragile (REV-SWM-0001)." },
+    { "criterion": 11, "score": 3, "justification": "Ethics adequate (REV-MAP-0001)." },
+    { "criterion": 12, "score": 4, "justification": "Writing clear (REV-MAP-0001)." },
+    { "criterion": 13, "score": 3, "justification": "Scope fit (REV-CTX-0001)." },
+    { "criterion": 14, "score": 3, "justification": "Analysis reproducible once corrected (REV-STAT-0002)." },
+    { "criterion": 15, "score": 3, "justification": "Robustness fair (REV-SWM-0001)." }
+  ],
+  "references": ["Author, A. (2024). A brief wellbeing intervention. Journal of Wellbeing Science, 12(3), 200-215."],
+  "citedFindingIds": ["REV-STAT-0001", "REV-STAT-0002", "REV-REF-0001", "REV-CTX-0001", "REV-SWM-0001", "REV-MAP-0001"],
+  "editorOnlyLeak": false
+}
