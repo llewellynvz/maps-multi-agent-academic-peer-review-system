@@ -61,11 +61,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     failedAttempts.delete(key);
     const issued = issueToken(db);
     const response = NextResponse.json(issued);
+    const secure = req.headers.get('x-forwarded-proto') === 'https' || new URL(req.url).protocol === 'https:';
     response.cookies.set(SESSION_COOKIE, issued.token, {
       httpOnly: true,
       sameSite: 'strict',
       path: '/',
       expires: new Date(issued.expiresAt),
+      secure,
     });
     return response;
   } catch (error) {
