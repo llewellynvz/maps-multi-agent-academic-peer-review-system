@@ -141,7 +141,7 @@ export function mergeFindings(db: MaraDatabase, input: MergeFindingsInput): Merg
     }
 
     return merged;
-  });
+  }, { behavior: 'immediate' });
 }
 
 function mapRow(row: Record<string, unknown>): CurrentFinding {
