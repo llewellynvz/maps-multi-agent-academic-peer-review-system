@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import {
   AlignmentType,
   BorderStyle,
@@ -7,6 +5,7 @@ import {
   Footer,
   Header,
   type IParagraphOptions,
+  LevelFormat,
   Packer,
   PageNumber,
   Paragraph,
@@ -17,7 +16,6 @@ import {
   TextRun,
   WidthType,
 } from 'docx';
-import { repoRoot } from '../paths';
 
 const INTER = 'Inter';
 const MONO = 'JetBrains Mono';
@@ -31,41 +29,14 @@ const TEAL_TINT = 'E8F5F7';
 const LIME = 'A7D12B';
 const TABLE_BORDER = 'CFE6EA';
 
-const FONT_DIR = resolve(repoRoot, 'server', 'assets', 'fonts');
-
-interface EmbeddedFont {
-  name: string;
-  data: Buffer;
-}
-
-let embeddedFontsCache: EmbeddedFont[] | null = null;
-
-function loadEmbeddedFonts(): EmbeddedFont[] {
-  if (embeddedFontsCache !== null) {
-    return embeddedFontsCache;
-  }
-  const candidates: Array<{ name: string; file: string }> = [
-    { name: INTER, file: 'Inter_18pt-Regular.ttf' },
-    { name: MONO, file: 'JetBrainsMono-Regular.ttf' },
-  ];
-  const loaded: EmbeddedFont[] = [];
-  for (const candidate of candidates) {
-    const path = resolve(FONT_DIR, candidate.file);
-    if (existsSync(path)) {
-      loaded.push({ name: candidate.name, data: readFileSync(path) });
-    }
-  }
-  embeddedFontsCache = loaded;
-  return loaded;
-}
-
 const PAGE = {
   width: 11906,
   height: 16838,
   margin: { top: 2350, bottom: 1650, left: 1134, right: 1134 },
 };
 
-const MONO_TOKEN = /(REV-[A-Z]{3,4}-\d{4}|\b\d[\d.,%]*\b)/g;
+const FINDING_ID = /REV-[A-Z]{3,4}-\d{4}/;
+const INLINE_TOKEN = /(\*\*.+?\*\*|`[^`]+`|REV-[A-Z]{3,4}-\d{4})/g;
 
 export interface DeliverableMetadataRow {
   label: string;
@@ -97,38 +68,59 @@ function letterheadBand(): Header {
   });
 }
 
+function plainText(text: string): string {
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');
+}
+
 function inlineRuns(text: string, color: string, font: string): TextRun[] {
   const runs: TextRun[] = [];
-  const parts = text.split(MONO_TOKEN);
-  for (const part of parts) {
+  for (const part of text.split(INLINE_TOKEN)) {
     if (part.length === 0) {
       continue;
     }
-    const isMono = /^REV-[A-Z]{3,4}-\d{4}$/.test(part) || /^\d[\d.,%]*$/.test(part);
-    runs.push(new TextRun({ text: part, color, font: isMono ? MONO : font }));
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      const inner = part.slice(2, -2);
+      for (const piece of inner.split(INLINE_TOKEN)) {
+        if (piece.length === 0) {
+          continue;
+        }
+        const mono = FINDING_ID.test(piece) && piece.match(FINDING_ID)?.[0] === piece;
+        runs.push(new TextRun({ text: mono ? piece : plainText(piece), bold: true, color, font: mono ? MONO : font }));
+      }
+      continue;
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      runs.push(new TextRun({ text: part.slice(1, -1), color, font: MONO }));
+      continue;
+    }
+    if (FINDING_ID.test(part) && part.match(FINDING_ID)?.[0] === part) {
+      runs.push(new TextRun({ text: part, color, font: MONO }));
+      continue;
+    }
+    runs.push(new TextRun({ text: part, color, font }));
   }
-  return runs.length > 0 ? runs : [new TextRun({ text, color, font })];
+  return runs.length > 0 ? runs : [new TextRun({ text: plainText(text), color, font })];
 }
 
 function banner(text: string): Paragraph {
   return new Paragraph({
     spacing: { before: 260, after: 160 },
     shading: { type: ShadingType.CLEAR, color: 'auto', fill: TEAL_DARK },
-    children: [new TextRun({ text, bold: true, color: BONE, font: INTER, size: 26 })],
+    children: [new TextRun({ text: plainText(text), bold: true, color: BONE, font: INTER, size: 26 })],
   });
 }
 
 function subHeading(text: string): Paragraph {
   return new Paragraph({
     spacing: { before: 200, after: 120 },
-    children: [new TextRun({ text, bold: true, color: TEAL_DARK, font: INTER, size: 24 })],
+    children: [new TextRun({ text: plainText(text), bold: true, color: TEAL_DARK, font: INTER, size: 24 })],
   });
 }
 
 function minorHeading(text: string): Paragraph {
   return new Paragraph({
     spacing: { before: 160, after: 80 },
-    children: [new TextRun({ text, bold: true, color: TEAL_DARK, font: INTER, size: 22 })],
+    children: [new TextRun({ text: plainText(text), bold: true, color: TEAL_DARK, font: INTER, size: 22 })],
   });
 }
 
@@ -155,7 +147,7 @@ function tableFrom(rows: string[][]): Table {
         new TableCell({
           shading: cellShade(TEAL),
           borders,
-          children: [new Paragraph({ children: [new TextRun({ text: value, bold: true, color: BONE, font: INTER })] })],
+          children: [new Paragraph({ children: [new TextRun({ text: plainText(value), bold: true, color: BONE, font: INTER })] })],
         }),
     ),
   });
@@ -170,7 +162,7 @@ function tableFrom(rows: string[][]): Table {
           children: [
             new Paragraph({
               children: isFirst
-                ? [new TextRun({ text: value, bold: true, color: TEAL_DARK, font: INTER })]
+                ? [new TextRun({ text: plainText(value), bold: true, color: TEAL_DARK, font: INTER })]
                 : inlineRuns(value, GRAPHITE, INTER),
             }),
           ],
@@ -181,18 +173,38 @@ function tableFrom(rows: string[][]): Table {
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...bodyRows] });
 }
 
-function parseBody(markdown: string): Array<Paragraph | Table> {
+function listLevel(line: string): number {
+  const leading = line.length - line.trimStart().length;
+  if (leading >= 5) {
+    return 2;
+  }
+  if (leading >= 2) {
+    return 1;
+  }
+  return 0;
+}
+
+interface ParsedBody {
+  blocks: Array<Paragraph | Table>;
+  orderedListRefs: string[];
+}
+
+function parseBody(markdown: string): ParsedBody {
   const lines = markdown.split(/\r?\n/);
   const blocks: Array<Paragraph | Table> = [];
+  const orderedListRefs: string[] = [];
+  let activeListRef: string | null = null;
   let i = 0;
   while (i < lines.length) {
     const line = lines[i] ?? '';
     const trimmed = line.trim();
     if (trimmed.length === 0) {
+      activeListRef = null;
       i += 1;
       continue;
     }
     if (trimmed.startsWith('|') && (lines[i + 1] ?? '').includes('---')) {
+      activeListRef = null;
       const tableLines: string[] = [];
       while (i < lines.length && (lines[i] ?? '').trim().startsWith('|')) {
         tableLines.push(lines[i] ?? '');
@@ -214,25 +226,58 @@ function parseBody(markdown: string): Array<Paragraph | Table> {
       continue;
     }
     if (trimmed.startsWith('### ')) {
+      activeListRef = null;
       blocks.push(minorHeading(trimmed.slice(4)));
     } else if (trimmed.startsWith('## ')) {
+      activeListRef = null;
       blocks.push(subHeading(trimmed.slice(3)));
     } else if (trimmed.startsWith('# ')) {
+      activeListRef = null;
       blocks.push(banner(trimmed.slice(2)));
     } else if (/^[-*]\s+/.test(trimmed)) {
-      blocks.push(bodyParagraph(cleanInline(trimmed.replace(/^[-*]\s+/, '')), { bullet: { level: 0 } }));
+      blocks.push(bodyParagraph(trimmed.replace(/^[-*]\s+/, ''), { bullet: { level: listLevel(line) } }));
     } else if (/^\d+\.\s+/.test(trimmed)) {
-      blocks.push(bodyParagraph(cleanInline(trimmed)));
+      if (activeListRef === null) {
+        activeListRef = `ordered-${orderedListRefs.length + 1}`;
+        orderedListRefs.push(activeListRef);
+      }
+      blocks.push(
+        bodyParagraph(trimmed.replace(/^\d+\.\s+/, ''), {
+          numbering: { reference: activeListRef, level: listLevel(line) },
+        }),
+      );
     } else {
-      blocks.push(bodyParagraph(cleanInline(trimmed)));
+      activeListRef = null;
+      blocks.push(bodyParagraph(trimmed));
     }
     i += 1;
   }
-  return blocks;
+  return { blocks, orderedListRefs };
 }
 
-function cleanInline(text: string): string {
-  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');
+function orderedNumberingConfig(references: string[]): Array<{
+  reference: string;
+  levels: Array<{
+    level: number;
+    format: (typeof LevelFormat)[keyof typeof LevelFormat];
+    text: string;
+    alignment: (typeof AlignmentType)['START'];
+    style: { paragraph: { indent: { left: number; hanging: number } } };
+  }>;
+}> {
+  const levels = [
+    { level: 0, format: LevelFormat.DECIMAL, text: '%1.' },
+    { level: 1, format: LevelFormat.LOWER_LETTER, text: '%2)' },
+    { level: 2, format: LevelFormat.LOWER_ROMAN, text: '%3.' },
+  ];
+  return references.map((reference) => ({
+    reference,
+    levels: levels.map((entry) => ({
+      ...entry,
+      alignment: AlignmentType.START,
+      style: { paragraph: { indent: { left: 720 * (entry.level + 1), hanging: 360 } } },
+    })),
+  }));
 }
 
 function titleBlock(job: DeliverableJob): Array<Paragraph | Table> {
@@ -297,17 +342,26 @@ function titleBlock(job: DeliverableJob): Array<Paragraph | Table> {
 
 export async function renderDeliverableDocx(job: DeliverableJob): Promise<Buffer> {
   const footerText = job.confidential ? 'Confidential. Page ' : 'Page ';
-  const fonts = loadEmbeddedFonts();
+  const body = parseBody(job.bodyMarkdown);
   const document = new Document({
     creator: 'The Reviewer',
     title: job.title,
     description: '',
-    ...(fonts.length > 0 ? { fonts } : {}),
     styles: {
       default: {
         document: { run: { font: INTER, size: 20, color: GRAPHITE } },
       },
+      paragraphStyles: [
+        {
+          id: 'Normal',
+          name: 'Normal',
+          quickFormat: true,
+          run: { font: INTER, size: 20, color: GRAPHITE },
+          paragraph: {},
+        },
+      ],
     },
+    ...(body.orderedListRefs.length > 0 ? { numbering: { config: orderedNumberingConfig(body.orderedListRefs) } } : {}),
     sections: [
       {
         properties: {
@@ -327,12 +381,14 @@ export async function renderDeliverableDocx(job: DeliverableJob): Promise<Buffer
                 children: [
                   new TextRun({ text: footerText, color: GREY, font: INTER, size: 16 }),
                   new TextRun({ children: [PageNumber.CURRENT], color: GREY, font: MONO, size: 16 }),
+                  new TextRun({ text: ' of ', color: GREY, font: INTER, size: 16 }),
+                  new TextRun({ children: [PageNumber.TOTAL_PAGES], color: GREY, font: MONO, size: 16 }),
                 ],
               }),
             ],
           }),
         },
-        children: [...titleBlock(job), ...parseBody(job.bodyMarkdown)],
+        children: [...titleBlock(job), ...body.blocks],
       },
     ],
   });
