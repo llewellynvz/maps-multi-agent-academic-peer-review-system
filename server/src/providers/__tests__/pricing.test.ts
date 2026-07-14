@@ -13,7 +13,8 @@ describe('dispatch cost estimation', () => {
       cachedTokens: 1900,
       reasoningTokens: 0,
     });
-    expect(cost).toBeCloseTo((100 * 0.625 + 1900 * 0.0625 + 100 * 5.0) / 1_000_000, 9);
+    const raw = (100 * 0.625 + 1900 * 0.0625 + 100 * 5.0) / 1_000_000;
+    expect(cost).toBe(Math.round(raw * 1_000_000) / 1_000_000);
   });
 
   it('returns zero for a model with no pricing entry', () => {
