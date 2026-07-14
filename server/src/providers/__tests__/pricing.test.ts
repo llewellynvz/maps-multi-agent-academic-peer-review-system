@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { estimateCostUsd } from '../pricing';
+import { estimateCostUsd, hasPricing } from '../pricing';
 
 afterEach(() => {
   delete process.env.MARA_PRICING_GPT_5_1;
@@ -43,5 +43,20 @@ describe('dispatch cost estimation', () => {
       reasoningTokens: 0,
     });
     expect(cost).toBeCloseTo(0.625, 6);
+  });
+
+  it('rejects overrides without exactly three non-empty fields', () => {
+    const tokens = { inputTokens: 0, outputTokens: 1_000_000, cachedTokens: 0, reasoningTokens: 0 };
+    process.env.MARA_PRICING_GPT_5_1 = '1,,3';
+    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(5);
+    process.env.MARA_PRICING_GPT_5_1 = '1,2,3,4';
+    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(5);
+    process.env.MARA_PRICING_GPT_5_1 = '1,2,3';
+    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(3);
+  });
+
+  it('reports whether a model has a usable pricing entry', () => {
+    expect(hasPricing('gpt-5.1')).toBe(true);
+    expect(hasPricing('qwen2:7b')).toBe(false);
   });
 });

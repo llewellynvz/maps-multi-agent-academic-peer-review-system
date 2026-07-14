@@ -17,12 +17,19 @@ const PRICING_TABLE: Record<string, ModelPricing> = {
 function pricingFor(model: string): ModelPricing | undefined {
   const override = process.env[`MARA_PRICING_${model.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
   if (override !== undefined) {
-    const [input, cached, output] = override.split(',').map(Number);
-    if ([input, cached, output].every((value) => Number.isFinite(value) && value! >= 0)) {
-      return { inputPerMillion: input!, cachedPerMillion: cached!, outputPerMillion: output! };
+    const parts = override.split(',');
+    if (parts.length === 3 && parts.every((part) => part.trim() !== '')) {
+      const [input, cached, output] = parts.map(Number);
+      if ([input, cached, output].every((value) => Number.isFinite(value) && value! >= 0)) {
+        return { inputPerMillion: input!, cachedPerMillion: cached!, outputPerMillion: output! };
+      }
     }
   }
   return PRICING_TABLE[model];
+}
+
+export function hasPricing(model: string): boolean {
+  return pricingFor(model) !== undefined;
 }
 
 export function estimateCostUsd(model: string, tokens: DispatchTokens): number {

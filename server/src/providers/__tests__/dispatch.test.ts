@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraDatabase, type SqliteConnection } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
+import { writeSetting } from '../../data/settings-store';
 import { createDispatchRunner, type GenerateApi } from '../dispatch';
 import type { Registry } from '../registry';
 import type { ModelRef } from '../types';
@@ -177,6 +178,33 @@ describe('dispatch runner', () => {
     expect(objectCalls()).toBe(1);
     expect(textCalls()).toBe(0);
     expect(result.object).toEqual({ verdict: 'ok' });
+  });
+
+  it('records prompt content in telemetry only when the telemetry setting is on', async () => {
+    let captured: { experimental_telemetry?: { recordInputs: boolean; recordOutputs: boolean } } | undefined;
+    const generate: GenerateApi = {
+      generateText: async (options) => {
+        captured = options;
+        return { text: 'x', usage: { inputTokens: 1, outputTokens: 1 } };
+      },
+      generateObject: async () => {
+        throw new Error('not used');
+      },
+    };
+    const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
+
+    await run(baseInput());
+    expect(captured?.experimental_telemetry?.recordInputs).toBe(false);
+    expect(captured?.experimental_telemetry?.recordOutputs).toBe(false);
+
+    writeSetting(db, 'telemetry', true);
+    await run(baseInput());
+    expect(captured?.experimental_telemetry?.recordInputs).toBe(true);
+    expect(captured?.experimental_telemetry?.recordOutputs).toBe(true);
+
+    writeSetting(db, 'telemetry', false);
+    await run(baseInput());
+    expect(captured?.experimental_telemetry?.recordInputs).toBe(false);
   });
 
   it('drops temperature for a reasoning model but forwards it for a non-reasoning model', async () => {

@@ -5,7 +5,8 @@ import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { MaraDatabase } from '../db/client';
 import { dispatches } from '../db/schema';
-import { estimateCostUsd } from './pricing';
+import { readSetting } from '../data/settings-store';
+import { estimateCostUsd, hasPricing } from './pricing';
 import type { Registry } from './registry';
 import type { DispatchProvider, ModelRef, Role } from './types';
 
@@ -59,7 +60,7 @@ interface GenerateCallOptions {
   temperature?: number;
   maxRetries: number;
   providerOptions?: Record<string, Record<string, unknown>>;
-  experimental_telemetry: { isEnabled: boolean; functionId: string };
+  experimental_telemetry: { isEnabled: boolean; functionId: string; recordInputs: boolean; recordOutputs: boolean };
   schema?: z.ZodType;
 }
 
@@ -134,6 +135,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
   const now = options.now ?? Date.now;
   const activeTraceId = options.activeTraceId ?? defaultActiveTraceId;
   const { db } = options;
+  const unpricedWarned = new Set<string>();
 
   const findPersisted = (dispatchId: string): DispatchResult | undefined => {
     const rows = db
@@ -173,6 +175,17 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
     errorClass: string | null,
     langfuseTraceId: string | null,
   ): void => {
+    if (
+      modelRef.providerName !== 'local' &&
+      tokens.inputTokens + tokens.outputTokens > 0 &&
+      !hasPricing(modelRef.model) &&
+      !unpricedWarned.has(modelRef.model)
+    ) {
+      unpricedWarned.add(modelRef.model);
+      console.warn(
+        `[dispatch] no pricing entry for model ${modelRef.model}; cost_usd recorded as 0 and the cost ceiling cannot see this spend. Set MARA_PRICING_${modelRef.model.toUpperCase().replace(/[^A-Z0-9]/g, '_')}=input,cached,output (USD per million tokens).`,
+      );
+    }
     db.insert(dispatches)
       .values({
         id,
@@ -206,12 +219,15 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
       }
     }
 
+    const recordContent = readSetting<boolean>(db, 'telemetry') === true;
     const callOptions: GenerateCallOptions = {
       model: modelRef.languageModel,
       maxRetries: input.maxRetries ?? 2,
       experimental_telemetry: {
         isEnabled: input.telemetry ?? true,
         functionId: `${input.phase}:${input.agent}`,
+        recordInputs: recordContent,
+        recordOutputs: recordContent,
       },
     };
     if (input.parts.system !== undefined) {
