@@ -73,7 +73,7 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
       lensPrefix: 'MAP',
       phase: 'phase_1',
       agent: 'manuscript-analyst',
-      fragments: analystA.findings,
+      fragments: sanitiseSupersedes(analystA.findings, new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id))),
       marker: 'p1-analyst-a',
     });
 
@@ -97,7 +97,7 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
       lensPrefix: 'MAP',
       phase: 'phase_1',
       agent: 'manuscript-analyst',
-      fragments: analystB.findings,
+      fragments: sanitiseSupersedes(analystB.findings, new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id))),
       marker: 'p1-analyst-b',
     });
 
@@ -219,12 +219,13 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
 
     const reconciled = citation.verifications.map((verification) => reconcileExistence(verification, clientVerdicts));
 
+    const knownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
     mergeFindingsOnce(db, {
       reviewId,
       lensPrefix: 'CTX',
       phase: 'phase_2',
       agent: 'field-context-scout',
-      fragments: scout.findings,
+      fragments: sanitiseSupersedes(scout.findings, knownIds),
       marker: 'p2-context',
     });
     mergeFindingsOnce(db, {
@@ -232,7 +233,7 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
       lensPrefix: 'REF',
       phase: 'phase_2',
       agent: 'citation-auditor',
-      fragments: citation.findings,
+      fragments: sanitiseSupersedes(citation.findings, knownIds),
       marker: 'p2-citations',
     });
     writeArtefact(reviewId, 'p2-citations', { ...citation, verifications: reconciled, clientVerdicts });
@@ -461,6 +462,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
       ),
     );
 
+    const knownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
     for (const { cluster, result } of results) {
       const groups = new Map<string, Finding[]>();
       for (const finding of result.findings) {
@@ -479,7 +481,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
           lensPrefix: prefix,
           phase: 'phase_4',
           agent: 'integrity-screener',
-          fragments,
+          fragments: sanitiseSupersedes(fragments, knownIds),
           marker: `p4-${cluster.name}-${prefix}`,
         });
       }
