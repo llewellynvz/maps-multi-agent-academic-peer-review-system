@@ -456,7 +456,16 @@ export class WorkerRunner {
       .from(reviews)
       .where(eq(reviews.status, 'awaiting_input'))
       .all();
+    if (rows.length === 0) {
+      return;
+    }
+    const pending = new Set(
+      this.db.select({ reviewId: runCommands.reviewId }).from(runCommands).all().map((command) => command.reviewId),
+    );
     for (const row of rows) {
+      if (pending.has(row.id)) {
+        continue;
+      }
       const age = nowMs - Date.parse(row.updatedAt);
       if (Number.isFinite(age) && age >= this.awaitingInputTimeoutMs) {
         pauseReview(this.db, row.id, { reason: 'awaiting_input_timeout' });

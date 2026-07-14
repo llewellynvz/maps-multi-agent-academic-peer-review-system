@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { manuscripts, phaseCheckpoints, reviewEvents, reviews } from '../db/schema';
 import { nowIso } from '../data/db';
@@ -212,12 +212,12 @@ export function insertEvent(
 ): number {
   return db.transaction(
     (tx) => {
-      const rows = tx
-        .select({ seq: reviewEvents.seq })
+      const maxRow = tx
+        .select({ max: sql<number>`coalesce(max(${reviewEvents.seq}), 0)` })
         .from(reviewEvents)
         .where(eq(reviewEvents.reviewId, input.reviewId))
-        .all();
-      const nextSeq = rows.reduce((max, row) => (row.seq > max ? row.seq : max), 0) + 1;
+        .all()[0];
+      const nextSeq = (maxRow?.max ?? 0) + 1;
       tx.insert(reviewEvents)
         .values({
           id: randomUUID(),

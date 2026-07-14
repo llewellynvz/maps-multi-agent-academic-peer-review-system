@@ -252,6 +252,17 @@ describe('PIPE-27 awaiting_input timeout', () => {
     expect(engineOrder).toEqual([]);
   });
 
+  it('never times out a review whose resume command is already queued', () => {
+    insertReview('rev-A', '2026-07-14T00:00:00.000Z');
+    setAwaitingInput('rev-A', '2026-07-14T10:00:00.000Z');
+    insertRunCommand('rev-A', 'resume');
+
+    const runner = new WorkerRunner({ client, processors: countingProcessors([]), now: () => nowMs, awaitingInputTimeoutMs: timeoutMs });
+    runner.scanAwaitingInputTimeouts();
+
+    expect(reviewStatus('rev-A')).toBe('awaiting_input');
+  });
+
   it('keeps resume available after an awaiting_input timeout pause', async () => {
     insertReview('rev-A', '2026-07-14T00:00:00.000Z');
     setAwaitingInput('rev-A', '2026-07-14T10:00:00.000Z');
