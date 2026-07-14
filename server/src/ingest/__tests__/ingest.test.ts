@@ -25,6 +25,8 @@ describe('parseTei', () => {
 
     const withDoi = map.references.filter((reference) => reference.doi !== null);
     expect(withDoi.length).toBeGreaterThanOrEqual(10);
+    const withVenue = map.references.filter((reference) => reference.venue !== null);
+    expect(withVenue.length).toBeGreaterThanOrEqual(10);
     expect(map.references[0]?.authors.length).toBeGreaterThan(0);
     expect(map.references[0]?.year).not.toBeNull();
   });
