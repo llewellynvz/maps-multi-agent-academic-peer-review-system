@@ -67,7 +67,10 @@ function writeContainerEnv(): void {
     }
     lines.push(line);
   }
-  lines.push('LANGFUSE_HOST=http://host.docker.internal:4000');
+  const hostLangfuse = (process.env.LANGFUSE_HOST ?? '').trim();
+  if (hostLangfuse !== '') {
+    lines.push(`LANGFUSE_HOST=${hostLangfuse.replace('127.0.0.1', 'host.docker.internal').replace('localhost', 'host.docker.internal')}`);
+  }
   lines.push('GROBID_URL=');
   mkdirSync(resolve(repoRoot, 'data'), { recursive: true });
   writeFileSync(TEST_ENV_FILE, `${lines.join('\n')}\n`);

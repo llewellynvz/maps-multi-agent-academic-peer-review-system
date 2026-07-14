@@ -9,7 +9,7 @@ export interface RotatingLog {
 }
 
 const SECRET_KEY =
-  /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|access[_-]?token|refresh[_-]?token|client[_-]?cert|_pem)/i;
+  /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|tokens?(?!s|[_-]?(?:in|out|cached))|credential|bearer|cookie|client[_-]?cert|_pem)/i;
 
 function redact(value: unknown): unknown {
   if (Array.isArray(value)) {

@@ -14,8 +14,9 @@ export async function onRequestError(
     return;
   }
   const { createRotatingLog } = await import('server/src/logging/rotating-log');
+  const message = error instanceof Error ? error.message : String(error);
   createRotatingLog('app').write('error', 'app', 'request error', {
-    message: error instanceof Error ? error.message : String(error),
+    message: message.slice(0, 300),
     method: request.method,
     path: request.path,
   });

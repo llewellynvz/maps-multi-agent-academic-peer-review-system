@@ -29,8 +29,15 @@ describe('createRotatingLog', () => {
     log.write('info', 'worker', 'dispatch complete', {
       apiKey: 'sk-secret-value',
       authorization: 'Bearer abc',
+      token: 'session-token-value',
+      refresh_tokens: 'rt-secret',
+      access_tokens: 'at-secret',
+      credential: 'cred-value',
+      cookie: 'session=abc',
       tokensIn: 1234,
+      tokensOut: 78,
       tokensCached: 56,
+      tokens_in: 90,
       provider: 'azure',
     });
     const file = resolve(root, 'data', 'logs', 'worker.log');
@@ -41,8 +48,15 @@ describe('createRotatingLog', () => {
     expect(line.msg).toBe('dispatch complete');
     expect(line.apiKey).toBe('[redacted]');
     expect(line.authorization).toBe('[redacted]');
+    expect(line.token).toBe('[redacted]');
+    expect(line.refresh_tokens).toBe('[redacted]');
+    expect(line.access_tokens).toBe('[redacted]');
+    expect(line.credential).toBe('[redacted]');
+    expect(line.cookie).toBe('[redacted]');
     expect(line.tokensIn).toBe(1234);
+    expect(line.tokensOut).toBe(78);
     expect(line.tokensCached).toBe(56);
+    expect(line.tokens_in).toBe(90);
     expect(line.provider).toBe('azure');
   });
 
