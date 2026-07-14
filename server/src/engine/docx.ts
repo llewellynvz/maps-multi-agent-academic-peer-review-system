@@ -1,8 +1,11 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   AlignmentType,
   BorderStyle,
   Document,
   Footer,
+  Header,
   type IParagraphOptions,
   Packer,
   PageNumber,
@@ -14,6 +17,7 @@ import {
   TextRun,
   WidthType,
 } from 'docx';
+import { repoRoot } from '../paths';
 
 const INTER = 'Inter';
 const MONO = 'JetBrains Mono';
@@ -26,6 +30,34 @@ const BONE = 'FEFCF5';
 const TEAL_TINT = 'E8F5F7';
 const LIME = 'A7D12B';
 const TABLE_BORDER = 'CFE6EA';
+
+const FONT_DIR = resolve(repoRoot, 'server', 'assets', 'fonts');
+
+interface EmbeddedFont {
+  name: string;
+  data: Buffer;
+}
+
+let embeddedFontsCache: EmbeddedFont[] | null = null;
+
+function loadEmbeddedFonts(): EmbeddedFont[] {
+  if (embeddedFontsCache !== null) {
+    return embeddedFontsCache;
+  }
+  const candidates: Array<{ name: string; file: string }> = [
+    { name: INTER, file: 'Inter_18pt-Regular.ttf' },
+    { name: MONO, file: 'JetBrainsMono-Regular.ttf' },
+  ];
+  const loaded: EmbeddedFont[] = [];
+  for (const candidate of candidates) {
+    const path = resolve(FONT_DIR, candidate.file);
+    if (existsSync(path)) {
+      loaded.push({ name: candidate.name, data: readFileSync(path) });
+    }
+  }
+  embeddedFontsCache = loaded;
+  return loaded;
+}
 
 const PAGE = {
   width: 11906,
@@ -48,6 +80,21 @@ export interface DeliverableJob {
   metadata: DeliverableMetadataRow[];
   bodyMarkdown: string;
   confidential: boolean;
+}
+
+function letterheadBand(): Header {
+  return new Header({
+    children: [
+      new Paragraph({
+        spacing: { after: 40 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: LIME } },
+        children: [
+          new TextRun({ text: 'PSYNALYTICS', bold: true, color: TEAL_DARK, font: INTER, size: 18 }),
+          new TextRun({ text: '   Peer review', color: GREY, font: INTER, size: 16 }),
+        ],
+      }),
+    ],
+  });
 }
 
 function inlineRuns(text: string, color: string, font: string): TextRun[] {
@@ -250,10 +297,12 @@ function titleBlock(job: DeliverableJob): Array<Paragraph | Table> {
 
 export async function renderDeliverableDocx(job: DeliverableJob): Promise<Buffer> {
   const footerText = job.confidential ? 'Confidential. Page ' : 'Page ';
+  const fonts = loadEmbeddedFonts();
   const document = new Document({
     creator: 'The Reviewer',
     title: job.title,
     description: '',
+    ...(fonts.length > 0 ? { fonts } : {}),
     styles: {
       default: {
         document: { run: { font: INTER, size: 20, color: GRAPHITE } },
@@ -266,6 +315,9 @@ export async function renderDeliverableDocx(job: DeliverableJob): Promise<Buffer
             size: { width: PAGE.width, height: PAGE.height },
             margin: PAGE.margin,
           },
+        },
+        headers: {
+          default: letterheadBand(),
         },
         footers: {
           default: new Footer({
