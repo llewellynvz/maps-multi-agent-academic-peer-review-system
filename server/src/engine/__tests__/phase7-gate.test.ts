@@ -151,8 +151,9 @@ function mockDeps(
   criticVerdicts: ReviewFinalCriticOutput[],
   shippedOverride?: ReturnType<typeof shippedObject>,
   metaSequence?: Array<ReturnType<typeof metaObject>>,
+  shippedSequence?: Array<ReturnType<typeof shippedObject>>,
 ): { deps: EngineDeps; criticCalls: number; specialistCalls: string[]; writerInputs: string[] } {
-  const state = { criticCalls: 0, metaCalls: 0, specialistCalls: [] as string[], writerInputs: [] as string[] };
+  const state = { criticCalls: 0, metaCalls: 0, writerCalls: 0, specialistCalls: [] as string[], writerInputs: [] as string[] };
   const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
     let object: unknown;
     switch (input.agent) {
@@ -165,7 +166,9 @@ function mockDeps(
         break;
       case 'review-report-writer':
         state.writerInputs.push(JSON.stringify(input));
-        object = shippedOverride ?? shippedObject();
+        object =
+          shippedSequence?.[Math.min(state.writerCalls, shippedSequence.length - 1)] ?? shippedOverride ?? shippedObject();
+        state.writerCalls += 1;
         break;
       case 'specialist-reviewer':
         state.specialistCalls.push(input.phase);
@@ -355,6 +358,42 @@ describe('phase 7 release gate routing', () => {
     const gateRecord = readArtefact<{ recommendation: string; recommendationConfidence: number }>(reviewId, 'p7-gate-record');
     expect(gateRecord.recommendation).toBe('minor_revision');
     expect(gateRecord.recommendationConfidence).toBeCloseTo(0.6);
+  });
+
+  it('aligns the released report with the arbitration-narrowed recommendation', async () => {
+    const narrowedEnvelope = { ...shippedObject(), recommendation: 'reject_and_resubmit' };
+    const harness = mockDeps(
+      [critic('revise'), critic('revise')],
+      undefined,
+      undefined,
+      [shippedObject(), shippedObject(), shippedObject(), narrowedEnvelope],
+    );
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
+    const review = sqlite.prepare('SELECT recommendation FROM reviews WHERE id = ?').get(reviewId) as { recommendation: string };
+    expect(review.recommendation).toBe('reject_and_resubmit');
+    const finalShipped = readArtefact<{ recommendation: string }>(reviewId, 'p7-shipped-final');
+    expect(finalShipped.recommendation).toBe('reject_and_resubmit');
+    const alignEvents = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'gate_verdict'")
+      .all(reviewId)
+      .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source: string; verdict: string });
+    expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'aligned')).toBe(true);
+  });
+
+  it('halts instead of releasing a report that cannot be aligned with the narrowed recommendation', async () => {
+    const harness = mockDeps([critic('revise'), critic('revise')]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(false);
+    const review = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(reviewId) as { status: string };
+    expect(review.status).toBe('failed');
+    const alignEvents = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'gate_verdict'")
+      .all(reviewId)
+      .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source: string; verdict: string });
+    expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'block')).toBe(true);
   });
 
   it('never shows editor-only ids to the writer, even after a leak-triggered revise', async () => {

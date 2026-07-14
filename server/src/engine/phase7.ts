@@ -412,6 +412,90 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       });
     }
 
+    if (
+      released &&
+      releaseVerdict === 'arbitrated' &&
+      arbitration !== null &&
+      arbitration.narrowedRecommendation !== null &&
+      lastShipped !== null &&
+      arbitration.narrowedRecommendation !== lastShipped.recommendation
+    ) {
+      const narrowed = arbitration.narrowedRecommendation;
+      const alignAll = getCurrentFindings(db, reviewId);
+      const alignLedgerIds = new Set(alignAll.map((finding) => finding.id));
+      const alignEditorOnlyIds = new Set(
+        alignAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
+      );
+      const alignAuthorFacing = alignAll.filter((finding) => finding.scope !== 'editor_only');
+      try {
+        const aligned = await runAgent<ShippedReportEnvelope>(deps, {
+          reviewId,
+          phase: 'phase_7',
+          agent: 'review-report-writer',
+          mode: 'B',
+          artefactName: 'p7-shipped-aligned',
+          validate: (value) => {
+            const envelope = value as ShippedReportEnvelope;
+            if (envelope.recommendation !== narrowed) {
+              throw new Error(`the arbitrated recommendation is ${narrowed}; the envelope and the report body must state it`);
+            }
+          },
+          assembleInput: {
+            mode: 'B',
+            artefacts: [
+              {
+                label: 'Prior shipped report (recommendation superseded by arbitration)',
+                content: redactEditorOnlyIds(lastShipped.bodyMarkdown, alignEditorOnlyIds),
+              },
+              {
+                label: 'Author-facing ledger (cite only these ids)',
+                content: JSON.stringify(ledgerForReport(alignAuthorFacing), null, 2),
+              },
+              { label: 'Arbitration rationale', content: arbitration.rationale },
+            ],
+            routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue ${narrowed} honestly in the developmental voice. Findings, evidence, and cited ids stay exactly as they are; only the recommendation framing changes. Cite only ids from the author-facing ledger; list every cited id in citedFindingIds.`,
+          },
+        });
+        const alignedNotes = assemblePrivateNotes({
+          recommendation: narrowed,
+          recommendationConfidence: currentMeta.recommendationConfidence,
+          currentFindings: alignAll,
+          strongestMinorityReport: swarm.strongestMinorityReport,
+        });
+        const alignedGrounding = validateGrounding({
+          authorFacingBody: aligned.bodyMarkdown,
+          authorFacingCitedIds: aligned.citedFindingIds,
+          privateNotesBody: alignedNotes.markdown,
+          privateNotesReferencedIds: alignedNotes.referencedIds,
+          ledgerIds: alignLedgerIds,
+          editorOnlyIds: alignEditorOnlyIds,
+        });
+        if (alignedGrounding.ok) {
+          lastShipped = aligned;
+          lastPrivateNotes = alignedNotes.markdown;
+        } else {
+          released = false;
+          blocked = true;
+          blockReason = `Arbitration narrowed the recommendation to ${narrowed} but the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
+        }
+      } catch (error) {
+        released = false;
+        blocked = true;
+        blockReason = `Arbitration narrowed the recommendation to ${narrowed} but no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      insertEvent(db, {
+        reviewId,
+        kind: 'gate_verdict',
+        phase: 'phase_7',
+        payload: {
+          cycle: fixCycles,
+          source: 'arbitration-alignment',
+          verdict: blocked ? 'block' : 'aligned',
+          narrowedRecommendation: narrowed,
+        },
+      });
+    }
+
     if (blocked) {
       writeArtefact(reviewId, 'p7-block-summary', { reason: blockReason, fixCycles, arbitration });
       updateReview(db, reviewId, { status: 'failed', errorClass: 'release_gate_block' });
