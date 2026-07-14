@@ -42,8 +42,15 @@ export function verifyQuery(query: string, signature: string, key: Buffer): bool
   return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(signQuery(query, key), 'hex'));
 }
 
+const REDACTED_QUERY_PARAMS = new Set(['api_key', 'apikey', 'mailto']);
+
 export function canonicalQuery(url: string): string {
   const parsed = new URL(url);
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (REDACTED_QUERY_PARAMS.has(key.toLowerCase())) {
+      parsed.searchParams.delete(key);
+    }
+  }
   return `${parsed.pathname}${parsed.search}`;
 }
 

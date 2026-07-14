@@ -149,4 +149,14 @@ describe('guarded purge (DATA-19..21)', () => {
 
     purgeReview(client, review.id);
   });
+
+  it('rejects a path-traversal review id before any filesystem or db operation', () => {
+    let code: string | undefined;
+    try {
+      purgeReview(client, 'x/../../../etc');
+    } catch (error) {
+      code = (error as { code?: string }).code;
+    }
+    expect(code).toBe('bad_request');
+  });
 });

@@ -7,6 +7,7 @@ services:
     ports:
       - "${MARA_PORT:-3100}:3100"
     volumes:
+      # the container runs as the non-root node user (uid 1000); ensure ./data is writable by it
       - ./data:/app/data
     env_file:
       - ${MARA_ENV_FILE:-.env}

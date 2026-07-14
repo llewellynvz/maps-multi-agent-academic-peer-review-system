@@ -10,6 +10,7 @@ import { POST as sessionPOST } from '@/app/api/session/route';
 import { GET as reviewsGET, POST as reviewsPOST } from '@/app/api/reviews/route';
 import { GET as settingsGET, PUT as settingsPUT } from '@/app/api/settings/route';
 import { GET as eventsGET } from '@/app/api/reviews/[id]/events/route';
+import { POST as manuscriptPOST } from '@/app/api/reviews/[id]/manuscript/route';
 
 let tempDir: string;
 
@@ -73,6 +74,45 @@ describe('passphrase gate (API-02/04)', () => {
     const settings = await settingsGET(req('/api/settings'));
     const settingsBody = (await settings.json()) as { passphraseSet: boolean };
     expect(settingsBody.passphraseSet).toBe(false);
+  });
+});
+
+describe('session failed-attempt throttle', () => {
+  it('locks out after five failures with a Retry-After, and a success resets the counter', async () => {
+    await settingsPUT(req('/api/settings', { method: 'PUT', body: JSON.stringify({ passphrase: 'letmein' }) }));
+
+    const attacker = { 'x-forwarded-for': '203.0.113.7' };
+    for (let i = 0; i < 5; i += 1) {
+      const failed = await sessionPOST(req('/api/session', { method: 'POST', headers: attacker, body: JSON.stringify({ passphrase: 'wrong' }) }));
+      expect(failed.status).toBe(401);
+    }
+    const locked = await sessionPOST(req('/api/session', { method: 'POST', headers: attacker, body: JSON.stringify({ passphrase: 'wrong' }) }));
+    expect(locked.status).toBe(429);
+    expect(locked.headers.get('Retry-After')).not.toBeNull();
+
+    const other = { 'x-forwarded-for': '203.0.113.9' };
+    for (let i = 0; i < 4; i += 1) {
+      const failed = await sessionPOST(req('/api/session', { method: 'POST', headers: other, body: JSON.stringify({ passphrase: 'wrong' }) }));
+      expect(failed.status).toBe(401);
+    }
+    const success = await sessionPOST(req('/api/session', { method: 'POST', headers: other, body: JSON.stringify({ passphrase: 'letmein' }) }));
+    expect(success.status).toBe(200);
+    const afterReset1 = await sessionPOST(req('/api/session', { method: 'POST', headers: other, body: JSON.stringify({ passphrase: 'wrong' }) }));
+    const afterReset2 = await sessionPOST(req('/api/session', { method: 'POST', headers: other, body: JSON.stringify({ passphrase: 'wrong' }) }));
+    expect(afterReset1.status).toBe(401);
+    expect(afterReset2.status).toBe(401);
+  });
+});
+
+describe('manuscript upload cap', () => {
+  it('rejects an oversized manuscript with 413', async () => {
+    const oversized = new File([new Uint8Array(50 * 1024 * 1024 + 1)], 'big.pdf', { type: 'application/pdf' });
+    const form = new FormData();
+    form.append('file', oversized);
+    const res = await manuscriptPOST(req('/api/reviews/rev-cap/manuscript', { method: 'POST', body: form }), {
+      params: Promise.resolve({ id: 'rev-cap' }),
+    });
+    expect(res.status).toBe(413);
   });
 });
 

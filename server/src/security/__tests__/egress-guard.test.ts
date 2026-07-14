@@ -63,6 +63,24 @@ describe('egress guard suite (SEC-07..SEC-12, SEC-30)', () => {
     expect(logs[0]?.query).toBe(canonicalQuery(PUBLISHED_REFERENCE_URL));
   });
 
+  it('keeps credential and mailto params on the wire but strips them from the signed and logged canonical query', async () => {
+    const { fetch, calls, logs } = harness();
+    const url = `${CROSSREF}?query.bibliographic=${encodeURIComponent(
+      'Wellbeing at work review',
+    )}&api_key=SUPERSECRET123&mailto=ops%40example.com`;
+    const response = await fetch(url);
+    expect(response.ok).toBe(true);
+    expect(calls).toEqual([url]);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.blocked).toBe(false);
+    const serialised = JSON.stringify(logs[0]);
+    expect(serialised).not.toContain('SUPERSECRET123');
+    expect(serialised).not.toContain('ops@example.com');
+    expect(serialised).not.toContain('ops%40example.com');
+    expect(logs[0]?.query).not.toContain('api_key');
+    expect(logs[0]?.query).not.toContain('mailto');
+  });
+
   it('blocks a query that carries manuscript body text via the n-gram check, before any network call', async () => {
     const { fetch, calls, logs } = harness();
     const leaking = `${CROSSREF}?query.bibliographic=${encodeURIComponent(

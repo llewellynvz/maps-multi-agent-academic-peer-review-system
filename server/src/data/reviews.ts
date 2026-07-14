@@ -9,6 +9,14 @@ import { nowIso } from './db';
 import { ApiError } from './errors';
 import type { Review, ReviewDetail, ReviewOptions, ReviewSummary } from './types';
 
+const REVIEW_ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
+
+function assertSafeReviewId(id: string): void {
+  if (!REVIEW_ID_PATTERN.test(id)) {
+    throw new ApiError('bad_request', 'Review id contains characters that are not allowed.', { field: 'id' });
+  }
+}
+
 function slugify(title: string | null, id: string): string {
   const base = (title ?? '')
     .toLowerCase()
@@ -128,6 +136,7 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
 }
 
 export function purgeReview(client: MaraClient, id: string): void {
+  assertSafeReviewId(id);
   const { db, sqlite } = client;
   if (getReviewRow(db, id) === undefined) {
     removeReviewDirectories(id);
@@ -162,6 +171,7 @@ export function purgeReview(client: MaraClient, id: string): void {
 }
 
 function removeReviewDirectories(id: string): void {
+  assertSafeReviewId(id);
   const directories = [blobDir(id), resolve(dataDir(), 'deliverables', id)];
   for (const directory of directories) {
     rmSync(directory, { recursive: true, force: true });

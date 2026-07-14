@@ -35,5 +35,9 @@ COPY --from=build /build/app/public /app/web/app/public
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+RUN mkdir -p /app/data && chown -R node:node /app/data
+
+USER node
+
 EXPOSE 3100
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

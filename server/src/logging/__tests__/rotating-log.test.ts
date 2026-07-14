@@ -60,6 +60,25 @@ describe('createRotatingLog', () => {
     expect(line.provider).toBe('azure');
   });
 
+  it('redacts secret-shaped values and message content even under non-secret keys', async () => {
+    const { createRotatingLog } = await import('../rotating-log');
+    const log = createRotatingLog('worker');
+    log.write('info', 'worker', 'inbound authorization=sk-abcdef0123456789abcdef0123456789', {
+      detail: 'api_key=SECRET_TOKEN_VALUE_1234567890',
+      blob: 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5YWJjZA==',
+      note: 'plain text is fine',
+    });
+    const file = resolve(root, 'data', 'logs', 'worker.log');
+    const raw = readFileSync(file, 'utf8').trim();
+    expect(raw).not.toContain('SECRET_TOKEN_VALUE_1234567890');
+    expect(raw).not.toContain('sk-abcdef0123456789abcdef0123456789');
+    expect(raw).not.toContain('QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5YWJjZA');
+    const line = JSON.parse(raw) as Record<string, unknown>;
+    expect(line.note).toBe('plain text is fine');
+    expect(line.detail).toBe('api_key=[redacted]');
+    expect(line.msg).toBe('inbound authorization=[redacted]');
+  });
+
   it('rotates when the file exceeds the size cap', async () => {
     const { createRotatingLog } = await import('../rotating-log');
     const log = createRotatingLog('worker');

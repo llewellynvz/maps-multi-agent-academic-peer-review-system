@@ -11,7 +11,19 @@ export interface RotatingLog {
 const SECRET_KEY =
   /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|tokens?(?!s|[_-]?(?:in|out|cached))|credential|bearer|cookie|client[_-]?cert|_pem)/i;
 
+const SECRET_ASSIGNMENT =
+  /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|bearer|credential|token|cookie)(\s*[=:]\s*)(\S+)/gi;
+const LONG_SECRET_TOKEN =
+  /\b(?:sk|pk|rk)[-_][A-Za-z0-9._-]{16,}\b|\b[A-Za-z0-9+/]{40,}={0,2}\b|\b[A-Fa-f0-9]{40,}\b/g;
+
+function scrubString(value: string): string {
+  return value.replace(SECRET_ASSIGNMENT, (_match, key, sep) => `${key}${sep}[redacted]`).replace(LONG_SECRET_TOKEN, '[redacted]');
+}
+
 function redact(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return scrubString(value);
+  }
   if (Array.isArray(value)) {
     return value.map(redact);
   }
@@ -79,7 +91,7 @@ export function createRotatingLog(name: string): RotatingLog {
           ts: new Date().toISOString(),
           level,
           component,
-          msg: message,
+          msg: scrubString(message),
         };
         if (fields !== undefined) {
           Object.assign(record, redact(fields) as Record<string, unknown>);
