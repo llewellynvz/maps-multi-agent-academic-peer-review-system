@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3100",
+    "dev": "next dev -p 3100 -H 127.0.0.1",
     "build": "next build",
-    "start": "next start -p 3100",
+    "start": "next start -p 3100 -H 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

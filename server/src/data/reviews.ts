@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { desc, eq, sql } from 'drizzle-orm';
 import type { MaraClient, MaraDatabase } from '../db/client';
@@ -130,7 +130,6 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
 export function purgeReview(client: MaraClient, id: string): void {
   const { db, sqlite } = client;
   if (getReviewRow(db, id) === undefined) {
-    // DATA-20: idempotent. Still clear any stray directories, then report success.
     removeReviewDirectories(id);
     return;
   }
@@ -144,7 +143,6 @@ export function purgeReview(client: MaraClient, id: string): void {
 
   removeReviewDirectories(id);
 
-  // DATA-21: verify no dependent row survives.
   const tables = [
     'manuscripts',
     'findings',
@@ -164,6 +162,11 @@ export function purgeReview(client: MaraClient, id: string): void {
 }
 
 function removeReviewDirectories(id: string): void {
-  rmSync(blobDir(id), { recursive: true, force: true });
-  rmSync(resolve(dataDir(), 'deliverables', id), { recursive: true, force: true });
+  const directories = [blobDir(id), resolve(dataDir(), 'deliverables', id)];
+  for (const directory of directories) {
+    rmSync(directory, { recursive: true, force: true });
+    if (existsSync(directory)) {
+      throw new ApiError('internal', `Purge could not remove ${directory}. Close any open file handles and retry.`);
+    }
+  }
 }

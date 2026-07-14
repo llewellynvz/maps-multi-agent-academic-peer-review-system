@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
-import { phaseCheckpoints, reviews, runCommands } from '../db/schema';
+import { phaseCheckpoints, reviewEvents, reviews, runCommands } from '../db/schema';
 import { nowIso } from './db';
 import { ApiError } from './errors';
 import { requireReview } from './reviews';
@@ -28,6 +28,38 @@ function otherActiveExists(db: MaraDatabase, reviewId: string): boolean {
   return rows.some((row) => row.id !== reviewId && ACTIVE_STATUSES.has(row.status));
 }
 
+function pendingCommandExists(db: MaraDatabase, reviewId: string, command: RunCommand): boolean {
+  const commands = db
+    .select({ id: runCommands.id, command: runCommands.command })
+    .from(runCommands)
+    .where(eq(runCommands.reviewId, reviewId))
+    .all()
+    .filter((row) => row.command === command);
+  if (commands.length === 0) {
+    return false;
+  }
+  const acked = new Set<string>();
+  const events = db
+    .select({ kind: reviewEvents.kind, payloadJson: reviewEvents.payloadJson })
+    .from(reviewEvents)
+    .where(eq(reviewEvents.reviewId, reviewId))
+    .all();
+  for (const event of events) {
+    if (event.kind !== 'control_ack') {
+      continue;
+    }
+    try {
+      const payload = JSON.parse(event.payloadJson) as { commandId?: string };
+      if (typeof payload.commandId === 'string') {
+        acked.add(payload.commandId);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return commands.some((row) => !acked.has(row.id));
+}
+
 export interface RunControlResult {
   accepted: true;
   command: RunCommand;
@@ -52,7 +84,7 @@ export function submitRunControl(
   let queued = false;
 
   if (command === 'run') {
-    if (ACTIVE_STATUSES.has(review.status)) {
+    if (ACTIVE_STATUSES.has(review.status) || pendingCommandExists(db, reviewId, 'run')) {
       noop = true;
     } else if (otherActiveExists(db, reviewId)) {
       queued = true;

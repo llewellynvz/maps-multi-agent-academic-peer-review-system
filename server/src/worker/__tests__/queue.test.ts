@@ -142,4 +142,60 @@ describe('WorkerRunner single-slot queue (NFR-06)', () => {
     await runner.runOnce();
     expect(reviewStatus('rev-B')).toBe('completed');
   });
+
+  it('prioritises an explicit command over crash-recovered stale reviews', async () => {
+    insertReview('rev-stale', '2026-07-13T00:00:00.000Z');
+    client.sqlite.prepare("UPDATE reviews SET status = 'running' WHERE id = 'rev-stale'").run();
+    insertReview('rev-fresh', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-stale');
+    completeIngest('rev-fresh');
+
+    const engineOrder: string[] = [];
+    const processors: WorkerProcessors = {
+      startIngest: async () => 'ingested',
+      resumeIngest: async () => 'ingested',
+      runEngine: async (reviewId) => {
+        engineOrder.push(reviewId);
+        updateReview(client.db, reviewId, { status: 'completed' });
+        return 'completed';
+      },
+    };
+
+    const runner = new WorkerRunner({ client, processors });
+    runner.recover();
+    insertRunCommand('rev-fresh', 'run');
+
+    await runner.runOnce();
+    await runner.runOnce();
+    expect(engineOrder).toEqual(['rev-fresh', 'rev-stale']);
+  });
+
+  it('marks a release-gate-blocked run failed without duplicating the engine terminal', async () => {
+    insertReview('rev-blocked', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-blocked');
+    insertRunCommand('rev-blocked', 'run');
+
+    const processors: WorkerProcessors = {
+      startIngest: async () => 'ingested',
+      resumeIngest: async () => 'ingested',
+      runEngine: async (reviewId) => {
+        updateReview(client.db, reviewId, { status: 'running', errorClass: 'release_gate_block' });
+        client.sqlite
+          .prepare(
+            "INSERT INTO review_events (id, review_id, seq, ts, kind, phase, payload_json) VALUES (?, ?, 1, ?, 'run_terminal', 'phase_7', ?)",
+          )
+          .run(randomUUID(), reviewId, new Date().toISOString(), JSON.stringify({ released: false, reason: 'halt' }));
+        return 'completed';
+      },
+    };
+
+    const runner = new WorkerRunner({ client, processors });
+    await runner.runOnce();
+
+    expect(reviewStatus('rev-blocked')).toBe('failed');
+    const terminals = client.sqlite
+      .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = 'rev-blocked' AND kind = 'run_terminal'")
+      .get() as { n: number };
+    expect(terminals.n).toBe(1);
+  });
 });

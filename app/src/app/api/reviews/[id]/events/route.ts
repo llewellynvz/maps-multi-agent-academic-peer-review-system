@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { deriveEphemeral, getClient, maxSeq, replayEvents, reviewTerminalState } from 'server/src/data';
+import { deriveEphemeral, getClient, maxSeq, replayEvents } from 'server/src/data';
 import { authDenied } from '@/lib/server';
 
 export const runtime = 'nodejs';
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
 
   const encoder = new TextEncoder();
   const { db } = getClient();
+  let close: () => void = () => undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -34,25 +35,27 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
           controller.enqueue(encoder.encode(chunk));
           return true;
         } catch {
+          close();
           return false;
         }
       };
 
       const replay = (): void => {
         for (const event of replayEvents(db, id, lastSeq)) {
-          send(frame(event.event, event.data, event.seq));
+          if (!send(frame(event.event, event.data, event.seq))) {
+            return;
+          }
           lastSeq = event.seq;
         }
       };
 
       const ephemeral = (): void => {
         for (const event of deriveEphemeral(db, id)) {
-          send(frame(event.event, event.data));
+          if (!send(frame(event.event, event.data))) {
+            return;
+          }
         }
       };
-
-      replay();
-      ephemeral();
 
       const persistedTimer = setInterval(() => {
         try {
@@ -60,20 +63,15 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
             replay();
           }
         } catch {
-          /* review purged mid-stream */
+          close();
         }
       }, 1000);
 
       const ephemeralTimer = setInterval(() => {
         try {
-          const state = reviewTerminalState(db, id);
           ephemeral();
-          if (state.terminal) {
-            // The terminal audit event has already been replayed; keep the connection
-            // open on a heartbeat so a late reconnect still resolves cleanly.
-          }
         } catch {
-          /* review purged mid-stream */
+          close();
         }
       }, 2000);
 
@@ -81,7 +79,7 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
         send(': ping\n\n');
       }, 15000);
 
-      const close = (): void => {
+      close = (): void => {
         clearInterval(persistedTimer);
         clearInterval(ephemeralTimer);
         clearInterval(heartbeatTimer);
@@ -93,6 +91,16 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
       };
 
       req.signal.addEventListener('abort', close);
+
+      try {
+        replay();
+        ephemeral();
+      } catch {
+        close();
+      }
+    },
+    cancel() {
+      close();
     },
   });
 

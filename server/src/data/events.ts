@@ -20,10 +20,12 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
     case 'finding_recorded':
       return { seq: row.seq, event: 'finding_headline', data: payload };
     case 'run_terminal': {
-      const outcome = (payload as { outcome?: string }).outcome;
+      const outcome = (payload as { outcome?: string; released?: boolean }).outcome;
+      const released = (payload as { released?: boolean }).released;
+      const failed = outcome === 'failed' || outcome === 'cancelled' || released === false;
       return {
         seq: row.seq,
-        event: outcome === 'failed' ? 'run_failed' : 'run_complete',
+        event: failed ? 'run_failed' : 'run_complete',
         data: payload,
       };
     }
@@ -61,8 +63,12 @@ export function replayEvents(db: MaraDatabase, reviewId: string, afterSeq: numbe
 }
 
 export function maxSeq(db: MaraDatabase, reviewId: string): number {
-  const rows = db.select({ seq: reviewEvents.seq }).from(reviewEvents).where(eq(reviewEvents.reviewId, reviewId)).all();
-  return rows.reduce((max, row) => (row.seq > max ? row.seq : max), 0);
+  const rows = db
+    .select({ seq: reviewEvents.seq, kind: reviewEvents.kind })
+    .from(reviewEvents)
+    .where(eq(reviewEvents.reviewId, reviewId))
+    .all();
+  return rows.reduce((max, row) => (STREAMED_KINDS.has(row.kind) && row.seq > max ? row.seq : max), 0);
 }
 
 export interface EphemeralEvent {

@@ -20,6 +20,7 @@ interface Intent {
   answers?: Record<string, string>;
   preset?: string;
   createdAt: string;
+  recovered?: boolean;
 }
 
 export interface WorkerRunnerOptions {
@@ -152,13 +153,18 @@ export class WorkerRunner {
     if (this.activeReviewId !== null) {
       return null;
     }
-    let best: { reviewId: string; createdAt: string } | null = null;
+    let best: { reviewId: string; createdAt: string; recovered: boolean } | null = null;
     for (const [reviewId, intent] of this.intents) {
       if (this.cancelRequested.has(reviewId)) {
         continue;
       }
-      if (best === null || intent.createdAt < best.createdAt) {
-        best = { reviewId, createdAt: intent.createdAt };
+      const recovered = intent.recovered === true;
+      if (
+        best === null ||
+        (!recovered && best.recovered) ||
+        (recovered === best.recovered && intent.createdAt < best.createdAt)
+      ) {
+        best = { reviewId, createdAt: intent.createdAt, recovered };
       }
     }
     return best?.reviewId ?? null;
@@ -234,10 +240,16 @@ export class WorkerRunner {
   private finishEngine(reviewId: string, result: EngineResult, durationMs: number): void {
     if (result === 'completed') {
       const review = this.db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
-      this.emitTerminal(reviewId, 'complete', {
-        recommendation: review?.recommendation ?? null,
-        durationMs,
-      });
+      if (review?.status === 'completed') {
+        this.emitTerminal(reviewId, 'complete', {
+          recommendation: review.recommendation ?? null,
+          durationMs,
+        });
+        return;
+      }
+      const errorClass = review?.errorClass ?? 'not_released';
+      updateReview(this.db, reviewId, { status: 'failed', errorClass });
+      this.emitTerminal(reviewId, 'failed', { errorClass, durationMs });
     } else if (result === 'paused') {
       this.pauseRequested.delete(reviewId);
       updateReview(this.db, reviewId, { status: 'paused' });
@@ -250,6 +262,12 @@ export class WorkerRunner {
   }
 
   private emitTerminal(reviewId: string, outcome: string, extra: Record<string, unknown>): void {
+    const existing = this.client.sqlite
+      .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = ? AND kind = 'run_terminal'")
+      .get(reviewId) as { n: number };
+    if (existing.n > 0) {
+      return;
+    }
     insertEvent(this.db, {
       reviewId,
       kind: 'run_terminal',
@@ -316,7 +334,7 @@ export class WorkerRunner {
     const ts = new Date().toISOString();
     for (const row of rows) {
       if (row.status === 'running' || row.status === 'sanitizing' || row.status === 'queued') {
-        this.intents.set(row.id, { kind: 'run', args: {}, createdAt: row.createdAt ?? ts });
+        this.intents.set(row.id, { kind: 'run', args: {}, createdAt: row.createdAt ?? ts, recovered: true });
       }
     }
   }

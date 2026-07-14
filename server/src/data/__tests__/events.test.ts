@@ -70,6 +70,12 @@ describe('SSE persisted replay (API-22/26)', () => {
     insertEvent('rev-2', 1, 'run_terminal', { outcome: 'failed', errorClass: 'engine_error' }, 'phase_8');
     expect(replayEvents(client.db, 'rev-2', 0)[0]?.event).toBe('run_failed');
   });
+
+  it('maps a release-gate halt terminal (released false, no outcome) to run_failed', () => {
+    insertReview('rev-4');
+    insertEvent('rev-4', 1, 'run_terminal', { released: false, reason: 'Forced halt at the release gate.' }, 'phase_7');
+    expect(replayEvents(client.db, 'rev-4', 0)[0]?.event).toBe('run_failed');
+  });
 });
 
 describe('editor-only masking (API-25, UI-33)', () => {

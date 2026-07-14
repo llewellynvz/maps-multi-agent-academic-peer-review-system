@@ -5,7 +5,8 @@ import { isAbsolute, resolve } from 'node:path';
 import { createDb, type SqliteConnection } from '../src/db/client';
 import { dataDir, fixturesDir, maraDbPath, repoRoot } from '../src/paths';
 
-const BASE = 'http://127.0.0.1:3100';
+const PORT = process.env.MARA_PORT ?? '3100';
+const BASE = `http://127.0.0.1:${PORT}`;
 const PLOS_DOI = '10.1371/journal.pone.0275925';
 const PLOS_PDF_URL = `https://journals.plos.org/plosone/article/file?id=${PLOS_DOI}&type=printable`;
 const PDF_FIXTURE = resolve(fixturesDir(), 'plos-0275925.pdf');
@@ -175,7 +176,7 @@ interface SseEvent {
 
 async function consumeSse(
   reviewId: string,
-  options: { lastEventId?: number; stopAfterEvent?: string; dropAfterIds?: number; maxMs: number },
+  options: { lastEventId?: number; stopAfterEvents?: string[]; dropAfterIds?: number; maxMs: number },
 ): Promise<{ events: SseEvent[]; lastId: number }> {
   const controller = new AbortController();
   const headers: Record<string, string> = {};
@@ -223,7 +224,7 @@ async function consumeSse(
           idsWithLine += 1;
         }
         events.push(parsed);
-        if (options.stopAfterEvent !== undefined && event === options.stopAfterEvent) {
+        if (options.stopAfterEvents !== undefined && options.stopAfterEvents.includes(event)) {
           return { events, lastId };
         }
         if (options.dropAfterIds !== undefined && idsWithLine >= options.dropAfterIds) {
@@ -289,11 +290,11 @@ async function main(): Promise<void> {
     }
   }
 
-  spawnService('app', ['--filter', 'app', 'start']);
+  spawnService('app', ['--filter', 'app', 'exec', 'next', 'start', '-p', PORT, '-H', '127.0.0.1']);
   spawnService('worker', ['--filter', 'server', 'worker']);
 
   await waitForApp(90000);
-  check('boot.app', true, 'app healthy on 127.0.0.1:3100');
+  check('boot.app', true, `app healthy on ${BASE}`);
   await waitForWorker(30000);
   check('boot.worker', true, 'worker heartbeat up');
 
@@ -327,7 +328,11 @@ async function main(): Promise<void> {
   const tinyWhileBusy = await reviewStatus(tinyId);
   check('queue.secondQueued', tinyWhileBusy.status === 'queued', `second review status ${tinyWhileBusy.status} while first runs`);
 
-  const secondLeg = await consumeSse(reviewId, { lastEventId: firstLeg.lastId, stopAfterEvent: 'run_complete', maxMs: 600000 });
+  const secondLeg = await consumeSse(reviewId, {
+    lastEventId: firstLeg.lastId,
+    stopAfterEvents: ['run_complete', 'run_failed'],
+    maxMs: 600000,
+  });
   const receivedIds = new Set<number>([
     ...firstLeg.events.filter((e) => e.id !== undefined).map((e) => e.id as number),
     ...secondLeg.events.filter((e) => e.id !== undefined).map((e) => e.id as number),
