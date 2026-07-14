@@ -1,6 +1,6 @@
 {
   "name": "review-report-writer",
-  "promptVersion": "1.0.0",
+  "promptVersion": "1.2.0",
   "phase": [6, 7],
   "role": "frontier",
   "knowledge": [

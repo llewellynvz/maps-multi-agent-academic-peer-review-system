@@ -12,40 +12,41 @@ The markdown templates below are the working drafts. The final `.docx` deliverab
 
 ## House-style deliverable specification (the .docx look, non-negotiable)
 
-The two shipped deliverables are branded A4 Word documents. They are produced at Phase 8 by the reusable generator at `.claude/skills/review-paper/assets/house-docx-generator.js` (do not hand-build docx XML). Two documents ship:
+The two shipped deliverables are branded A4 Word documents, produced deterministically by the platform's docx generator at Phase 8. No agent hand-builds docx: agents produce the markdown bodies and structured envelopes, and the generator renders them. Two documents ship:
 
-- `output/Peer-Review-Report.docx`: the referee report, addressed to the editor and authors, carrying no editor-only content (no integrity signals, no swarm figures, no confidentiality forensics). It carries the rubric-score table, which is part of the standard report.
-- `output/Editor-Summary.docx`: the confidential editor-only note (recommendation and confidence, the preserved alternative reading, integrity signals in signal language, confidentiality position, scope fit, human checks).
+- The **Peer Review Report**: the referee report, addressed to the editor and authors, carrying no editor-only content (no integrity signals, no swarm figures, no confidentiality forensics). It carries the rubric-score table, which is part of the standard report.
+- The **Editor Summary**: the confidential editor-only note (recommendation and confidence, the preserved alternative reading, integrity signals in signal language, confidentiality position, scope fit, human checks).
 
 Both are anonymous: signed "The Reviewer", no reviewer identity anywhere, unless a dispatch overrides to a signed review.
 
-**The first page is a clean letterhead, not a full-bleed cover.** The benchmark referee reports open straight into the letterhead: a teal title block, a metadata table, then the review. No brochure-style gradient cover. The letterhead background sits on every page.
+**The first page is a clean letterhead, not a full-bleed cover**: a Psynalytics header bar, a teal title block, a metadata table, then the review. No brochure-style cover.
 
-**Visual system (do not substitute):**
-- Page: A4 portrait (11906 x 16838 twip). Every page sits over the full-bleed letterhead `letterhead-bg.png` (logo and contact bar at the top, footer wave and KvK line at the bottom). Content margins clear it (top ~2350, bottom ~1650, left and right 1134 twip).
-- Fonts: headings **Gadugi**, body **Calibri Light**. Never Inter or Arial for the shipped docx.
+**Visual system (rendered by the generator, recorded here so prose and tables are written for it):**
+- Page: A4 portrait. Header bar `PSYNALYTICS · Peer review` over a lime rule on every page.
+- Fonts: **Inter** throughout, **JetBrains Mono** for identifiers and metadata values.
 - Palette: teal `008DA1`, teal-dark `006D7C`, graphite body `2B2D2E`, grey `595959`, bone `FEFCF5`, teal-tint `E8F5F7`, lime accent `A7D12B` (accent only). No other colours.
-- Title block (page 1, below the letterhead header): the document type in large teal Gadugi (`PEER REVIEW REPORT`), a lime accent rule, then one grey sub-line (journal, section, date). No cover image.
-- Metadata table: opens the content, a `Field | Detail` table (Manuscript ID, Title, Article type, Recommendation, and any material-scope rows). Teal header, bold teal-dark first column, teal-tint zebra striping.
-- Section headers (`#`): white Gadugi on a full-width teal-dark `006D7C` banner. Sub-headers (`##`): teal-dark Gadugi, no fill. Body: Calibri Light graphite, justified. Bold inline: bold teal-dark, used for the per-concern problem labels.
-- Rubric table and top-findings table: same teal-header table style as the metadata table.
-- Footer: centred grey line, anonymous, `Confidential peer review · <journal> · Page N`.
-- Bullets use a teal en-dash marker.
+- Title block (page 1): a teal kicker line, the review title in large teal-dark Inter, a lime accent rule, then one grey sub-line (journal, article type, date).
+- Metadata table: opens the content, a `Field | Detail` table. Teal header, bold teal-dark first column, teal-tint and bone striping.
+- Section headers (`#`): bone Inter on a full-width teal-dark banner. Sub-headers (`##`, `###`): teal-dark Inter, no fill. Body: Inter graphite. Bold inline: the per-concern problem labels.
+- Rubric table and any findings table: same teal-header table style as the metadata table.
+- Footer: centred grey line, anonymous, with `Page N of M`.
 
 **House section structure for the Peer Review Report** (author-and-editor facing, the seven parts, matching the benchmark reports):
 1. Title block and metadata table (rendered by the generator from the job config, not from body markdown).
-2. `Dear Editor and Authors,` salutation and a one-paragraph lead-in: thanks, what was read, where the comments concentrate, the recommendation stated early.
+2. `Dear Editor and Authors,` salutation and a one-paragraph lead-in: thanks, what was read, where the comments concentrate, the recommendation stated early in natural prose.
 3. `# 1. Brief overview`: 4 to 7 lines, what the manuscript does, constructs, design, claimed contribution, evidence types. Non-evaluative.
-4. `# 2. Overall recommendation`: one line stating the taxonomy and confidence, then three bullets naming the concerns that anchor the decision.
+4. `# 2. Overall recommendation`: the decision and its confidence written as reviewer prose per the knowledge/06 natural-language register (never a taxonomy token, never a key-value line, never a bare numeric confidence), then three bullets naming the concerns that anchor the decision.
 5. `# 3. Executive summary` with `## Strengths` (3 to 5, anchored), `## Major issues` (each a bold-labelled scannable unit per knowledge/06), and `## Top five imperative changes` (numbered).
-6. `# 4. Developmental feedback`: the major issues in full as numbered points (4.1, 4.2, each with a short descriptive heading), every point in the knowledge/06 micro-pattern, plus any structural upgrades and a `## Minor points` list.
+6. `# 4. Developmental feedback`, in two halves:
+   - `## 4A. Major issues in full`: numbered points (4A.1, 4A.2, each with a short descriptive heading), every point in the knowledge/06 micro-pattern and engaging the named literature where the field-context material supplies it. A major-class recommendation carries 6 to 12 majors. When fewer than 3 substantive majors exist, spend the full word budget on the depth of what is there, never on invented breadth.
+   - `## 4B. By-section review`: one subsection per manuscript section with substantive content (Introduction, Methods, Results as present, and the Discussion always). The Discussion subsection interprets the manuscript against the literature: causal inflation, overclaiming, and unexamined alternative explanations. Restating the results is a defect. Primer boxes (knowledge/06) sit inside the subsection that needs them, and the half closes with `### Structural upgrades` for new elements the manuscript needs, then a `## Minor points` list.
 7. `# 5. Rubric scores`: the criterion table (Criterion | Score | Justification) from knowledge/03, the average, and the three lowest criteria named as bottlenecks.
 8. `# 6. What would change my recommendation`: a numbered minimum-revision package, each item naming the category the outcome could advance to.
 9. `# 7. Closing`: the decision-hinge consolidation per knowledge/04, then `# References` (APA 7).
 
-The recommendation taxonomy and confidence come from knowledge/03 and the meta-synthesis. The developmental stance and banned-phrasing rules (knowledge/04) and the writing craft and humanize pass (knowledge/06) bind every sentence (no em dashes, no prose semicolons, South African English, first person, anonymous). Confidence may be shown as the qualitative band alongside or in place of the numeric value, but it must not contradict the editor summary.
+The recommendation taxonomy and confidence come from knowledge/03 and the meta-synthesis. The developmental stance and banned-phrasing rules (knowledge/04) and the writing craft, humanize pass, and natural-language register (knowledge/06) bind every sentence (no em dashes, no prose semicolons, South African English, first person, anonymous). The shipped report body carries no finding ids: grounding travels in the structured evidence map returned alongside the body, one entry per 4A point and 4B subsection, each entry naming the section, the bold problem label verbatim, the manuscript anchor, and the supporting finding ids. The narrative target for the shipped report is 2000 to 2500 words excluding the rubric table and references, enforced by the final critic.
 
-**Production and verification:** install `docx` under the repo if absent, run the generator with a job config, then validate every produced file with the document skill's `validate.py` and render it to PDF and image (Word COM `SaveAs(path, 17)` on Windows) to confirm the letterhead, title block, metadata table, banners, rubric table, and body read correctly. Never ship a docx you have not seen rendered.
+**Production and verification:** the platform generator renders both documents at Phase 8 from the shipped envelope and the private notes, and the release gate has already validated the content by then. Agents never produce or verify docx files. What agents control is the markdown: GFM only, no raw HTML, literal hierarchical numbering in headings, tables well-formed, and the writing-craft rules applied, so the generator renders cleanly.
 
 ---
 
@@ -310,11 +311,13 @@ The mechanical and completeness gate before production. Every unchecked box is a
 - [ ] Every criterion score references at least one ledger ID.
 
 ## Structural completeness (the seven parts)
-- [ ] Salutation opens: merit acknowledged, what was read, recommendation stated early.
+- [ ] Salutation opens: merit acknowledged, what was read, recommendation stated early in natural prose.
 - [ ] Part 1 Brief overview present, non-evaluative.
-- [ ] Part 2 Overall recommendation: one line plus three anchor bullets.
+- [ ] Part 2 Overall recommendation: reviewer prose per the knowledge/06 natural-language register, plus three anchor bullets. No taxonomy tokens, key-value lines, or bare numeric confidence anywhere in the body.
 - [ ] Part 3 Executive summary: strengths (3 to 5, anchored), major issues, top five changes.
-- [ ] Part 4 Developmental feedback: numbered points, minor points listed separately.
+- [ ] Part 4A Major issues in full: 6 to 12 for a major-class recommendation, or the depth rule applied and visible when fewer than 3 exist. Literature engaged by name where the field-context material supplies it.
+- [ ] Part 4B By-section review present, Discussion always covered as interpretation (causal inflation, overclaiming, unexamined alternatives), never restatement. Primer boxes where a foundational correction is needed. Structural upgrades and minor points listed separately.
+- [ ] No finding ids in the shipped report body. The evidence map covers every 4A point and 4B subsection with section, verbatim bold label, anchor, and finding ids.
 - [ ] Part 5 Rubric scores: table, average, three lowest as bottlenecks.
 - [ ] Part 6 What would change my recommendation: numbered, each names a category.
 - [ ] Part 7 Closing identifies the defensible paper and states the decision hinge.
@@ -331,12 +334,16 @@ The mechanical and completeness gate before production. Every unchecked box is a
 - [ ] No sentence over ~35 words. Average sits at 15 to 20. Concrete leads each sentence.
 - [ ] AI-tell scan clean: no "which is why", "as it stands", "so that", trailing
       participles, "not X it's Y", formulaic transitions, marketing descriptors.
+- [ ] Machine-token scan clean per knowledge/06: no underscore tokens, key-value lines,
+      finding ids, or pipeline vocabulary in shipped prose.
+- [ ] Transplant test applied: every evaluative sentence carries a detail only this
+      manuscript could produce.
 - [ ] First person throughout. Anonymous: signed "The Reviewer", no reviewer identity.
 - [ ] Reads in ninety seconds as the editor: decision, anchor concerns, and fixes findable at a glance.
 
 ## Word count
-- [ ] Report narrative is roughly 2000 to 3000 words excluding the rubric table and
-      references. Guidance, not a gate.
+- [ ] Shipped report narrative is 2000 to 2500 words excluding the rubric table and
+      references. The final critic enforces the band. The internal report has no cap.
 ```
 
 ---

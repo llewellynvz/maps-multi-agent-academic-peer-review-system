@@ -171,7 +171,7 @@ const bindings: GoldenBinding[] = [
     },
   },
   {
-    label: 'report writer mode B ships the seven-part report with no editor-only leak',
+    label: 'report writer mode B ships the seven-part report id-free with a grounding evidence map',
     agent: 'review-report-writer',
     mode: 'B',
     file: 'review-report-writer-B.json',
@@ -180,7 +180,13 @@ const bindings: GoldenBinding[] = [
       expect(value.editorOnlyLeak).toBe(false);
       expect(value.rubricTable).toHaveLength(15);
       expect(value.citedFindingIds).toContain('REV-STAT-0001');
-      expect(value.bodyMarkdown).toContain('REV-STAT-0001');
+      expect(value.bodyMarkdown).not.toMatch(/REV-[A-Z]{3,4}-\d{4}/);
+      expect(value.evidenceMap.length).toBeGreaterThan(0);
+      const union = new Set(value.evidenceMap.flatMap((entry) => entry.findingIds));
+      expect([...union].sort()).toEqual([...value.citedFindingIds].sort());
+      for (const entry of value.evidenceMap) {
+        expect(value.bodyMarkdown).toContain(`**${entry.label}`);
+      }
     },
   },
   {

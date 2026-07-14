@@ -20,6 +20,7 @@ export const reviewMetaReviewerSchema = z.object({
   recommendationConfidence: z.number().min(0).max(1),
   scopeFit: z.object({ score: z.number(), factorsUsed: z.array(z.string()) }),
   decisionHinges: z.array(z.object({ findingId: findingIdSchema, hinge: z.string() })),
+  editorSummaryMarkdown: z.string().min(1),
   selfCritique: selfCritiqueSchema,
 });
 

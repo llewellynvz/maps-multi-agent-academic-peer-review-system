@@ -1,6 +1,6 @@
 {
   "name": "manuscript-sanitizer",
-  "promptVersion": "1.0.0",
+  "promptVersion": "1.1.0",
   "phase": [0],
   "role": "cheap",
   "knowledge": ["01_REVIEW_GOVERNANCE.md", "05_REVIEW_TEMPLATES.md"]

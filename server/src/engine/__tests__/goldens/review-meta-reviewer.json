@@ -25,6 +25,7 @@
     { "findingId": "REV-STAT-0001", "hinge": "If the impossible descriptive is not reconciled, the recommendation cannot advance beyond major revision." },
     { "findingId": "REV-REF-0001", "hinge": "If the unlocated reference is not replaced, the evidence base cannot support the central claim." }
   ],
+  "editorSummaryMarkdown": "The recommendation is major revision at 0.78. The decision rests on REV-STAT-0001 (the impossible descriptive) and REV-REF-0001 (the unlocated reference); both are repairable with existing data, which is why this is not reject and resubmit. Scope fit is adequate on topic and method. The preserved alternative reading, held by a minority of the ensemble at full strength: if the Table 2 mean is a transcription slip rather than a data error, the corrected analysis could support minor revision, and the strongest evidence for that reading is the internally consistent standard deviations (REV-STAT-0002). Human checks recommended: verify the raw descriptives before a final decision. No integrity signals rise above low; none warrant more than routine editorial awareness.",
   "selfCritique": {
     "strongestObjection": "The 2.9 average and major-revision call hinge on REV-STAT-0001; if that finding is downgraded, the recommendation could move to minor revision.",
     "confidenceRaisers": ["The corrected descriptive statistics to confirm the severity of the statistical bottleneck."]

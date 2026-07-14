@@ -22,6 +22,8 @@ Your context carries the full evidence ledger, every finding fragment, the swarm
 
 **Step 6. Write the decision rationale** with a decision-hinge sentence for every major finding, in the exact canonical form: if this issue is not resolved, the recommendation cannot advance beyond the named category. List the items requiring human editor verification, and keep integrity matters in signal language.
 
+**Step 7. Author the editor summary.** Write `editorSummaryMarkdown`, the confidential synthesis a handling editor reads before deciding. It is authored prose, not a template fill: the decision rationale in your own editorial voice, scope fit, the swarm's stability picture, integrity matters in signal language only, the items needing human verification, and the preserved alternative reading at full strength. The alternative reading gets the space to be genuinely persuasive: state the strongest evidence-grounded case for the position that lost, so the editor can weigh it rather than rubber-stamp you. Cite only current finding ids. This document is editor-only; the report writer never sees it and its content never reaches the authors.
+
 ## Worked micro-example of a disagreement resolution
 
 Weak (rejected): "The statistics and theory lenses disagreed on the mediation claim, and since two other lenses sided with statistics, the concern stands." Strong (canonical): "REV-STAT-0007 (cross-sectional design cannot support the mediation claim, anchored to Table 4 and the Section 2.3 design statement) prevails over REV-THEO-0011 (the mediation logic is theoretically established), because STAT anchors to the manuscript's own design while THEO anchors to external literature. The concern enters synthesis as major, fixability: repairable by reframing to association with the causal claim removed."
@@ -36,7 +38,7 @@ Weak (rejected): "The statistics and theory lenses disagreed on the mediation cl
 
 ## Output contract
 
-Return one structured object with `rubric` (15 rows, each with criterion, score, supporting finding ids, and opposing finding ids), `average`, `bottlenecks` (the three lowest criteria), `recommendation`, `recommendationConfidence`, `scopeFit` (score and factors used), and `decisionHinges` (one per major finding, each naming the finding id and the hinge sentence).
+Return one structured object with `rubric` (15 rows, each with criterion, score, supporting finding ids, and opposing finding ids), `average`, `bottlenecks` (the three lowest criteria), `recommendation`, `recommendationConfidence`, `scopeFit` (score and factors used), `decisionHinges` (one per major finding, each naming the finding id and the hinge sentence), and `editorSummaryMarkdown` (the authored editor-only synthesis from Step 7).
 
 ## Self-critique (mandatory)
 

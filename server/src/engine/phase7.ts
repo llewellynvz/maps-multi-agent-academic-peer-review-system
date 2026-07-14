@@ -142,7 +142,7 @@ async function runMetaReviewer(
         { label: 'Cross-review calibration lessons', content: 'No calibration record yet (early-run condition).' },
       ],
       routingNote:
-        'Integrate every lens, integrity, and swarm finding into one editorial synthesis. Score all 15 criteria, each row citing supporting and opposing finding ids that exist in the ledger above. Set the recommendation by the taxonomy and thresholds, pulled down never up by severity and fixability. Give one decision hinge per major finding, each naming a real finding id. Compute the unweighted average to one decimal.',
+        'Integrate every lens, integrity, and swarm finding into one editorial synthesis. Score all 15 criteria, each row citing supporting and opposing finding ids that exist in the ledger above. Set the recommendation by the taxonomy and thresholds, pulled down never up by severity and fixability. Give one decision hinge per major finding, each naming a real finding id. Compute the unweighted average to one decimal. Author editorSummaryMarkdown for the handling editor: the decision rationale, scope fit, integrity matters in signal language, and the preserved alternative reading at full strength, citing only current finding ids.',
     },
   });
   for (const row of meta.rubric) {
@@ -240,7 +240,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             },
           ],
           routingNote:
-            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. Cite only finding ids from the author-facing ledger above; any id shown as [EDITOR-ONLY] in the other artefacts is confidential and must never appear in your text or citedFindingIds. List every id you cite in citedFindingIds and assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
+            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
 
@@ -249,6 +249,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         recommendationConfidence: currentMeta.recommendationConfidence,
         currentFindings: currentAll,
         strongestMinorityReport: swarm.strongestMinorityReport,
+        editorSummaryMarkdown: redactSupersededIds(currentMeta.editorSummaryMarkdown, ledgerIdsNow),
       });
       writeArtefact(reviewId, `p7-private-notes-${cycle}`, privateNotes);
       lastShipped = shipped;
@@ -261,6 +262,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         privateNotesReferencedIds: privateNotes.referencedIds,
         ledgerIds: ledgerIdsNow,
         editorOnlyIds,
+        idFreeProse: true,
+        evidenceMap: shipped.evidenceMap,
+        authorFacingAncillary: shipped.rubricTable.map((row) => row.justification).join('\n'),
       });
 
       if (!grounding.ok) {
@@ -271,7 +275,13 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
             : grounding.kind === 'ungrounded-id'
               ? 'grounding validator: your text cited finding ids that are superseded or unknown; cite only ids present verbatim in the author-facing ledger artefact and never ids marked [SUPERSEDED]'
-              : `grounding validator: ${lastObjection}`;
+              : grounding.kind === 'id-in-prose'
+                ? `grounding validator: the shipped report body contains raw finding ids; the prose stays id-free and all grounding moves into evidenceMap entries. Specifically: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`
+                : grounding.kind === 'machine-token'
+                  ? `grounding validator: the shipped report body contains internal machine tokens; rewrite exactly these spots as natural reviewer prose and change nothing else: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`
+                  : grounding.kind === 'evidence-map-mismatch'
+                    ? `grounding validator: the evidence map does not line up with the ledger and the body: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`
+                    : `grounding validator: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {
@@ -465,7 +475,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               },
               { label: 'Arbitration rationale', content: arbitration.rationale },
             ],
-            routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue ${narrowed} honestly in the developmental voice. Findings, evidence, and cited ids stay exactly as they are; only the recommendation framing changes. Cite only ids from the author-facing ledger; list every cited id in citedFindingIds.`,
+            routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register (no taxonomy tokens, no key-value lines, no finding ids in the body). Findings, evidence, the evidenceMap, and citedFindingIds stay exactly as they are; only the recommendation framing changes.`,
           },
         });
         const alignedNotes = assemblePrivateNotes({
@@ -473,6 +483,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           recommendationConfidence: currentMeta.recommendationConfidence,
           currentFindings: alignAll,
           strongestMinorityReport: swarm.strongestMinorityReport,
+          editorSummaryMarkdown: redactSupersededIds(currentMeta.editorSummaryMarkdown, alignLedgerIds),
         });
         const alignedGrounding = validateGrounding({
           authorFacingBody: aligned.bodyMarkdown,
@@ -481,6 +492,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           privateNotesReferencedIds: alignedNotes.referencedIds,
           ledgerIds: alignLedgerIds,
           editorOnlyIds: alignEditorOnlyIds,
+          idFreeProse: true,
+          evidenceMap: aligned.evidenceMap,
+          authorFacingAncillary: aligned.rubricTable.map((row) => row.justification).join('\n'),
         });
         if (alignedGrounding.ok) {
           lastShipped = aligned;

@@ -81,6 +81,29 @@ The humanize pass cleans the prose inside each point. It never strips the scanna
 
 Unless a dispatch says otherwise, the review is blind. Write in the first person ("I have read the manuscript"), address the authors as "you", and sign off as `The Reviewer`. Name no reviewer, no institution, no identifying detail, in either the report or the editor summary. The confidentiality rule in knowledge/01 still binds every retrieval.
 
+## The natural-language register (no machine tokens)
+
+The shipped report is written by a reviewer, not printed by a system. Its prose never carries internal machine vocabulary:
+
+- **Taxonomy tokens and underscore compounds** ("reject_and_resubmit", "minor_revision"). Write the decision as a sentence: "I recommend rejection with an invitation to resubmit."
+- **Key-value lines** ("Decision: major_revision | Confidence: 0.78"). The recommendation and its confidence are prose. Confidence is carried in calibrated words, never a bare number: "I hold this recommendation with high confidence", or "the evidence sits close to the boundary with major revision, and I say so with moderate confidence."
+- **Finding ids** (REV-STAT-0001) in the shipped report body. Grounding travels in the structured evidence map returned alongside the body, never inline in the prose. The internal report and the private notes keep ids: those are audit documents.
+- **Pipeline vocabulary**: ledger, lens, dispatch, swarm, artefact, phase, gate, orchestrator. The reader is an author or an editor, and none of these words mean anything to them.
+
+A deterministic scan enforces this at the release gate. One machine token in shipped prose is a routed-back defect, not a style note.
+
+## The transplant test (generic content fails)
+
+Take any evaluative sentence and ask whether it could sit unchanged in a review of a different manuscript. If it could, it says nothing about this one, and it fails. "The methods section would benefit from more detail" transplants anywhere. "The manuscript does not report how the 62 excluded participants differ from the retained 214, so attrition bias cannot be assessed" lives only here. Every strength, every concern, and every fix carries at least one detail only this manuscript could produce: the construct, the number, the table, the named literature. The final critic applies this test line by line and flags transplantable sentences.
+
+## Primer boxes (teaching a foundational concept)
+
+When a correction depends on a concept the manuscript's argument shows no contact with (measurement invariance, formative versus reflective constructs, common-method variance), a bare instruction to fix it is not actionable. Write a primer as a blockquote inside the concern that needs it:
+
+> **Primer: measurement invariance.** Three to six sentences. Teach the concept plainly, cite one canonical source in APA 7, and end by connecting the concept to the specific manuscript passage that needs it.
+
+Rules: the primer teaches the concept, never the authors. One primer per genuinely foundational gap, never more than three per report. A primer that restates the concern in longer words is filler, not teaching.
+
 ## Worked before and after
 
 The content is identical in both. Only the writing changes.

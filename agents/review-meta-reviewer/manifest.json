@@ -1,6 +1,6 @@
 {
   "name": "review-meta-reviewer",
-  "promptVersion": "1.0.0",
+  "promptVersion": "1.2.0",
   "phase": [7],
   "role": "frontier",
   "knowledge": [

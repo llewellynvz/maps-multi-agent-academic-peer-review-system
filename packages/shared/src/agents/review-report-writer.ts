@@ -19,11 +19,19 @@ export const fullReportEnvelopeSchema = z.object({
   selfCritique: selfCritiqueSchema,
 });
 
+export const evidenceMapEntrySchema = z.object({
+  section: z.string().min(1),
+  label: z.string().min(1),
+  anchor: z.string().min(1),
+  findingIds: z.array(findingIdSchema).min(1),
+});
+
 export const shippedReportEnvelopeSchema = z.object({
   mode: z.literal('B'),
   recommendation: recommendationSchema,
   recommendationConfidence: z.number().min(0).max(1),
   bodyMarkdown: z.string(),
+  evidenceMap: z.array(evidenceMapEntrySchema).min(1),
   rubricTable: z
     .array(
       z.object({
@@ -45,6 +53,7 @@ export const reviewReportWriterSchema = z.discriminatedUnion('mode', [
   shippedReportEnvelopeSchema,
 ]);
 
+export type EvidenceMapEntry = z.infer<typeof evidenceMapEntrySchema>;
 export type FullReportEnvelope = z.infer<typeof fullReportEnvelopeSchema>;
 export type ShippedReportEnvelope = z.infer<typeof shippedReportEnvelopeSchema>;
 export type ReviewReportWriterOutput = z.infer<typeof reviewReportWriterSchema>;

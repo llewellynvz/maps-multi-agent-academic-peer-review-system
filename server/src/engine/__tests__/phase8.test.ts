@@ -51,6 +51,7 @@ function metaObject() {
     recommendationConfidence: 0.8,
     scopeFit: { score: 0.7, factorsUsed: ['topic-fit'] },
     decisionHinges: [{ findingId: 'REV-STAT-0001', hinge: 'Cannot advance beyond major revision until resolved.' }],
+    editorSummaryMarkdown: 'The decision rests on REV-STAT-0001; the strongest alternative reading holds that the effect survives.',
     selfCritique,
   };
 }
@@ -60,7 +61,16 @@ function shippedObject() {
     mode: 'B',
     recommendation: 'major_revision',
     recommendationConfidence: 0.8,
-    bodyMarkdown: '# 1. Brief overview\nThe central concern is REV-STAT-0001 and REV-METH-0001.\n\n## 2. Overall recommendation\nMajor revision.',
+    bodyMarkdown:
+      '# 1. Brief overview\n**The central statistical concern.** Table 2 reports a mean above the scale ceiling.\n\n## 2. Overall recommendation\nI recommend major revision.',
+    evidenceMap: [
+      {
+        section: '4A.1',
+        label: 'The central statistical concern.',
+        anchor: 'Table 2',
+        findingIds: ['REV-STAT-0001', 'REV-METH-0001'],
+      },
+    ],
     rubricTable: Array.from({ length: 15 }, (_u, index) => ({ criterion: index + 1, score: 3, justification: 'Grounded.' })),
     references: [],
     citedFindingIds: ['REV-STAT-0001', 'REV-METH-0001'],

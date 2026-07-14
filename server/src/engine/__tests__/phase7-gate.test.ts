@@ -103,6 +103,7 @@ function metaObject() {
       { findingId: 'REV-STAT-0001', hinge: 'Until resolved, cannot advance beyond major revision.' },
       { findingId: 'REV-METH-0001', hinge: 'Sampling must be clarified.' },
     ],
+    editorSummaryMarkdown: 'The decision rests on REV-STAT-0001. The strongest alternative reading holds that the effect survives the statistical concern.',
     selfCritique,
   };
 }
@@ -112,7 +113,20 @@ function shippedObject() {
     mode: 'B',
     recommendation: 'major_revision',
     recommendationConfidence: 0.8,
-    bodyMarkdown: `Dear Editor and Authors, the central concern is REV-STAT-0001, with REV-STAT-0002 and REV-METH-0001.`,
+    bodyMarkdown: [
+      'Dear Editor and Authors, I recommend major revision, and I hold this with moderate confidence.',
+      '**The reported mean is impossible.** Table 2 reports a value outside the scale range.',
+      '**Sampling is under-described.** The frame and exclusions are not yet reported.',
+    ].join('\n\n'),
+    evidenceMap: [
+      {
+        section: '4A.1',
+        label: 'The reported mean is impossible.',
+        anchor: 'Table 2',
+        findingIds: ['REV-STAT-0001', 'REV-STAT-0002'],
+      },
+      { section: '4A.2', label: 'Sampling is under-described.', anchor: 'Methods', findingIds: ['REV-METH-0001'] },
+    ],
     rubricTable: Array.from({ length: 15 }, (_unused, index) => ({
       criterion: index + 1,
       score: 3,
@@ -331,6 +345,49 @@ describe('phase 7 release gate routing', () => {
     expect(review.status).toBe('failed');
     const deliverableCount = (sqlite.prepare('SELECT count(*) AS n FROM deliverables WHERE review_id = ?').get(reviewId) as { n: number }).n;
     expect(deliverableCount).toBe(0);
+  });
+
+  it('routes back a shipped body that carries inline finding ids, with the id-free instruction', async () => {
+    const withInlineId = {
+      ...shippedObject(),
+      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\nSee REV-STAT-0001 for the full detail.`,
+    };
+    const harness = mockDeps([critic('pass')], withInlineId);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.criticCalls).toBe(0);
+    expect(checkpointRow().snapshot.released).toBe(false);
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(2);
+    expect(harness.writerInputs[1]).toContain('id-free');
+  });
+
+  it('routes back machine tokens in the shipped prose, with the natural-prose instruction', async () => {
+    const withTokens = {
+      ...shippedObject(),
+      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\nDecision: major_revision | Confidence: 0.78`,
+    };
+    const harness = mockDeps([critic('pass')], withTokens);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.criticCalls).toBe(0);
+    expect(checkpointRow().snapshot.released).toBe(false);
+    expect(harness.writerInputs[1]).toContain('natural reviewer prose');
+    expect(harness.writerInputs[1]).toContain('major_revision');
+  });
+
+  it('routes back an evidence map whose labels are missing from the body', async () => {
+    const brokenMap = { ...shippedObject(), bodyMarkdown: 'Dear Editor and Authors, I recommend major revision.' };
+    const harness = mockDeps([critic('pass')], brokenMap);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.criticCalls).toBe(0);
+    expect(checkpointRow().snapshot.released).toBe(false);
+    expect(harness.writerInputs[1]).toContain('evidence map');
+  });
+
+  it('embeds the meta editorial synthesis in the private notes with superseded ids masked', async () => {
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    const notes = readArtefact<{ markdown: string }>(reviewId, 'p7-private-notes-final');
+    expect(notes.markdown).toContain('## Editorial synthesis');
+    expect(notes.markdown).toContain('strongest alternative reading');
   });
 
   it('does not let the writer self-certify: release requires the critic verdict node', async () => {

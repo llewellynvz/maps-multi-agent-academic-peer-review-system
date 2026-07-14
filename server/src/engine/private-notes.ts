@@ -17,6 +17,7 @@ export interface PrivateNotesInput {
   recommendationConfidence: number;
   currentFindings: CurrentFinding[];
   strongestMinorityReport: string;
+  editorSummaryMarkdown?: string;
 }
 
 export interface AssembledPrivateNotes {
@@ -36,6 +37,11 @@ export function assemblePrivateNotes(input: PrivateNotesInput): AssembledPrivate
     `${RECOMMENDATION_LABEL[input.recommendation]} at confidence ${input.recommendationConfidence.toFixed(2)}.`,
   );
   lines.push('');
+  if (input.editorSummaryMarkdown !== undefined && input.editorSummaryMarkdown.trim().length > 0) {
+    lines.push('## Editorial synthesis');
+    lines.push(input.editorSummaryMarkdown.trim());
+    lines.push('');
+  }
   lines.push('## Editorial signals');
   lines.push(SIGNAL_FRAMING);
   lines.push('');
