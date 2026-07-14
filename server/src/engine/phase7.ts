@@ -24,7 +24,7 @@ import { readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
-import { validateGrounding, type GroundingFailureKind } from './grounding';
+import { redactEditorOnlyIds, validateGrounding, type GroundingFailureKind } from './grounding';
 import { matchLens } from './lenses';
 import { mergeFindingsOnce } from './merge';
 import { assemblePrivateNotes } from './private-notes';
@@ -201,6 +201,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         currentAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
       );
 
+      const redact = (content: string): string => redactEditorOnlyIds(content, editorOnlyIds);
       const shipped = await runAgent<ShippedReportEnvelope>(deps, {
         reviewId,
         phase: 'phase_7',
@@ -210,16 +211,16 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         assembleInput: {
           mode: 'B',
           artefacts: [
-            { label: 'Recommendation package (from the meta-reviewer)', content: JSON.stringify(recommendationPackage(currentMeta), null, 2) },
-            { label: 'Swarm report critique (Phase 7 mode B)', content: JSON.stringify(swarmCritique.critique, null, 2) },
-            { label: 'Full internal report (Phase 6, yours)', content: report.bodyMarkdown },
+            { label: 'Recommendation package (from the meta-reviewer)', content: redact(JSON.stringify(recommendationPackage(currentMeta), null, 2)) },
+            { label: 'Swarm report critique (Phase 7 mode B)', content: redact(JSON.stringify(swarmCritique.critique, null, 2)) },
+            { label: 'Full internal report (Phase 6, yours)', content: redact(report.bodyMarkdown) },
             {
               label: 'Author-facing ledger (cite only these ids; editor-only findings are excluded by construction)',
               content: JSON.stringify(ledgerForReport(authorFacing), null, 2),
             },
           ],
           routingNote:
-            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. Cite only finding ids from the author-facing ledger above; list every id you cite in citedFindingIds and assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
+            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. Cite only finding ids from the author-facing ledger above; any id shown as [EDITOR-ONLY] in the other artefacts is confidential and must never appear in your text or citedFindingIds. List every id you cite in citedFindingIds and assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
 
@@ -245,7 +246,10 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       if (!grounding.ok) {
         lastGroundingFailureKind = grounding.kind;
         lastObjection = grounding.failures.join('; ');
-        priorDefect = `grounding validator: ${lastObjection}`;
+        priorDefect =
+          grounding.kind === 'editor-only-leak'
+            ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
+            : `grounding validator: ${lastObjection}`;
         insertEvent(db, {
           reviewId,
           kind: 'gate_verdict',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadBannedVerdictTerms, validateGrounding } from '../grounding';
+import { loadBannedVerdictTerms, redactEditorOnlyIds, validateGrounding } from '../grounding';
 
 const ledgerIds = new Set(['REV-STAT-0001', 'REV-MAP-0001', 'REV-SIM-0001']);
 const editorOnlyIds = new Set(['REV-SIM-0001']);
@@ -59,5 +59,18 @@ describe('deterministic grounding validator', () => {
     const terms = loadBannedVerdictTerms();
     expect(terms.length).toBeGreaterThan(0);
     expect(terms).toContain('fabricated');
+  });
+
+  it('redacts every occurrence of editor-only ids from artefact content', () => {
+    const content = 'Signal REV-SIM-0001 recurs; see REV-SIM-0001 in JSON {"id":"REV-SIM-0001"} beside REV-STAT-0001.';
+    const redacted = redactEditorOnlyIds(content, editorOnlyIds);
+    expect(redacted).not.toContain('REV-SIM-0001');
+    expect(redacted).toContain('REV-STAT-0001');
+    expect(redacted.match(/\[EDITOR-ONLY\]/g)?.length).toBe(3);
+  });
+
+  it('leaves content untouched when there are no editor-only ids', () => {
+    const content = 'Only REV-STAT-0001 here.';
+    expect(redactEditorOnlyIds(content, new Set())).toBe(content);
   });
 });

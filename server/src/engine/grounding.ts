@@ -63,6 +63,14 @@ export interface GroundingResult {
   failures: string[];
 }
 
+export function redactEditorOnlyIds(content: string, editorOnlyIds: Set<string>): string {
+  let result = content;
+  for (const id of editorOnlyIds) {
+    result = result.split(id).join('[EDITOR-ONLY]');
+  }
+  return result;
+}
+
 export function validateGrounding(input: GroundingInput): GroundingResult {
   const failures: string[] = [];
   let kind: GroundingFailureKind = null;

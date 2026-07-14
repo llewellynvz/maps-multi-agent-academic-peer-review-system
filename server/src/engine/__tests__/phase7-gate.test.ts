@@ -150,8 +150,8 @@ function critic(verdict: ReviewFinalCriticOutput['verdict'], overrides: Partial<
 function mockDeps(
   criticVerdicts: ReviewFinalCriticOutput[],
   shippedOverride?: ReturnType<typeof shippedObject>,
-): { deps: EngineDeps; criticCalls: number; specialistCalls: string[] } {
-  const state = { criticCalls: 0, specialistCalls: [] as string[] };
+): { deps: EngineDeps; criticCalls: number; specialistCalls: string[]; writerInputs: string[] } {
+  const state = { criticCalls: 0, specialistCalls: [] as string[], writerInputs: [] as string[] };
   const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
     let object: unknown;
     switch (input.agent) {
@@ -162,6 +162,7 @@ function mockDeps(
         object = swarmBObject();
         break;
       case 'review-report-writer':
+        state.writerInputs.push(JSON.stringify(input));
         object = shippedOverride ?? shippedObject();
         break;
       case 'specialist-reviewer':
@@ -194,6 +195,9 @@ function mockDeps(
     },
     get specialistCalls() {
       return state.specialistCalls;
+    },
+    get writerInputs() {
+      return state.writerInputs;
     },
   };
 }
@@ -323,5 +327,25 @@ describe('phase 7 release gate routing', () => {
       .all(reviewId) as Array<{ payload_json: string }>;
     const sources = gateEvents.map((row) => (JSON.parse(row.payload_json) as { source: string }).source);
     expect(sources).toContain('final-critic');
+  });
+
+  it('never shows editor-only ids to the writer, even after a leak-triggered revise', async () => {
+    writeArtefact(reviewId, 'p6-report', {
+      mode: 'A',
+      bodyMarkdown: 'Full internal report referencing REV-STAT-0001 and the editorial signal REV-SIM-0001.',
+    });
+    const leaking = {
+      ...shippedObject(),
+      bodyMarkdown: 'Dear Authors, the central concern is REV-STAT-0001, and note REV-SIM-0001.',
+    };
+    const harness = mockDeps([critic('pass')], leaking);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(false);
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(2);
+    for (const input of harness.writerInputs) {
+      expect(input).not.toContain('REV-SIM-0001');
+      expect(input).toContain('[EDITOR-ONLY]');
+    }
   });
 });
