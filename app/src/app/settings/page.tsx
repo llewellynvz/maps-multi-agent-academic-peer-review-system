@@ -1,0 +1,173 @@
+'use client';
+
+import { type ReactNode, useEffect, useState } from 'react';
+import { api, type ProviderKeyView, type PublicSettings, type ReviewSummary } from '@/lib/api';
+import { Icon, Pill, Spinner } from '@/components/ui';
+import { SideDrawer } from '@/components/SideDrawer';
+
+export default function SettingsPage(): ReactNode {
+  const [settings, setSettings] = useState<PublicSettings | null>(null);
+  const [keys, setKeys] = useState<ProviderKeyView[]>([]);
+  const [reviews, setReviews] = useState<ReviewSummary[]>([]);
+  const [newProvider, setNewProvider] = useState('anthropic');
+  const [newKey, setNewKey] = useState('');
+  const [passphrase, setPassphrase] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+  const [dangerReview, setDangerReview] = useState<ReviewSummary | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+
+  const load = async (): Promise<void> => {
+    setSettings(await api.getSettings().catch(() => null));
+    setKeys((await api.listKeys().catch(() => ({ keys: [] }))).keys);
+    setReviews((await api.listReviews().catch(() => ({ reviews: [] }))).reviews);
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const flash = (message: string): void => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const addKey = async (): Promise<void> => {
+    try {
+      await api.addKey({ provider: newProvider, apiKey: newKey, persist: 'disk' });
+      setNewKey('');
+      flash('Key added');
+      await load();
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not add the key');
+    }
+  };
+
+  const savePassphrase = async (clear: boolean): Promise<void> => {
+    await api.putSettings({ passphrase: clear ? null : passphrase }).catch(() => null);
+    setPassphrase('');
+    flash(clear ? 'Passphrase cleared' : 'Passphrase set');
+    await load();
+  };
+
+  const toggleTelemetry = async (value: boolean): Promise<void> => {
+    setSettings(await api.putSettings({ telemetry: value }).catch(() => settings));
+  };
+
+  const purge = async (): Promise<void> => {
+    if (dangerReview === null) {
+      return;
+    }
+    await api.deleteReview(dangerReview.id).catch(() => null);
+    setDangerReview(null);
+    setConfirmText('');
+    flash('Review deleted');
+    await load();
+  };
+
+  if (settings === null) {
+    return <div style={{ display: 'flex', gap: 10 }}><Spinner /> Loading settings</div>;
+  }
+
+  return (
+    <div>
+      <p className="eyebrow">Settings</p>
+      <h1 className="h1" style={{ marginBottom: 24 }}>Manage your instance</h1>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h2 className="h3">Providers and keys</h2>
+        <div className="table-scroll">
+          <table className="table">
+            <thead><tr><th>Provider</th><th>Key</th><th>Persist</th><th></th></tr></thead>
+            <tbody>
+              {keys.length === 0 ? <tr><td colSpan={4} className="muted">No providers configured.</td></tr> : null}
+              {keys.map((key) => (
+                <tr key={key.id}>
+                  <td>{key.provider}</td>
+                  <td className="num">{key.maskedKey}</td>
+                  <td><Pill tone="info" label="Verified" /></td>
+                  <td className="num"><button className="btn btn-ghost" onClick={() => api.deleteKey(key.id).then(load)} aria-label="Delete key"><Icon name="trash" /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Provider</label>
+            <select value={newProvider} onChange={(event) => setNewProvider(event.target.value)}>
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="google">Google</option>
+              <option value="local">Local</option>
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+            <label>API key</label>
+            <input type="password" value={newKey} onChange={(event) => setNewKey(event.target.value)} />
+          </div>
+          <button className="btn btn-secondary" onClick={addKey} disabled={newKey.length === 0}><Icon name="plus" /> Add</button>
+        </div>
+      </div>
+
+      <div className="grid-2" style={{ marginBottom: 20 }}>
+        <div className="card">
+          <h2 className="h3">Instance passphrase</h2>
+          <p className="sub" style={{ marginBottom: 12 }}>When set, every screen requires this passphrase. It is stored only as a salted hash.</p>
+          <Pill tone={settings.passphraseSet ? 'info' : 'neutral'} label={settings.passphraseSet ? 'Passphrase set' : 'Open instance'} />
+          <div className="field" style={{ marginTop: 16 }}>
+            <label>New passphrase</label>
+            <input type="password" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-secondary" onClick={() => savePassphrase(false)} disabled={passphrase.length === 0}>Set</button>
+            {settings.passphraseSet ? <button className="btn btn-ghost" onClick={() => savePassphrase(true)}>Clear</button> : null}
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="h3">Telemetry and defaults</h2>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
+            <input type="checkbox" checked={settings.telemetry} onChange={(event) => toggleTelemetry(event.target.checked)} />
+            <span>Telemetry (anonymous run timings to your local instance only)</span>
+          </label>
+          <div className="table-scroll">
+            <table className="table">
+              <tbody>
+                <tr><td>Default tier</td><td className="num">{settings.presetDefault}</td></tr>
+                <tr><td>Data location</td><td className="num" style={{ wordBreak: 'break-all' }}>{settings.dataLocation}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ borderColor: 'rgba(224,117,103,0.3)' }}>
+        <h2 className="h3">Danger zone</h2>
+        <p className="sub" style={{ marginBottom: 12 }}>Deleting a review removes its manuscript, findings, and deliverables from disk. This cannot be undone.</p>
+        <div className="table-scroll">
+          <table className="table">
+            <tbody>
+              {reviews.map((review) => (
+                <tr key={review.id}>
+                  <td>{review.title ?? 'Untitled'}</td>
+                  <td className="num">{review.status}</td>
+                  <td className="num"><button className="btn btn-danger" onClick={() => setDangerReview(review)}>Delete</button></td>
+                </tr>
+              ))}
+              {reviews.length === 0 ? <tr><td colSpan={3} className="muted">No reviews stored.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <SideDrawer open={dangerReview !== null} title="Confirm deletion" onClose={() => { setDangerReview(null); setConfirmText(''); }}>
+        <p className="sub" style={{ marginBottom: 16 }}>This permanently removes <strong>{dangerReview?.title ?? 'this review'}</strong> and every artefact on disk. Type <span className="mono">delete</span> to confirm.</p>
+        <div className="field">
+          <label>Confirmation</label>
+          <input value={confirmText} onChange={(event) => setConfirmText(event.target.value)} />
+        </div>
+        <button className="btn btn-danger" onClick={purge} disabled={confirmText !== 'delete'}><Icon name="trash" /> Delete review</button>
+      </SideDrawer>
+
+      {toast !== null ? <div className="toast-wrap"><div className="toast toast-info"><Icon name="check" /> {toast}</div></div> : null}
+    </div>
+  );
+}
