@@ -29,7 +29,7 @@ export default function RunPage(): ReactNode {
   const [cost, setCost] = useState<{ total: number; tokensIn: number; tokensOut: number } | null>(null);
   const [eta, setEta] = useState<{ seconds: number; basis: string } | null>(null);
   const [gate, setGate] = useState<{ verdict: string; cycle: number } | null>(null);
-  const [logs, setLogs] = useState<Array<{ ts: string; message: string }>>([]);
+  const [logEntries, setLogEntries] = useState<Record<string, { ts: string; message: string }>>({});
   const [connected, setConnected] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const notified = useRef(false);
@@ -42,10 +42,15 @@ export default function RunPage(): ReactNode {
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
 
+    const addLog = (key: string, ts: string | undefined, message: string): void => {
+      setLogEntries((prev) => (prev[key] !== undefined ? prev : { ...prev, [key]: { ts: ts ?? new Date().toISOString(), message } }));
+    };
+
     source.addEventListener('phase_status', (event) => {
-      const data = JSON.parse((event as MessageEvent).data) as { phase: string | null };
+      const data = JSON.parse((event as MessageEvent).data) as { phase: string | null; ts?: string };
       if (data.phase !== null) {
         setCurrentPhase((prev) => (phaseIndex(data.phase) >= phaseIndex(prev) ? (data.phase as string) : prev));
+        addLog(`phase-${data.phase}`, data.ts, `Started ${phaseLabel(data.phase)}`);
       }
     });
     source.addEventListener('lens_status', (event) => {
@@ -65,12 +70,29 @@ export default function RunPage(): ReactNode {
       setEta({ seconds: data.etaSeconds, basis: data.basis });
     });
     source.addEventListener('gate_verdict', (event) => {
-      const data = JSON.parse((event as MessageEvent).data) as { verdict: string; cycle: number };
+      const data = JSON.parse((event as MessageEvent).data) as { verdict: string; cycle: number; source?: string; ts?: string };
       setGate({ verdict: data.verdict, cycle: data.cycle });
+      addLog(
+        `gate-${data.cycle}-${data.source ?? 'gate'}-${data.verdict}`,
+        data.ts,
+        `Release gate ${data.verdict}${data.source !== undefined ? ` (${data.source}, cycle ${data.cycle})` : ` (cycle ${data.cycle})`}`,
+      );
     });
     source.addEventListener('log_event', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { ts: string; message: string };
-      setLogs((prev) => [...prev.slice(-80), data]);
+      addLog(`log-${data.ts}-${data.message.slice(0, 40)}`, data.ts, data.message);
+    });
+    source.addEventListener('dispatch_log', (event) => {
+      const data = JSON.parse((event as MessageEvent).data) as {
+        dispatches: Array<{ id: string; ts: string; agent: string; phase: string; status: string; latencyMs: number }>;
+      };
+      for (const dispatch of data.dispatches) {
+        addLog(
+          `dispatch-${dispatch.id}`,
+          dispatch.ts,
+          `${dispatch.agent} ${dispatch.status === 'success' ? `finished in ${(dispatch.latencyMs / 1000).toFixed(1)}s` : 'errored'} (${phaseLabel(dispatch.phase)})`,
+        );
+      }
     });
     source.addEventListener('run_complete', () => {
       setTerminal('complete');
@@ -125,6 +147,10 @@ export default function RunPage(): ReactNode {
   }
 
   const lensList = useMemo(() => Object.entries(lenses), [lenses]);
+  const logList = useMemo(
+    () => Object.entries(logEntries).sort((a, b) => (a[1].ts < b[1].ts ? 1 : -1)).slice(0, 120),
+    [logEntries],
+  );
   const editorOnlyCount = findings.filter((finding) => finding.scope === 'editor_only').length;
 
   return (
@@ -247,9 +273,9 @@ export default function RunPage(): ReactNode {
             </button>
             {logOpen ? (
               <div className="logstream" style={{ marginTop: 12 }} role="log">
-                {logs.length === 0 ? <span className="muted">No activity yet.</span> : null}
-                {logs.map((entry, index) => (
-                  <div key={index}><span className="ts">{entry.ts.slice(11, 19)}</span><span className="msg">{entry.message}</span></div>
+                {logList.length === 0 ? <span className="muted">No activity yet.</span> : null}
+                {logList.map(([key, entry]) => (
+                  <div key={key}><span className="ts">{entry.ts.slice(11, 19)}</span><span className="msg">{entry.message}</span></div>
                 ))}
               </div>
             ) : null}

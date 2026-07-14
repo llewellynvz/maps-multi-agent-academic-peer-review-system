@@ -57,11 +57,11 @@ describe('SSE persisted replay (API-22/26)', () => {
     insertEvent('rev-1', 6, 'run_terminal', { outcome: 'complete', recommendation: 'minor_revision' }, 'phase_8');
 
     const all = replayEvents(client.db, 'rev-1', 0);
-    expect(all.map((e) => e.event)).toEqual(['phase_status', 'gate_verdict', 'finding_headline', 'run_complete']);
-    expect(all.map((e) => e.seq)).toEqual([1, 3, 5, 6]);
+    expect(all.map((e) => e.event)).toEqual(['phase_status', 'gate_verdict', 'log_event', 'finding_headline', 'run_complete']);
+    expect(all.map((e) => e.seq)).toEqual([1, 3, 4, 5, 6]);
 
-    const afterThree = replayEvents(client.db, 'rev-1', 3);
-    expect(afterThree.map((e) => e.seq)).toEqual([5, 6]);
+    const afterFour = replayEvents(client.db, 'rev-1', 4);
+    expect(afterFour.map((e) => e.seq)).toEqual([5, 6]);
     expect(maxSeq(client.db, 'rev-1')).toBe(6);
   });
 
@@ -92,6 +92,49 @@ describe('SSE persisted replay (API-22/26)', () => {
     insertReview('rev-4');
     insertEvent('rev-4', 1, 'run_terminal', { released: false, reason: 'Forced halt at the release gate.' }, 'phase_7');
     expect(replayEvents(client.db, 'rev-4', 0)[0]?.event).toBe('run_failed');
+  });
+
+  it('carries the failing phase on run_failed so recovery can target it', () => {
+    insertReview('rev-5');
+    insertEvent('rev-5', 1, 'run_terminal', { released: false, reason: 'halt' }, 'phase_7');
+    const data = replayEvents(client.db, 'rev-5', 0)[0]?.data as { phase?: string };
+    expect(data.phase).toBe('phase_7');
+  });
+});
+
+describe('activity log stream confidentiality (H2c)', () => {
+  it('streams web_query rows as log events built only from the egress columns, truncated', () => {
+    insertReview('rev-log');
+    const longQuery = 'a'.repeat(300);
+    client.sqlite
+      .prepare(
+        "INSERT INTO review_events (id, review_id, seq, ts, kind, phase, payload_json, egress_target, egress_query) VALUES (?, 'rev-log', 1, ?, 'web_query', 'phase_2', '{}', 'crossref', ?)",
+      )
+      .run(randomUUID(), new Date().toISOString(), longQuery);
+    const mapped = replayEvents(client.db, 'rev-log', 0)[0];
+    expect(mapped?.event).toBe('log_event');
+    const data = mapped?.data as { message: string; ts: string };
+    expect(data.message).toContain('crossref');
+    expect(data.message.length).toBeLessThan(200);
+    expect(data.ts.length).toBeGreaterThan(0);
+  });
+
+  it('keeps finding claims and manuscript text out of every log surface', () => {
+    insertReview('rev-log2');
+    insertFinding('REV-STAT-0001', 'rev-log2', 'author_facing', 'the unpublished thesis result is fabricated', 'major');
+    client.sqlite
+      .prepare(
+        `INSERT INTO dispatches (id, review_id, phase, agent, provider, model, prompt_version, latency_ms, cost_usd, status, created_at)
+         VALUES (?, 'rev-log2', 'phase_3', 'specialist-reviewer', 'azure', 'gpt-5.1', 'v1', 1200, 0.01, 'success', ?)`,
+      )
+      .run(randomUUID(), new Date().toISOString());
+    const ephemeral = deriveEphemeral(client.db, 'rev-log2');
+    const dispatchLog = ephemeral.find((event) => event.event === 'dispatch_log');
+    expect(dispatchLog).toBeDefined();
+    const serialised = JSON.stringify(dispatchLog);
+    expect(serialised).not.toContain('unpublished thesis');
+    expect(serialised).not.toContain('claim');
+    expect(serialised).toContain('specialist-reviewer');
   });
 });
 

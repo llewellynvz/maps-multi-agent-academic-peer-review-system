@@ -5,7 +5,15 @@ import { getCurrentFindings } from '../ledger';
 import { requireReview } from './reviews';
 import type { PersistedEvent } from './types';
 
-const STREAMED_KINDS_LIST = ['phase_transition', 'gate_verdict', 'finding_recorded', 'run_terminal'] as const;
+const STREAMED_KINDS_LIST = [
+  'phase_transition',
+  'gate_verdict',
+  'finding_recorded',
+  'run_terminal',
+  'web_query',
+  'arbitration',
+  'error',
+] as const;
 const STREAMED_KINDS = new Set<string>(STREAMED_KINDS_LIST);
 
 const PHASE_MEDIAN_SECONDS = 26;
@@ -16,11 +24,11 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
   switch (row.kind) {
     case 'phase_transition':
       if (payload.paused === true) {
-        return { seq: row.seq, event: 'run_paused', data: { phase: row.phase, ...payload } };
+        return { seq: row.seq, event: 'run_paused', data: { ts: row.ts, phase: row.phase, ...payload } };
       }
-      return { seq: row.seq, event: 'phase_status', data: { phase: row.phase, status: 'active', ...payload } };
+      return { seq: row.seq, event: 'phase_status', data: { ts: row.ts, phase: row.phase, status: 'active', ...payload } };
     case 'gate_verdict':
-      return { seq: row.seq, event: 'gate_verdict', data: { phase: row.phase, ...payload } };
+      return { seq: row.seq, event: 'gate_verdict', data: { ts: row.ts, phase: row.phase, ...payload } };
     case 'finding_recorded':
       return { seq: row.seq, event: 'finding_headline', data: payload };
     case 'run_terminal': {
@@ -33,9 +41,41 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
         data: { phase: row.phase, ...payload },
       };
     }
+    case 'web_query': {
+      const blocked = (payload as { blocked?: boolean }).blocked === true;
+      return {
+        seq: row.seq,
+        event: 'log_event',
+        data: {
+          ts: row.ts,
+          kind: 'web_query',
+          message: `Citation lookup via ${row.egressTarget ?? 'unknown source'}${blocked ? ' blocked by the egress guard' : ''}: ${truncate(row.egressQuery ?? '', 100)}`,
+        },
+      };
+    }
+    case 'arbitration': {
+      const outcome = (payload as { outcome?: string }).outcome ?? 'resolved';
+      return {
+        seq: row.seq,
+        event: 'log_event',
+        data: { ts: row.ts, kind: 'arbitration', message: `Gate arbitration: ${outcome}` },
+      };
+    }
+    case 'error': {
+      const message = (payload as { message?: string }).message ?? 'an error was recorded';
+      return {
+        seq: row.seq,
+        event: 'log_event',
+        data: { ts: row.ts, kind: 'error', message: `Error: ${truncate(message, 160)}` },
+      };
+    }
     default:
       return null;
   }
+}
+
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
 function safeParse(value: string): Record<string, unknown> {
@@ -135,6 +175,19 @@ export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEv
     event: 'eta_update',
     data: { etaSeconds: remaining * PHASE_MEDIAN_SECONDS, basis: 'bundled median' },
   });
+
+  const recentDispatches = [...dispatchRows]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 20)
+    .map((row) => ({
+      id: row.id,
+      ts: row.createdAt,
+      agent: row.agent,
+      phase: row.phase,
+      status: row.status,
+      latencyMs: row.latencyMs,
+    }));
+  out.push({ event: 'dispatch_log', data: { dispatches: recentDispatches } });
 
   byReview.set(reviewId, { seq: currentMax, computedAt: Date.now(), events: out });
   return [...out];
