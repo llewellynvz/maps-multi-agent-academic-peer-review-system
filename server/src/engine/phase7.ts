@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import type {
   FullReportEnvelope,
   Recommendation,
@@ -20,7 +21,7 @@ import {
   upsertCheckpoint,
 } from '../workflow/repo';
 import { DispatchPauseError, type EngineDeps } from './phases-shared';
-import { artefactExists, readArtefact, writeArtefact } from './artefacts';
+import { readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
@@ -34,6 +35,24 @@ const MAX_FIX_CYCLES = 2;
 
 function checkpointKey(phase: string): string {
   return `engine_${phase}`;
+}
+
+function emitGateVerdict(
+  db: EngineDeps['db'],
+  reviewId: string,
+  payload: { cycle: number; source: string; verdict: string } & Record<string, unknown>,
+): void {
+  const existing = db.all(
+    sql`SELECT 1 FROM review_events WHERE review_id = ${reviewId} AND kind = 'gate_verdict'
+        AND json_extract(payload_json, '$.cycle') = ${payload.cycle}
+        AND json_extract(payload_json, '$.source') = ${payload.source}
+        AND json_extract(payload_json, '$.verdict') = ${payload.verdict}
+        LIMIT 1`,
+  );
+  if (existing.length > 0) {
+    return;
+  }
+  insertEvent(db, { reviewId, kind: 'gate_verdict', phase: 'phase_7', payload });
 }
 
 function phaseDone(deps: EngineDeps, reviewId: string): boolean {
@@ -250,12 +269,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           grounding.kind === 'editor-only-leak'
             ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
             : `grounding validator: ${lastObjection}`;
-        insertEvent(db, {
-          reviewId,
-          kind: 'gate_verdict',
-          phase: 'phase_7',
-          payload: { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures },
-        });
+        emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {
           reviewId,
@@ -297,12 +311,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
 
       lastObjection = critic.mostDangerousDefect ?? critic.failureConstructionAttempt;
 
-      insertEvent(db, {
-        reviewId,
-        kind: 'gate_verdict',
-        phase: 'phase_7',
-        payload: { cycle, source: 'final-critic', verdict: critic.verdict, lens: critic.lens },
-      });
+      emitGateVerdict(db, reviewId, { cycle, source: 'final-critic', verdict: critic.verdict, lens: critic.lens });
 
       if (critic.verdict === 'pass') {
         released = true;
@@ -427,7 +436,6 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         alignAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
       );
       const alignAuthorFacing = alignAll.filter((finding) => finding.scope !== 'editor_only');
-      const alignmentReplayed = artefactExists(reviewId, 'p7-shipped-aligned');
       try {
         const aligned = await runAgent<ShippedReportEnvelope>(deps, {
           reviewId,
@@ -487,19 +495,12 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         blocked = true;
         blockReason = `Arbitration narrowed the recommendation to ${narrowed} but no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
       }
-      if (!alignmentReplayed || blocked) {
-        insertEvent(db, {
-          reviewId,
-          kind: 'gate_verdict',
-          phase: 'phase_7',
-          payload: {
-            cycle: fixCycles,
-            source: 'arbitration-alignment',
-            verdict: blocked ? 'block' : 'aligned',
-            narrowedRecommendation: narrowed,
-          },
-        });
-      }
+      emitGateVerdict(db, reviewId, {
+        cycle: fixCycles,
+        source: 'arbitration-alignment',
+        verdict: blocked ? 'block' : 'aligned',
+        narrowedRecommendation: narrowed,
+      });
     }
 
     if (blocked) {

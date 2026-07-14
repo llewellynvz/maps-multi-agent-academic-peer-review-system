@@ -412,6 +412,15 @@ describe('phase 7 release gate routing', () => {
       .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source?: string; verdict?: string });
     expect(gateEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'block')).toBe(false);
     expect(eventKinds()).not.toContain('run_terminal');
+
+    await runPhase7(harness.deps, reviewId);
+    const resumed = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'gate_verdict'")
+      .all(reviewId)
+      .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { cycle: number; source: string; verdict: string });
+    const triples = resumed.map((event) => `${event.cycle}|${event.source}|${event.verdict}`);
+    expect(new Set(triples).size).toBe(triples.length);
+    expect(checkpointRow().snapshot.released).toBe(true);
   });
 
   it('halts instead of releasing a report that cannot be aligned with the narrowed recommendation', async () => {
