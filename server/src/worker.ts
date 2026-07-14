@@ -144,6 +144,9 @@ async function main(): Promise<void> {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           log(`engine error for ${reviewId}: ${message}`);
+          if (shouldStop() === 'shutdown') {
+            return 'stopped';
+          }
           updateReview(db, reviewId, { status: 'failed', errorClass: 'engine_error' });
           return 'failed';
         }

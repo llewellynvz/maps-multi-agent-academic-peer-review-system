@@ -94,6 +94,16 @@ export async function runEnginePhases<D>(params: RunEnginePhasesParams<D>): Prom
         break;
       } catch (error) {
         if (error instanceof StaleDispatchError && restarts < max) {
+          const interrupt = params.shouldStop();
+          if (interrupt === 'cancel') {
+            return 'cancelled';
+          }
+          if (interrupt === 'pause') {
+            return 'paused';
+          }
+          if (interrupt === 'shutdown') {
+            return 'stopped';
+          }
           restarts += 1;
           params.onStale?.({ phase: phase.name, restart: restarts, reason: error.reason });
           continue;

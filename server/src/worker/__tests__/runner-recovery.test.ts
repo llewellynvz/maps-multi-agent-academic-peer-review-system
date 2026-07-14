@@ -1,0 +1,246 @@
+import { randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createDb, type MaraClient } from '../../db/client';
+import { runMigrations } from '../../db/migrate';
+import { updateReview } from '../../workflow/repo';
+import { WorkerRunner, type WorkerProcessors } from '../runner';
+import type { StopSignal } from '../supervisor';
+
+let tempDir: string;
+let client: MaraClient;
+
+function insertReview(id: string, createdAt: string): void {
+  client.sqlite
+    .prepare('INSERT INTO reviews (id, slug, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run(id, id, 'created', createdAt, createdAt);
+}
+
+function insertRunCommand(reviewId: string, command: string, args: Record<string, unknown> = {}): void {
+  client.sqlite
+    .prepare('INSERT INTO run_commands (id, review_id, command, args_json, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(randomUUID(), reviewId, command, JSON.stringify(args), new Date().toISOString());
+}
+
+function completeIngest(reviewId: string): void {
+  client.sqlite
+    .prepare(
+      "INSERT INTO phase_checkpoints (id, review_id, phase, status, updated_at) VALUES (?, ?, 'phase_1', 'completed', ?)",
+    )
+    .run(randomUUID(), reviewId, new Date().toISOString());
+}
+
+function reviewStatus(id: string): string {
+  return (client.sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(id) as { status: string }).status;
+}
+
+function ackCount(): number {
+  return (
+    client.sqlite.prepare("SELECT count(*) AS n FROM review_events WHERE kind = 'control_ack'").get() as { n: number }
+  ).n;
+}
+
+function completingProcessors(order: string[]): WorkerProcessors {
+  return {
+    startIngest: async () => 'ingested',
+    resumeIngest: async () => 'ingested',
+    runEngine: async (reviewId) => {
+      order.push(reviewId);
+      updateReview(client.db, reviewId, { status: 'completed' });
+      return 'completed';
+    },
+  };
+}
+
+beforeEach(() => {
+  tempDir = mkdtempSync(join(tmpdir(), 'mara-recovery-'));
+  client = createDb(join(tempDir, 'mara.db'));
+  runMigrations(client.db);
+});
+
+afterEach(() => {
+  client.sqlite.close();
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+function insertManuscript(reviewId: string, mimeType: string, filename: string, blobPath: string): void {
+  client.sqlite
+    .prepare(
+      'INSERT INTO manuscripts (id, review_id, original_filename, mime_type, blob_path, byte_size, sha256, ingested_at) VALUES (?, ?, ?, ?, ?, 10, ?, ?)',
+    )
+    .run(randomUUID(), reviewId, filename, mimeType, blobPath, 'a'.repeat(64), new Date().toISOString());
+}
+
+describe('WorkerRunner durable apply-then-ack recovery', () => {
+  it('resumes a queued review from the db alone after an apply+ack crash', async () => {
+    insertReview('rev-crash', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-crash');
+    insertRunCommand('rev-crash', 'run');
+
+    const orderA: string[] = [];
+    const runnerA = new WorkerRunner({ client, processors: completingProcessors(orderA) });
+    runnerA.pollCommands();
+    expect(reviewStatus('rev-crash')).toBe('queued');
+    expect(orderA).toEqual([]);
+    expect(ackCount()).toBe(1);
+
+    const orderB: string[] = [];
+    const runnerB = new WorkerRunner({ client, processors: completingProcessors(orderB) });
+    await runnerB.runOnce();
+    await runnerB.settle();
+
+    expect(orderB).toEqual(['rev-crash']);
+    expect(reviewStatus('rev-crash')).toBe('completed');
+    expect(ackCount()).toBe(1);
+  });
+
+  it('refuses to consume under a fresh peer lease, then takes over when it goes stale', async () => {
+    insertReview('rev-z', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-z');
+
+    let clock = Date.UTC(2026, 6, 14);
+    const now = (): number => clock;
+    const orderA: string[] = [];
+    const orderB: string[] = [];
+    const runnerA = new WorkerRunner({
+      client,
+      processors: completingProcessors(orderA),
+      now,
+      staleLeaseMs: 60_000,
+      workerId: 'worker-A',
+    });
+    const runnerB = new WorkerRunner({
+      client,
+      processors: completingProcessors(orderB),
+      now,
+      staleLeaseMs: 60_000,
+      workerId: 'worker-B',
+    });
+
+    await runnerA.runOnce();
+    insertRunCommand('rev-z', 'run');
+
+    await runnerB.runOnce();
+    expect(orderB).toEqual([]);
+    expect(reviewStatus('rev-z')).toBe('created');
+    expect(ackCount()).toBe(0);
+
+    clock += 61_000;
+    await runnerB.runOnce();
+    await runnerB.settle();
+
+    expect(orderB).toEqual(['rev-z']);
+    expect(reviewStatus('rev-z')).toBe('completed');
+  });
+
+  it('recovers a docx review with the manuscript row args, not pdf defaults', async () => {
+    const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    insertReview('rev-docx', '2026-07-14T00:00:00.000Z');
+    insertManuscript('rev-docx', docxMime, 'study.docx', 'data/blobs/rev-docx/manuscript/original.docx');
+    client.sqlite.prepare("UPDATE reviews SET status = 'queued' WHERE id = 'rev-docx'").run();
+
+    const seenArgs: Array<Record<string, unknown>> = [];
+    const processors: WorkerProcessors = {
+      startIngest: async (_reviewId, args) => {
+        seenArgs.push(args);
+        updateReview(client.db, 'rev-docx', { status: 'awaiting_input' });
+        return 'suspended';
+      },
+      resumeIngest: async () => 'ingested',
+      runEngine: async () => 'completed',
+    };
+    const runner = new WorkerRunner({ client, processors });
+    await runner.runOnce();
+    await runner.settle();
+
+    expect(seenArgs).toHaveLength(1);
+    expect(seenArgs[0]?.mimeType).toBe(docxMime);
+    expect(seenArgs[0]?.originalFilename).toBe('study.docx');
+    expect(seenArgs[0]?.filePath).toBe('data/blobs/rev-docx/manuscript/original.docx');
+  });
+
+  it('stops the engine at the next phase boundary when another worker takes the lease', async () => {
+    insertReview('rev-fence', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-fence');
+
+    let clock = Date.UTC(2026, 6, 14);
+    const now = (): number => clock;
+    const stops: Array<() => StopSignal> = [];
+    let releaseEngine!: () => void;
+    const engineGate = new Promise<'stopped'>((resolve) => {
+      releaseEngine = () => resolve('stopped');
+    });
+    const processorsA: WorkerProcessors = {
+      startIngest: async () => 'ingested',
+      resumeIngest: async () => 'ingested',
+      runEngine: async (_reviewId, shouldStop) => {
+        stops.push(shouldStop);
+        return engineGate;
+      },
+    };
+    const orderB: string[] = [];
+    const runnerA = new WorkerRunner({ client, processors: processorsA, now, staleLeaseMs: 60_000, workerId: 'worker-A' });
+    const runnerB = new WorkerRunner({ client, processors: completingProcessors(orderB), now, staleLeaseMs: 60_000, workerId: 'worker-B' });
+
+    insertRunCommand('rev-fence', 'run');
+    await runnerA.tick();
+    expect(runnerA.active).toBe('rev-fence');
+    expect(stops).toHaveLength(1);
+    expect(stops[0]!()).toBeNull();
+
+    clock += 61_000;
+    await runnerB.runOnce();
+    await runnerB.settle();
+    expect(orderB).toEqual(['rev-fence']);
+    expect(stops[0]!()).toBe('shutdown');
+
+    releaseEngine();
+    await runnerA.settle();
+    expect(reviewStatus('rev-fence')).toBe('completed');
+    const terminals = client.sqlite
+      .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = 'rev-fence' AND kind = 'run_terminal'")
+      .get() as { n: number };
+    expect(terminals.n).toBe(1);
+  });
+
+  it('does not stomp a takeover worker terminal status when its own engine errors', async () => {
+    insertReview('rev-guard', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-guard');
+
+    let clock = Date.UTC(2026, 6, 14);
+    const now = (): number => clock;
+    let failEngine!: () => void;
+    const engineGate = new Promise<never>((_, reject) => {
+      failEngine = () => reject(new Error('woke up after suspension'));
+    });
+    const processorsA: WorkerProcessors = {
+      startIngest: async () => 'ingested',
+      resumeIngest: async () => 'ingested',
+      runEngine: async () => engineGate,
+    };
+    const orderB: string[] = [];
+    const runnerA = new WorkerRunner({ client, processors: processorsA, now, staleLeaseMs: 60_000, workerId: 'worker-A' });
+    const runnerB = new WorkerRunner({ client, processors: completingProcessors(orderB), now, staleLeaseMs: 60_000, workerId: 'worker-B' });
+
+    insertRunCommand('rev-guard', 'run');
+    await runnerA.tick();
+    expect(runnerA.active).toBe('rev-guard');
+
+    clock += 61_000;
+    await runnerB.runOnce();
+    await runnerB.settle();
+    expect(orderB).toEqual(['rev-guard']);
+    expect(reviewStatus('rev-guard')).toBe('completed');
+
+    failEngine();
+    await runnerA.settle();
+    expect(reviewStatus('rev-guard')).toBe('completed');
+    const terminal = client.sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = 'rev-guard' AND kind = 'run_terminal'")
+      .all() as Array<{ payload_json: string }>;
+    expect(terminal).toHaveLength(1);
+    expect((JSON.parse(terminal[0]!.payload_json) as { outcome: string }).outcome).toBe('complete');
+  });
+});

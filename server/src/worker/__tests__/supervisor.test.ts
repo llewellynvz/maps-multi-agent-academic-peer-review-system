@@ -131,4 +131,26 @@ describe('runEnginePhases', () => {
       }),
     ).rejects.toThrow('boom');
   });
+
+  it('stops instead of restarting a stale phase once shutdown is signalled', async () => {
+    const runOrder: string[] = [];
+    let stop: StopSignal = null;
+    const outcome = await runEnginePhases({
+      deps: {},
+      reviewId: 'r1',
+      phases: [
+        {
+          name: 'phase_1',
+          run: async () => {
+            runOrder.push('phase_1');
+            stop = 'shutdown';
+            throw new StaleDispatchError('timeout');
+          },
+        },
+      ],
+      shouldStop: () => stop,
+    });
+    expect(outcome).toBe('stopped');
+    expect(runOrder).toEqual(['phase_1']);
+  });
 });

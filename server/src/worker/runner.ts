@@ -1,12 +1,23 @@
+import { randomUUID } from 'node:crypto';
 import { asc, eq } from 'drizzle-orm';
 import type { MaraClient, MaraDatabase } from '../db/client';
-import { reviewEvents, reviews, runCommands } from '../db/schema';
-import { insertEvent, updateReview } from '../workflow/repo';
+import { manuscripts, reviewEvents, reviews, runCommands } from '../db/schema';
+import { getReviewOptions, insertEvent, mergeReviewOptions, updateReview } from '../workflow/repo';
+import { readSetting, writeSetting } from '../data/settings-store';
 import { writeHeartbeat } from '../data/heartbeat';
 import type { StopSignal } from './supervisor';
 
 export type IngestOutcome = 'suspended' | 'ingested' | 'halted';
 export type EngineResult = 'completed' | 'paused' | 'cancelled' | 'stopped' | 'failed';
+
+const WORKER_LEASE_KEY = 'worker_lease';
+const QUEUEABLE_STATUSES = new Set(['created', 'awaiting_input', 'paused']);
+const RESUMABLE_STATUSES = new Set(['awaiting_input', 'paused']);
+
+interface WorkerLease {
+  workerId: string;
+  heartbeatAt: string;
+}
 
 export interface WorkerProcessors {
   startIngest: (reviewId: string, args: Record<string, unknown>) => Promise<IngestOutcome>;
@@ -28,6 +39,9 @@ export interface WorkerRunnerOptions {
   processors: WorkerProcessors;
   pollMs?: number;
   onLog?: (message: string) => void;
+  staleLeaseMs?: number;
+  now?: () => number;
+  workerId?: string;
 }
 
 export class WorkerRunner {
@@ -36,6 +50,9 @@ export class WorkerRunner {
   private readonly processors: WorkerProcessors;
   private readonly pollMs: number;
   private readonly log: (message: string) => void;
+  private readonly workerId: string;
+  private readonly staleLeaseMs: number;
+  private readonly now: () => number;
 
   private activeReviewId: string | null = null;
   private readonly intents = new Map<string, Intent>();
@@ -43,6 +60,7 @@ export class WorkerRunner {
   private readonly cancelRequested = new Set<string>();
   private readonly ackedCommands = new Set<string>();
   private ackedLoaded = false;
+  private recovered = false;
   private stopping = false;
   private processing: Promise<void> | null = null;
   private loopTimer: ReturnType<typeof setInterval> | null = null;
@@ -53,6 +71,9 @@ export class WorkerRunner {
     this.processors = options.processors;
     this.pollMs = options.pollMs ?? 500;
     this.log = options.onLog ?? (() => undefined);
+    this.workerId = options.workerId ?? randomUUID();
+    this.staleLeaseMs = options.staleLeaseMs ?? 60_000;
+    this.now = options.now ?? Date.now;
   }
 
   get active(): string | null {
@@ -74,6 +95,32 @@ export class WorkerRunner {
     this.ackedLoaded = true;
   }
 
+  private acquireLease(): boolean {
+    const nowMs = this.now();
+    return this.db.transaction(
+      (tx) => {
+        const current = readSetting<WorkerLease>(tx, WORKER_LEASE_KEY);
+        if (current !== undefined && current.workerId !== this.workerId) {
+          const age = nowMs - Date.parse(current.heartbeatAt);
+          if (Number.isFinite(age) && age < this.staleLeaseMs) {
+            return false;
+          }
+        }
+        writeSetting(tx, WORKER_LEASE_KEY, { workerId: this.workerId, heartbeatAt: new Date(nowMs).toISOString() });
+        return true;
+      },
+      { behavior: 'immediate' },
+    );
+  }
+
+  private ensureLease(): boolean {
+    const held = this.acquireLease();
+    if (held && !this.recovered) {
+      this.recover();
+    }
+    return held;
+  }
+
   pollCommands(): void {
     if (!this.ackedLoaded) {
       this.loadAckedCommands();
@@ -84,38 +131,73 @@ export class WorkerRunner {
         continue;
       }
       const args = safeArgs(command.argsJson);
-      this.applyCommand(command.reviewId, command.command, args, command.createdAt);
-      insertEvent(this.db, {
-        reviewId: command.reviewId,
-        kind: 'control_ack',
-        payload: { commandId: command.id, command: command.command },
-      });
+      if (command.command === 'run' || command.command === 'resume') {
+        try {
+          this.db.transaction((tx) => {
+            this.applyDurable(tx, command.reviewId, command.command, args);
+            insertEvent(tx, {
+              reviewId: command.reviewId,
+              kind: 'control_ack',
+              payload: { commandId: command.id, command: command.command },
+            });
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(`could not apply ${command.command} for ${command.reviewId}: ${message}`);
+          continue;
+        }
+        this.applyMemory(command.reviewId, command.command, args, command.createdAt);
+      } else {
+        this.applyCommand(command.reviewId, command.command, args, command.createdAt);
+        insertEvent(this.db, {
+          reviewId: command.reviewId,
+          kind: 'control_ack',
+          payload: { commandId: command.id, command: command.command },
+        });
+      }
       this.ackedCommands.add(command.id);
       this.log(`command ${command.command} for ${command.reviewId}`);
     }
   }
 
+  private applyDurable(tx: MaraDatabase, reviewId: string, command: string, args: Record<string, unknown>): void {
+    if (command === 'resume') {
+      const answers = (args.answers as Record<string, string> | undefined) ?? {};
+      const preset = typeof args.preset === 'string' ? args.preset : undefined;
+      mergeReviewOptions(tx, reviewId, { pendingResume: { answers, ...(preset !== undefined ? { preset } : {}) } });
+      if (RESUMABLE_STATUSES.has(this.currentStatus(tx, reviewId) ?? '')) {
+        updateReview(tx, reviewId, { status: 'queued' });
+      }
+      return;
+    }
+    if (QUEUEABLE_STATUSES.has(this.currentStatus(tx, reviewId) ?? '')) {
+      updateReview(tx, reviewId, { status: 'queued' });
+    }
+  }
+
+  private applyMemory(reviewId: string, command: string, args: Record<string, unknown>, createdAt: string): void {
+    this.cancelRequested.delete(reviewId);
+    this.pauseRequested.delete(reviewId);
+    if (command === 'resume') {
+      this.intents.set(reviewId, {
+        kind: 'resume',
+        args,
+        answers: (args.answers as Record<string, string> | undefined) ?? {},
+        preset: typeof args.preset === 'string' ? args.preset : undefined,
+        createdAt,
+      });
+      return;
+    }
+    const kind = args.trigger === 'ingest' ? 'ingest' : 'run';
+    this.intents.set(reviewId, { kind, args, createdAt });
+  }
+
+  private currentStatus(tx: MaraDatabase, reviewId: string): string | undefined {
+    return tx.select({ status: reviews.status }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0]?.status;
+  }
+
   private applyCommand(reviewId: string, command: string, args: Record<string, unknown>, createdAt: string): void {
     switch (command) {
-      case 'run': {
-        const kind = args.trigger === 'ingest' ? 'ingest' : 'run';
-        this.cancelRequested.delete(reviewId);
-        this.pauseRequested.delete(reviewId);
-        this.intents.set(reviewId, { kind, args, createdAt });
-        break;
-      }
-      case 'resume': {
-        this.cancelRequested.delete(reviewId);
-        this.pauseRequested.delete(reviewId);
-        this.intents.set(reviewId, {
-          kind: 'resume',
-          args,
-          answers: (args.answers as Record<string, string> | undefined) ?? {},
-          preset: typeof args.preset === 'string' ? args.preset : undefined,
-          createdAt,
-        });
-        break;
-      }
       case 'pause': {
         this.pauseRequested.add(reviewId);
         break;
@@ -147,6 +229,32 @@ export class WorkerRunner {
     this.client.sqlite
       .prepare("UPDATE phase_checkpoints SET status = 'pending', updated_at = ? WHERE review_id = ? AND phase = ?")
       .run(new Date().toISOString(), reviewId, key);
+  }
+
+  private clearPendingResume(reviewId: string): void {
+    const options = getReviewOptions(this.db, reviewId);
+    if (options.pendingResume !== undefined && options.pendingResume !== null) {
+      mergeReviewOptions(this.db, reviewId, { pendingResume: null });
+    }
+  }
+
+  private pendingResume(optionsJson: string): { answers: Record<string, string>; preset?: string } | undefined {
+    try {
+      const options = JSON.parse(optionsJson) as { pendingResume?: unknown };
+      const marker = options.pendingResume;
+      if (marker !== null && typeof marker === 'object') {
+        const { answers, preset } = marker as { answers?: unknown; preset?: unknown };
+        if (answers !== null && typeof answers === 'object') {
+          return {
+            answers: answers as Record<string, string>,
+            ...(typeof preset === 'string' ? { preset } : {}),
+          };
+        }
+      }
+    } catch {
+      /* ignore malformed options */
+    }
+    return undefined;
   }
 
   pickNext(): string | null {
@@ -204,6 +312,9 @@ export class WorkerRunner {
           intent.kind === 'resume'
             ? await this.processors.resumeIngest(reviewId, intent.answers ?? {}, intent.preset)
             : await this.processors.startIngest(reviewId, intent.args);
+        if (intent.kind === 'resume') {
+          this.clearPendingResume(reviewId);
+        }
         if (outcome === 'suspended') {
           if (this.cancelRequested.has(reviewId)) {
             updateReview(this.db, reviewId, { status: 'cancelled' });
@@ -228,6 +339,10 @@ export class WorkerRunner {
       this.finishEngine(reviewId, result, durationMs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (this.shouldStop(reviewId) === 'shutdown') {
+        this.log(`review ${reviewId} interrupted after losing the worker slot: ${message}`);
+        return;
+      }
       updateReview(this.db, reviewId, { status: 'failed', errorClass: 'engine_error' });
       this.emitTerminal(reviewId, 'failed', { errorClass: 'engine_error', message });
       this.log(`review ${reviewId} failed: ${message}`);
@@ -286,7 +401,20 @@ export class WorkerRunner {
     if (this.stopping) {
       return 'shutdown';
     }
+    if (this.leaseLost()) {
+      this.log(`lease lost to another worker; stopping ${reviewId} at the next phase boundary`);
+      return 'shutdown';
+    }
     return null;
+  }
+
+  private leaseLost(): boolean {
+    const current = readSetting<WorkerLease>(this.db, WORKER_LEASE_KEY);
+    if (current === undefined || current.workerId === this.workerId) {
+      return false;
+    }
+    const age = this.now() - Date.parse(current.heartbeatAt);
+    return Number.isFinite(age) && age < this.staleLeaseMs;
   }
 
   private ingestComplete(reviewId: string): boolean {
@@ -297,6 +425,9 @@ export class WorkerRunner {
   }
 
   async tick(): Promise<void> {
+    if (!this.ensureLease()) {
+      return;
+    }
     this.pollCommands();
     this.markQueued();
     if (this.activeReviewId === null && this.processing === null) {
@@ -310,6 +441,9 @@ export class WorkerRunner {
   }
 
   async runOnce(): Promise<void> {
+    if (!this.ensureLease()) {
+      return;
+    }
     this.pollCommands();
     if (this.activeReviewId === null) {
       const next = this.pickNext();
@@ -333,15 +467,45 @@ export class WorkerRunner {
     const rows = this.db.select().from(reviews).all();
     const ts = new Date().toISOString();
     for (const row of rows) {
-      if (row.status === 'running' || row.status === 'sanitizing' || row.status === 'queued') {
-        this.intents.set(row.id, { kind: 'run', args: {}, createdAt: row.createdAt ?? ts, recovered: true });
+      if (row.status === 'running' || row.status === 'sanitizing') {
+        this.intents.set(row.id, { kind: 'run', args: this.recoveredArgs(row.id), createdAt: row.createdAt ?? ts, recovered: true });
+      } else if (row.status === 'queued') {
+        const resume = this.pendingResume(row.optionsJson);
+        if (resume !== undefined) {
+          this.intents.set(row.id, {
+            kind: 'resume',
+            args: {},
+            answers: resume.answers,
+            ...(resume.preset !== undefined ? { preset: resume.preset } : {}),
+            createdAt: row.createdAt ?? ts,
+            recovered: true,
+          });
+        } else {
+          this.intents.set(row.id, { kind: 'run', args: this.recoveredArgs(row.id), createdAt: row.createdAt ?? ts, recovered: true });
+        }
       }
     }
+    this.recovered = true;
+  }
+
+  private recoveredArgs(reviewId: string): Record<string, unknown> {
+    const row = this.db
+      .select({ blobPath: manuscripts.blobPath, originalFilename: manuscripts.originalFilename, mimeType: manuscripts.mimeType })
+      .from(manuscripts)
+      .where(eq(manuscripts.reviewId, reviewId))
+      .limit(1)
+      .all()[0];
+    if (row === undefined) {
+      return {};
+    }
+    return { filePath: row.blobPath, originalFilename: row.originalFilename, mimeType: row.mimeType };
   }
 
   start(): void {
     writeHeartbeat();
-    this.recover();
+    if (!this.ensureLease()) {
+      this.log('another worker holds the lease; standing by until it goes stale');
+    }
     this.loopTimer = setInterval(() => {
       writeHeartbeat();
       void this.tick();
