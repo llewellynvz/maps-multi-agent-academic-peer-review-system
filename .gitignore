@@ -11,3 +11,4 @@ scratch/
 next-env.d.ts
 REVIEW.md
 .claude/
+/docs/
