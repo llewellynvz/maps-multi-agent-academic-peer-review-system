@@ -1,0 +1,35 @@
+services:
+  mara:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: mara-platform:local
+    ports:
+      - "${MARA_PORT:-3100}:3100"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - ${MARA_ENV_FILE:-.env}
+    extra_hosts:
+      # lets the container reach a Langfuse running on the host (Linux compatibility)
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    restart: unless-stopped
+
+  grobid:
+    profiles: ["grobid"]
+    image: grobid/grobid:0.9.0-crf
+    ports:
+      - "8070:8070"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8070/api/isalive || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped

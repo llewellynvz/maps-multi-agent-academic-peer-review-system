@@ -14,7 +14,8 @@
     "exercise:slice-c": "tsx ./scripts/exercise-slice-c.ts",
     "exercise:slice-d": "tsx ./scripts/exercise-slice-d.ts",
     "exercise:slice-e": "tsx ./scripts/exercise-slice-e.ts",
-    "exercise:slice-f": "tsx ./scripts/exercise-slice-f.ts"
+    "exercise:slice-f": "tsx ./scripts/exercise-slice-f.ts",
+    "exercise:slice-g": "tsx ./scripts/exercise-slice-g.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.12",
@@ -41,13 +42,13 @@
     "jszip": "^3.10.1",
     "mammoth": "^1.11.0",
     "ollama-ai-provider-v2": "4.0.1",
+    "tsx": "^4.23.0",
     "unpdf": "^1.4.0",
     "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "drizzle-kit": "^0.31.10",
-    "tsx": "^4.23.0",
     "vitest": "^4.1.10"
   }
 }
