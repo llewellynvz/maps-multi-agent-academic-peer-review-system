@@ -3,28 +3,13 @@ import { eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { providerKeys } from '../db/schema';
 import { nowIso } from './db';
-import { maskKey, openKey, sealKey } from './crypto';
+import { maskKey, sealKey } from './crypto';
 import { ApiError } from './errors';
 import type { ProviderKeyView } from './types';
 
 const PROVIDERS = new Set(['anthropic', 'openai', 'google', 'local']);
 
-function maskFor(row: typeof providerKeys.$inferSelect): string {
-  try {
-    return maskKey(
-      openKey({
-        ciphertext: row.ciphertext as Buffer,
-        iv: row.iv as Buffer,
-        authTag: row.authTag as Buffer,
-        wrappedDek: row.wrappedDek as Buffer,
-        dekIv: row.dekIv as Buffer,
-        dekAuthTag: row.dekAuthTag as Buffer,
-      }),
-    );
-  } catch {
-    return '****';
-  }
-}
+const STORED_KEY_MASK = '****';
 
 export function listKeys(db: MaraDatabase): ProviderKeyView[] {
   return db
@@ -35,7 +20,7 @@ export function listKeys(db: MaraDatabase): ProviderKeyView[] {
       id: row.id,
       provider: row.provider,
       label: row.label,
-      maskedKey: maskFor(row),
+      maskedKey: STORED_KEY_MASK,
       baseUrl: row.baseUrl,
       persist: 'disk' as const,
     }));
