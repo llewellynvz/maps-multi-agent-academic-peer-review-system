@@ -65,6 +65,23 @@ describe('SSE persisted replay (API-22/26)', () => {
     expect(maxSeq(client.db, 'rev-1')).toBe(6);
   });
 
+  it('maxSeq returns the highest streamed seq, matching the old reduce and ignoring higher non-streamed events', () => {
+    insertReview('rev-max');
+    insertEvent('rev-max', 1, 'phase_transition', {}, 'phase_1');
+    insertEvent('rev-max', 2, 'web_query', {});
+    insertEvent('rev-max', 3, 'gate_verdict', { verdict: 'pass' }, 'phase_7');
+    insertEvent('rev-max', 4, 'control_ack', { commandId: 'c1' });
+
+    const rows = client.sqlite
+      .prepare("SELECT seq, kind FROM review_events WHERE review_id = 'rev-max'")
+      .all() as Array<{ seq: number; kind: string }>;
+    const streamed = new Set(['phase_transition', 'gate_verdict', 'finding_recorded', 'run_terminal']);
+    const oldImpl = rows.reduce((max, row) => (streamed.has(row.kind) && row.seq > max ? row.seq : max), 0);
+
+    expect(maxSeq(client.db, 'rev-max')).toBe(oldImpl);
+    expect(maxSeq(client.db, 'rev-max')).toBe(3);
+  });
+
   it('maps a failed terminal to run_failed', () => {
     insertReview('rev-2');
     insertEvent('rev-2', 1, 'run_terminal', { outcome: 'failed', errorClass: 'engine_error' }, 'phase_8');

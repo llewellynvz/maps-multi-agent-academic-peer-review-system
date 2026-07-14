@@ -73,6 +73,106 @@ function insertManuscript(reviewId: string, mimeType: string, filename: string, 
     .run(randomUUID(), reviewId, filename, mimeType, blobPath, 'a'.repeat(64), new Date().toISOString());
 }
 
+function leaseHeartbeat(): string {
+  const row = client.sqlite.prepare("SELECT value_json FROM settings WHERE key = 'worker_lease'").get() as
+    | { value_json: string }
+    | undefined;
+  return row !== undefined ? (JSON.parse(row.value_json) as { heartbeatAt: string }).heartbeatAt : '';
+}
+
+function leaseWorker(): string {
+  const row = client.sqlite.prepare("SELECT value_json FROM settings WHERE key = 'worker_lease'").get() as
+    | { value_json: string }
+    | undefined;
+  return row !== undefined ? (JSON.parse(row.value_json) as { workerId: string }).workerId : '';
+}
+
+function seedForeignLease(workerId: string, heartbeatAt: string): void {
+  client.sqlite
+    .prepare('INSERT INTO settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+    .run('worker_lease', JSON.stringify({ workerId, heartbeatAt }), new Date().toISOString());
+}
+
+describe('WorkerRunner lease heartbeat throttling (F10)', () => {
+  it('refreshes the held lease only after it ages past a third of the stale window', async () => {
+    let clock = Date.UTC(2026, 6, 14);
+    const runner = new WorkerRunner({
+      client,
+      processors: completingProcessors([]),
+      now: () => clock,
+      staleLeaseMs: 60_000,
+      workerId: 'w1',
+    });
+
+    await runner.tick();
+    const hb1 = leaseHeartbeat();
+    expect(hb1).not.toBe('');
+
+    clock += 10_000;
+    await runner.tick();
+    expect(leaseHeartbeat()).toBe(hb1);
+
+    clock += 15_000;
+    await runner.tick();
+    expect(leaseHeartbeat()).not.toBe(hb1);
+  });
+
+  it('takes over a stale foreign lease immediately', async () => {
+    const base = Date.UTC(2026, 6, 14);
+    seedForeignLease('other', new Date(base).toISOString());
+    let clock = base + 61_000;
+    const runner = new WorkerRunner({
+      client,
+      processors: completingProcessors([]),
+      now: () => clock,
+      staleLeaseMs: 60_000,
+      workerId: 'w1',
+    });
+
+    await runner.tick();
+    expect(leaseWorker()).toBe('w1');
+  });
+});
+
+describe('WorkerRunner ingest resume reconciliation (F11)', () => {
+  it('falls back to a fresh ingest when the stored ingest snapshot is missing', async () => {
+    insertReview('rev-missing', '2026-07-14T00:00:00.000Z');
+    insertManuscript('rev-missing', 'application/pdf', 'study.pdf', 'data/blobs/rev-missing/manuscript/original.pdf');
+    client.sqlite.prepare("UPDATE reviews SET status = 'awaiting_input' WHERE id = 'rev-missing'").run();
+    insertRunCommand('rev-missing', 'resume', { answers: { field: 'wellbeing' } });
+
+    const calls = { start: 0, resume: 0 };
+    const seenArgs: Array<Record<string, unknown>> = [];
+    const processors: WorkerProcessors = {
+      startIngest: async (_reviewId, args) => {
+        calls.start += 1;
+        seenArgs.push(args);
+        updateReview(client.db, 'rev-missing', { status: 'awaiting_input' });
+        return 'suspended';
+      },
+      resumeIngest: async () => {
+        calls.resume += 1;
+        return 'ingested';
+      },
+      runEngine: async () => 'completed',
+      ingestResumable: async () => false,
+    };
+
+    const runner = new WorkerRunner({ client, processors });
+    runner.pollCommands();
+    await runner.runOnce();
+    await runner.settle();
+
+    expect(calls.resume).toBe(0);
+    expect(calls.start).toBe(1);
+    expect(seenArgs[0]?.filePath).toBe('data/blobs/rev-missing/manuscript/original.pdf');
+    const fallbackEvents = client.sqlite
+      .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = 'rev-missing' AND kind = 'error'")
+      .get() as { n: number };
+    expect(fallbackEvents.n).toBe(1);
+  });
+});
+
 describe('WorkerRunner durable apply-then-ack recovery', () => {
   it('resumes a queued review from the db alone after an apply+ack crash', async () => {
     insertReview('rev-crash', '2026-07-14T00:00:00.000Z');

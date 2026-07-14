@@ -1,11 +1,12 @@
-import { and, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { dispatches, reviewEvents, reviews } from '../db/schema';
 import { getCurrentFindings } from '../ledger';
 import { requireReview } from './reviews';
 import type { PersistedEvent } from './types';
 
-const STREAMED_KINDS = new Set(['phase_transition', 'gate_verdict', 'finding_recorded', 'run_terminal']);
+const STREAMED_KINDS_LIST = ['phase_transition', 'gate_verdict', 'finding_recorded', 'run_terminal'] as const;
+const STREAMED_KINDS = new Set<string>(STREAMED_KINDS_LIST);
 
 const PHASE_MEDIAN_SECONDS = 26;
 const TOTAL_PHASES = 9;
@@ -63,12 +64,14 @@ export function replayEvents(db: MaraDatabase, reviewId: string, afterSeq: numbe
 }
 
 export function maxSeq(db: MaraDatabase, reviewId: string): number {
-  const rows = db
-    .select({ seq: reviewEvents.seq, kind: reviewEvents.kind })
+  const row = db
+    .select({ seq: reviewEvents.seq })
     .from(reviewEvents)
-    .where(eq(reviewEvents.reviewId, reviewId))
-    .all();
-  return rows.reduce((max, row) => (STREAMED_KINDS.has(row.kind) && row.seq > max ? row.seq : max), 0);
+    .where(and(eq(reviewEvents.reviewId, reviewId), inArray(reviewEvents.kind, [...STREAMED_KINDS_LIST])))
+    .orderBy(desc(reviewEvents.seq))
+    .limit(1)
+    .all()[0];
+  return row?.seq ?? 0;
 }
 
 export interface EphemeralEvent {
@@ -76,10 +79,22 @@ export interface EphemeralEvent {
   data: unknown;
 }
 
+const ephemeralCache = new WeakMap<object, Map<string, { seq: number; events: EphemeralEvent[] }>>();
+
 export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEvent[] {
   const review = db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
   if (review === undefined) {
     return [];
+  }
+  const currentMax = maxSeq(db, reviewId);
+  let byReview = ephemeralCache.get(db);
+  if (byReview === undefined) {
+    byReview = new Map();
+    ephemeralCache.set(db, byReview);
+  }
+  const cached = byReview.get(reviewId);
+  if (cached !== undefined && cached.seq === currentMax) {
+    return cached.events;
   }
   const phase = review.currentPhase ?? 'phase_0';
   const out: EphemeralEvent[] = [];
@@ -117,6 +132,7 @@ export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEv
     data: { etaSeconds: remaining * PHASE_MEDIAN_SECONDS, basis: 'bundled median' },
   });
 
+  byReview.set(reviewId, { seq: currentMax, events: out });
   return out;
 }
 

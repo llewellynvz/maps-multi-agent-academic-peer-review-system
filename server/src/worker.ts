@@ -120,6 +120,19 @@ async function main(): Promise<void> {
         mergeReviewOptions(db, reviewId, { ingestRunId: summary.runId });
         return mapIngest(summary);
       },
+      ingestResumable: async (reviewId): Promise<boolean> => {
+        const options = getReviewOptions(db, reviewId);
+        const runId = typeof options.ingestRunId === 'string' ? options.ingestRunId : null;
+        if (runId === null) {
+          return false;
+        }
+        try {
+          const run = await ingestMastra.getWorkflow('ingest').getWorkflowRunById(runId);
+          return run !== null;
+        } catch {
+          return false;
+        }
+      },
       resumeIngest: async (reviewId, answers, preset): Promise<IngestOutcome> => {
         const options = getReviewOptions(db, reviewId);
         const runId = typeof options.ingestRunId === 'string' ? options.ingestRunId : null;

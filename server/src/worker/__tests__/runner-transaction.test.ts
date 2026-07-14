@@ -32,10 +32,26 @@ function insertReview(id: string, createdAt: string): void {
     .run(id, id, 'created', createdAt, createdAt);
 }
 
-function insertRunCommand(reviewId: string, command: string): void {
+function insertRunCommand(reviewId: string, command: string): string {
+  const id = randomUUID();
   client.sqlite
     .prepare('INSERT INTO run_commands (id, review_id, command, args_json, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(randomUUID(), reviewId, command, '{}', new Date().toISOString());
+    .run(id, reviewId, command, '{}', new Date().toISOString());
+  return id;
+}
+
+function runCommandCount(reviewId: string): number {
+  return (
+    client.sqlite.prepare('SELECT count(*) AS n FROM run_commands WHERE review_id = ?').get(reviewId) as { n: number }
+  ).n;
+}
+
+function insertControlAck(reviewId: string, commandId: string): void {
+  client.sqlite
+    .prepare(
+      "INSERT INTO review_events (id, review_id, seq, ts, kind, payload_json) VALUES (?, ?, 1, ?, 'control_ack', ?)",
+    )
+    .run(randomUUID(), reviewId, new Date().toISOString(), JSON.stringify({ commandId }));
 }
 
 function completeIngest(reviewId: string): void {
@@ -108,5 +124,34 @@ describe('WorkerRunner apply-then-ack transactional coupling', () => {
     runner.pollCommands();
     expect(reviewStatus('rev-y')).toBe('queued');
     expect(controlAckCount('rev-y')).toBe(1);
+  });
+});
+
+describe('WorkerRunner command-row garbage collection (F8)', () => {
+  it('deletes the run_commands row after a successful apply and ack', () => {
+    insertReview('rev-gc', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-gc');
+    insertRunCommand('rev-gc', 'run');
+
+    const runner = new WorkerRunner({ client, processors });
+    runner.pollCommands();
+
+    expect(reviewStatus('rev-gc')).toBe('queued');
+    expect(controlAckCount('rev-gc')).toBe(1);
+    expect(runCommandCount('rev-gc')).toBe(0);
+  });
+
+  it('does not re-apply a legacy acked command that predates row deletion', () => {
+    insertReview('rev-legacy', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-legacy');
+    const commandId = insertRunCommand('rev-legacy', 'run');
+    insertControlAck('rev-legacy', commandId);
+
+    const runner = new WorkerRunner({ client, processors });
+    runner.pollCommands();
+
+    expect(reviewStatus('rev-legacy')).toBe('created');
+    expect(controlAckCount('rev-legacy')).toBe(1);
+    expect(runCommandCount('rev-legacy')).toBe(1);
   });
 });

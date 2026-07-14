@@ -23,6 +23,7 @@ export interface WorkerProcessors {
   startIngest: (reviewId: string, args: Record<string, unknown>) => Promise<IngestOutcome>;
   resumeIngest: (reviewId: string, answers: Record<string, string>, preset: string | undefined) => Promise<IngestOutcome>;
   runEngine: (reviewId: string, shouldStop: () => StopSignal) => Promise<EngineResult>;
+  ingestResumable?: (reviewId: string) => Promise<boolean> | boolean;
 }
 
 interface Intent {
@@ -105,6 +106,11 @@ export class WorkerRunner {
           if (Number.isFinite(age) && age < this.staleLeaseMs) {
             return false;
           }
+        } else if (current !== undefined) {
+          const age = nowMs - Date.parse(current.heartbeatAt);
+          if (Number.isFinite(age) && age < this.staleLeaseMs / 3) {
+            return true;
+          }
         }
         writeSetting(tx, WORKER_LEASE_KEY, { workerId: this.workerId, heartbeatAt: new Date(nowMs).toISOString() });
         return true;
@@ -141,6 +147,7 @@ export class WorkerRunner {
                 kind: 'control_ack',
                 payload: { commandId: command.id, command: command.command },
               });
+              tx.delete(runCommands).where(eq(runCommands.id, command.id)).run();
             },
             { behavior: 'immediate' },
           );
@@ -157,6 +164,7 @@ export class WorkerRunner {
           kind: 'control_ack',
           payload: { commandId: command.id, command: command.command },
         });
+        this.db.delete(runCommands).where(eq(runCommands.id, command.id)).run();
       }
       this.ackedCommands.add(command.id);
       this.log(`command ${command.command} for ${command.reviewId}`);
@@ -290,7 +298,7 @@ export class WorkerRunner {
         continue;
       }
       const row = this.db.select({ status: reviews.status }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
-      if (row !== undefined && ['created', 'awaiting_input', 'paused'].includes(row.status)) {
+      if (row !== undefined && QUEUEABLE_STATUSES.has(row.status)) {
         updateReview(this.db, reviewId, { status: 'queued' });
       }
     }
@@ -311,12 +319,25 @@ export class WorkerRunner {
 
       const ingested = this.ingestComplete(reviewId);
       if (!ingested) {
-        const outcome =
-          intent.kind === 'resume'
-            ? await this.processors.resumeIngest(reviewId, intent.answers ?? {}, intent.preset)
-            : await this.processors.startIngest(reviewId, intent.args);
+        let outcome: IngestOutcome;
         if (intent.kind === 'resume') {
+          const resumable =
+            this.processors.ingestResumable === undefined || (await this.processors.ingestResumable(reviewId));
+          if (resumable) {
+            outcome = await this.processors.resumeIngest(reviewId, intent.answers ?? {}, intent.preset);
+          } else {
+            this.log(`ingest snapshot missing for ${reviewId}; restarting ingest from the manuscript blob`);
+            insertEvent(this.db, {
+              reviewId,
+              kind: 'error',
+              phase: 'phase_0',
+              payload: { reason: 'ingest_snapshot_missing', action: 'restart_ingest' },
+            });
+            outcome = await this.processors.startIngest(reviewId, this.recoveredArgs(reviewId));
+          }
           this.clearPendingResume(reviewId);
+        } else {
+          outcome = await this.processors.startIngest(reviewId, intent.args);
         }
         if (outcome === 'suspended') {
           if (this.cancelRequested.has(reviewId)) {
