@@ -79,7 +79,8 @@ export interface EphemeralEvent {
   data: unknown;
 }
 
-const ephemeralCache = new WeakMap<object, Map<string, { seq: number; events: EphemeralEvent[] }>>();
+const EPHEMERAL_CACHE_TTL_MS = 2000;
+const ephemeralCache = new WeakMap<object, Map<string, { seq: number; computedAt: number; events: EphemeralEvent[] }>>();
 
 export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEvent[] {
   const review = db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
@@ -93,8 +94,8 @@ export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEv
     ephemeralCache.set(db, byReview);
   }
   const cached = byReview.get(reviewId);
-  if (cached !== undefined && cached.seq === currentMax) {
-    return cached.events;
+  if (cached !== undefined && cached.seq === currentMax && Date.now() - cached.computedAt < EPHEMERAL_CACHE_TTL_MS) {
+    return [...cached.events];
   }
   const phase = review.currentPhase ?? 'phase_0';
   const out: EphemeralEvent[] = [];
@@ -132,8 +133,8 @@ export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEv
     data: { etaSeconds: remaining * PHASE_MEDIAN_SECONDS, basis: 'bundled median' },
   });
 
-  byReview.set(reviewId, { seq: currentMax, events: out });
-  return out;
+  byReview.set(reviewId, { seq: currentMax, computedAt: Date.now(), events: out });
+  return [...out];
 }
 
 function phaseIndex(phase: string): number {
