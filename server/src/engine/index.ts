@@ -12,6 +12,18 @@ export {
   swarmProfile,
 } from './lenses';
 export { runAgent, type RunAgentDeps, type RunAgentParams } from './dispatch-agent';
+export {
+  COST_CEILING_SETTING_KEY,
+  createCostCeilingGate,
+  type CostCeilingGateOptions,
+  DEFAULT_PROJECTED_DISPATCH_USD,
+} from './cost-ceiling';
+export {
+  DispatchPauseError,
+  type PreDispatchDecision,
+  type PreDispatchGate,
+  type PreDispatchInfo,
+} from './phases-shared';
 export { mergeFindingsOnce, type MergeOnceInput } from './merge';
 export type { EngineDeps } from './phases-shared';
 export {

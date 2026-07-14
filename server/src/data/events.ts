@@ -15,6 +15,9 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
   const payload = safeParse(row.payloadJson);
   switch (row.kind) {
     case 'phase_transition':
+      if (payload.paused === true) {
+        return { seq: row.seq, event: 'run_paused', data: { phase: row.phase, ...payload } };
+      }
       return { seq: row.seq, event: 'phase_status', data: { phase: row.phase, status: 'active', ...payload } };
     case 'gate_verdict':
       return { seq: row.seq, event: 'gate_verdict', data: { phase: row.phase, ...payload } };

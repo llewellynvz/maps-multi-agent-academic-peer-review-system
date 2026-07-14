@@ -7,6 +7,7 @@ import { runMigrations } from './db/migrate';
 import { createRotatingLog } from './logging/rotating-log';
 import { citationCachePath, maraDbPath, mastraDbPath, repoRoot } from './paths';
 import {
+  createCostCeilingGate,
   type EngineDeps,
   runPhase1,
   runPhase2,
@@ -20,7 +21,7 @@ import {
 import { createGrobidClient } from './ingest';
 import { createDispatchRunner, createRegistry } from './providers';
 import { initTracing, startRun } from './tracing';
-import { getManuscript, getReviewOptions, mergeReviewOptions, updateReview } from './workflow/repo';
+import { getManuscript, getReviewOptions, mergeReviewOptions, pauseReview, updateReview } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
 import { readSetting } from './data/settings-store';
 import { announceFindings } from './worker/announce';
@@ -82,7 +83,7 @@ async function main(): Promise<void> {
     cachePath: citationCachePath(),
     ...(process.env.MARA_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MARA_CONTACT_EMAIL } : {}),
   });
-  const engineDeps: EngineDeps = { db, runDispatch, citationClient, egress };
+  const engineDeps: EngineDeps = { db, runDispatch, citationClient, egress, preDispatch: createCostCeilingGate({ db }) };
 
   const grobidUrl = (process.env.GROBID_URL ?? 'http://127.0.0.1:8070').replace('localhost', '127.0.0.1');
   const grobid = createGrobidClient({ baseUrl: grobidUrl });
@@ -154,6 +155,10 @@ async function main(): Promise<void> {
               phases: ENGINE_PHASES,
               shouldStop,
               onStale: (info) => log(`phase ${info.phase} stale (${info.reason}), restart ${info.restart}`),
+              onPause: (info) => {
+                log(`phase ${info.phase} paused (${info.reason})`);
+                pauseReview(db, reviewId, { reason: info.reason, phase: info.phase, ...(info.detail !== undefined ? { detail: info.detail } : {}) });
+              },
               afterPhase: () => announceFindings(db, reviewId, announced),
             });
           });

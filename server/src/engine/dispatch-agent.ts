@@ -3,9 +3,11 @@ import type { z } from 'zod';
 import type { DispatchRunner } from '../providers';
 import { assemble, type AssembleInput, readManifest, roleFor, schemaFor } from '../prompts';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
+import { DispatchPauseError, type PreDispatchGate } from './phases-shared';
 
 export interface RunAgentDeps {
   runDispatch: DispatchRunner;
+  preDispatch?: PreDispatchGate;
 }
 
 export interface RunAgentParams {
@@ -106,6 +108,17 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
   let lastError: unknown;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    if (deps.preDispatch !== undefined) {
+      const decision = deps.preDispatch({
+        reviewId: params.reviewId,
+        phase: params.phase,
+        agent: params.agent,
+        ...(params.mode !== undefined ? { mode: params.mode } : {}),
+      });
+      if (decision.pause) {
+        throw new DispatchPauseError(decision.reason ?? 'cost_ceiling', decision.detail);
+      }
+    }
     const { system, user } = assemble(params.agent, input);
     try {
       const result = await deps.runDispatch({

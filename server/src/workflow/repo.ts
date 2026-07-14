@@ -258,6 +258,21 @@ export function updateReview(
     .run();
 }
 
+export function pauseReview(
+  db: MaraDatabase,
+  reviewId: string,
+  input: { reason: string; phase?: string; detail?: Record<string, unknown> },
+): void {
+  updateReview(db, reviewId, { status: 'paused' });
+  mergeReviewOptions(db, reviewId, { pauseReason: input.reason });
+  insertEvent(db, {
+    reviewId,
+    kind: 'phase_transition',
+    ...(input.phase !== undefined ? { phase: input.phase } : {}),
+    payload: { paused: true, reason: input.reason, ...(input.detail ?? {}) },
+  });
+}
+
 export function getReviewOptions(db: MaraDatabase, reviewId: string): Record<string, unknown> {
   const row = db.select({ optionsJson: reviews.optionsJson }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
   if (row === undefined) {

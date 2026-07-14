@@ -1,3 +1,4 @@
+import { DispatchPauseError } from '../engine/phases-shared';
 import type { DispatchRunner } from '../providers';
 
 export class StaleDispatchError extends Error {
@@ -68,6 +69,7 @@ export interface RunEnginePhasesParams<D> {
   shouldStop: () => StopSignal;
   maxRestartsPerPhase?: number;
   onStale?: (info: { phase: string; restart: number; reason: string }) => void;
+  onPause?: (info: { phase: string; reason: string; detail?: Record<string, unknown> }) => void;
   afterPhase?: (name: string) => void;
 }
 
@@ -93,6 +95,10 @@ export async function runEnginePhases<D>(params: RunEnginePhasesParams<D>): Prom
         await phase.run(params.deps, params.reviewId);
         break;
       } catch (error) {
+        if (error instanceof DispatchPauseError) {
+          params.onPause?.({ phase: phase.name, reason: error.reason, ...(error.detail !== undefined ? { detail: error.detail } : {}) });
+          return 'paused';
+        }
         if (error instanceof StaleDispatchError && restarts < max) {
           const interrupt = params.shouldStop();
           if (interrupt === 'cancel') {
