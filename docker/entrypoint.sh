@@ -2,8 +2,12 @@
 set -uo pipefail
 
 if [ "$(id -u)" = "0" ]; then
-  chown -R node:node /app/data
-  exec setpriv --reuid node --regid node --init-groups "$0" "$@"
+  if [ ! -e /app/data/.ownership ]; then
+    chown -R node:node /app/data
+    : > /app/data/.ownership
+    chown node:node /app/data/.ownership
+  fi
+  exec setpriv --reuid node --regid node --init-groups --no-new-privs "$0" "$@"
 fi
 
 cd /app/server
