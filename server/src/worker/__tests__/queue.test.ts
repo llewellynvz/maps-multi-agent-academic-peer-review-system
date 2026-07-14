@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
+import { artefactExists, writeArtefact } from '../../engine/artefacts';
+import { blobDir } from '../../paths';
 import { pauseReview, updateReview } from '../../workflow/repo';
 import { WorkerRunner, type EngineResult, type WorkerProcessors } from '../runner';
 
@@ -217,6 +219,73 @@ const countingProcessors = (engineOrder: string[]): WorkerProcessors => ({
     updateReview(client.db, reviewId, { status: 'completed' });
     return 'completed';
   },
+});
+
+describe('retry_phase recovery semantics', () => {
+  function failReview(id: string, errorClass: string): void {
+    client.sqlite
+      .prepare("UPDATE reviews SET status = 'failed', error_class = ?, current_phase = 'phase_8' WHERE id = ?")
+      .run(errorClass, id);
+    for (const phase of ['engine_phase_7', 'engine_phase_8']) {
+      client.sqlite
+        .prepare("INSERT INTO phase_checkpoints (id, review_id, phase, status, updated_at) VALUES (?, ?, ?, 'completed', ?)")
+        .run(randomUUID(), id, phase, new Date().toISOString());
+    }
+  }
+
+  function checkpointStatus(id: string, phase: string): string | undefined {
+    const row = client.sqlite
+      .prepare('SELECT status FROM phase_checkpoints WHERE review_id = ? AND phase = ?')
+      .get(id, phase) as { status: string } | undefined;
+    return row?.status;
+  }
+
+  it('invalidates all gate cycle artefacts and downstream phases on a gate-block retry', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    writeArtefact(id, 'p6-report', { keep: true });
+    writeArtefact(id, 'p7-shipped-0', { stale: true });
+    writeArtefact(id, 'p7-critic-1', { stale: true });
+    writeArtefact(id, 'p8-quality-metrics', { stale: true });
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_7' });
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder) });
+    await runner.runOnce();
+
+    expect(artefactExists(id, 'p6-report')).toBe(true);
+    expect(artefactExists(id, 'p7-shipped-0')).toBe(false);
+    expect(artefactExists(id, 'p7-critic-1')).toBe(false);
+    expect(artefactExists(id, 'p8-quality-metrics')).toBe(false);
+    expect(checkpointStatus(id, 'engine_phase_7')).toBe('pending');
+    expect(checkpointStatus(id, 'engine_phase_8')).toBe('pending');
+    const errorClass = (client.sqlite.prepare('SELECT error_class FROM reviews WHERE id = ?').get(id) as { error_class: string | null }).error_class;
+    expect(errorClass).toBeNull();
+    expect(engineOrder).toEqual([id]);
+    expect(reviewStatus(id)).toBe('completed');
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
+
+  it('keeps cached artefacts on a transient engine_error retry so successes are not re-paid', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'engine_error');
+    writeArtefact(id, 'p7-shipped-0', { cached: true });
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_7' });
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder) });
+    await runner.runOnce();
+
+    expect(artefactExists(id, 'p7-shipped-0')).toBe(true);
+    expect(checkpointStatus(id, 'engine_phase_7')).toBe('pending');
+    expect(checkpointStatus(id, 'engine_phase_8')).toBe('completed');
+    expect(engineOrder).toEqual([id]);
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
 });
 
 describe('PIPE-27 awaiting_input timeout', () => {

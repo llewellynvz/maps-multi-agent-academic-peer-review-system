@@ -25,7 +25,7 @@ import { readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
-import { redactEditorOnlyIds, validateGrounding, type GroundingFailureKind } from './grounding';
+import { redactEditorOnlyIds, redactSupersededIds, validateGrounding, type GroundingFailureKind } from './grounding';
 import { matchLens } from './lenses';
 import { mergeFindingsOnce } from './merge';
 import { assemblePrivateNotes } from './private-notes';
@@ -220,7 +220,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         currentAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
       );
 
-      const redact = (content: string): string => redactEditorOnlyIds(content, editorOnlyIds);
+      const redact = (content: string): string =>
+        redactSupersededIds(redactEditorOnlyIds(content, editorOnlyIds), ledgerIdsNow);
       const shipped = await runAgent<ShippedReportEnvelope>(deps, {
         reviewId,
         phase: 'phase_7',
@@ -268,7 +269,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         priorDefect =
           grounding.kind === 'editor-only-leak'
             ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
-            : `grounding validator: ${lastObjection}`;
+            : grounding.kind === 'ungrounded-id'
+              ? 'grounding validator: your text cited finding ids that are superseded or unknown; cite only ids present verbatim in the author-facing ledger artefact and never ids marked [SUPERSEDED]'
+              : `grounding validator: ${lastObjection}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {
@@ -454,7 +457,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             artefacts: [
               {
                 label: 'Prior shipped report (recommendation superseded by arbitration)',
-                content: redactEditorOnlyIds(lastShipped.bodyMarkdown, alignEditorOnlyIds),
+                content: redactSupersededIds(redactEditorOnlyIds(lastShipped.bodyMarkdown, alignEditorOnlyIds), alignLedgerIds),
               },
               {
                 label: 'Author-facing ledger (cite only these ids)',

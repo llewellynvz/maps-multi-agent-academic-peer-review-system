@@ -437,6 +437,34 @@ describe('phase 7 release gate routing', () => {
     expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'block')).toBe(true);
   });
 
+  it('never shows superseded ids to the writer: stale ids in upstream artefacts are masked', async () => {
+    mergeFindings(db, {
+      reviewId,
+      lensPrefix: 'STAT',
+      phase: 'phase_3',
+      agent: 'specialist-reviewer',
+      fragments: [finding({ lens: 'statistical', claim: 'A first-pass reading later corrected.' })],
+    });
+    mergeFindings(db, {
+      reviewId,
+      lensPrefix: 'STAT',
+      phase: 'phase_5',
+      agent: 'specialist-reviewer',
+      fragments: [finding({ lens: 'statistical', claim: 'The corrected reading.', supersedes: 'REV-STAT-0003' })],
+    });
+    writeArtefact(reviewId, 'p6-report', {
+      mode: 'A',
+      bodyMarkdown: 'Full internal report referencing REV-STAT-0001 and the earlier REV-STAT-0003 reading.',
+    });
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(1);
+    for (const input of harness.writerInputs) {
+      expect(input).not.toContain('REV-STAT-0003');
+      expect(input).toContain('[SUPERSEDED]');
+    }
+  });
+
   it('never shows editor-only ids to the writer, even after a leak-triggered revise', async () => {
     writeArtefact(reviewId, 'p6-report', {
       mode: 'A',

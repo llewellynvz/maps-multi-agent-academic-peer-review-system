@@ -212,12 +212,21 @@ export default function RunPage(): ReactNode {
           {terminal === 'failed' ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <h2 className="h3">Recovery</h2>
-              <p className="sub" style={{ marginBottom: 12 }}>A phase did not complete. You can retry it from its checkpoint or keep the partial result.</p>
+              <p className="sub" style={{ marginBottom: 12 }}>
+                A phase did not complete. Retry re-runs the review from the failed phase (earlier completed work is reused), or you can keep what was produced so far.
+              </p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {failedPhase !== null ? (
-                  <button className="btn btn-secondary" onClick={() => void api.retryPhase(id, failedPhase)}>Retry phase</button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      void api.retryPhase(id, failedPhase).then(() => window.location.reload());
+                    }}
+                  >
+                    Retry from {phaseLabel(failedPhase)}
+                  </button>
                 ) : null}
-                <button className="btn btn-ghost" onClick={() => void api.cancel(id)}>Cancel and keep partial</button>
+                <button className="btn btn-ghost" onClick={() => router.push(`/reviews/${id}/results`)}>View partial results</button>
               </div>
             </div>
           ) : null}

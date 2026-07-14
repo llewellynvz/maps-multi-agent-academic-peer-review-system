@@ -4,6 +4,7 @@ import type { MaraClient, MaraDatabase } from '../db/client';
 import { manuscripts, reviewEvents, reviews, runCommands } from '../db/schema';
 import { getReviewOptions, insertEvent, mergeReviewOptions, pauseReview, updateReview } from '../workflow/repo';
 import { readSetting, writeSetting } from '../data/settings-store';
+import { deleteArtefactsByPrefix } from '../engine/artefacts';
 import { writeHeartbeat } from '../data/heartbeat';
 import type { StopSignal } from './supervisor';
 
@@ -228,7 +229,11 @@ export class WorkerRunner {
       case 'retry_phase': {
         const phase = typeof args.phase === 'string' ? args.phase : '';
         if (phase !== '') {
-          this.resetPhaseCheckpoint(reviewId, phase);
+          if (this.reviewErrorClass(reviewId) === 'release_gate_block') {
+            this.invalidateFromPhase(reviewId, phase);
+          } else {
+            this.resetPhaseCheckpoint(reviewId, phase);
+          }
           this.intents.set(reviewId, { kind: 'run', args: {}, createdAt });
         }
         break;
@@ -243,6 +248,28 @@ export class WorkerRunner {
     this.client.sqlite
       .prepare("UPDATE phase_checkpoints SET status = 'pending', updated_at = ? WHERE review_id = ? AND phase = ?")
       .run(new Date().toISOString(), reviewId, key);
+  }
+
+  private reviewErrorClass(reviewId: string): string | null {
+    const row = this.client.sqlite.prepare('SELECT error_class FROM reviews WHERE id = ?').get(reviewId) as
+      | { error_class: string | null }
+      | undefined;
+    return row?.error_class ?? null;
+  }
+
+  private invalidateFromPhase(reviewId: string, phase: string): void {
+    const startMatch = /phase_(\d+)/.exec(phase);
+    const start = startMatch !== null ? Number.parseInt(startMatch[1]!, 10) : 7;
+    for (let n = start; n <= 8; n += 1) {
+      const removed = deleteArtefactsByPrefix(reviewId, `p${n}-`);
+      this.resetPhaseCheckpoint(reviewId, `phase_${n}`);
+      if (removed.length > 0) {
+        this.log(`review ${reviewId}: invalidated ${removed.length} phase_${n} artefacts for gate retry`);
+      }
+    }
+    this.client.sqlite
+      .prepare("UPDATE reviews SET error_class = NULL, updated_at = ? WHERE id = ?")
+      .run(new Date().toISOString(), reviewId);
   }
 
   private clearPendingResume(reviewId: string): void {

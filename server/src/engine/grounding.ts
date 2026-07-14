@@ -71,6 +71,10 @@ export function redactEditorOnlyIds(content: string, editorOnlyIds: Set<string>)
   return result;
 }
 
+export function redactSupersededIds(content: string, currentIds: Set<string>): string {
+  return content.replace(FINDING_ID_TOKEN, (id) => (currentIds.has(id) ? id : '[SUPERSEDED]'));
+}
+
 export function validateGrounding(input: GroundingInput): GroundingResult {
   const failures: string[] = [];
   let kind: GroundingFailureKind = null;

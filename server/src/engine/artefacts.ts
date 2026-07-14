@@ -1,8 +1,24 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, unlinkSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { manuscriptBlobPath, readManuscriptBlobText, writeManuscriptBlob } from '../workflow/storage';
 
 function artefactRelativePath(name: string): string {
   return `engine/${name}.json`;
+}
+
+export function deleteArtefactsByPrefix(reviewId: string, prefix: string): string[] {
+  const engineDir = dirname(manuscriptBlobPath(reviewId, artefactRelativePath('any')));
+  if (!existsSync(engineDir)) {
+    return [];
+  }
+  const removed: string[] = [];
+  for (const file of readdirSync(engineDir)) {
+    if (file.startsWith(prefix) && file.endsWith('.json')) {
+      unlinkSync(manuscriptBlobPath(reviewId, `engine/${file}`));
+      removed.push(file);
+    }
+  }
+  return removed;
 }
 
 export function artefactExists(reviewId: string, name: string): boolean {

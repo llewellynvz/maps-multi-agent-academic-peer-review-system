@@ -88,6 +88,14 @@ export default function ResultsPage(): ReactNode {
 
   return (
     <div>
+      {review.status === 'failed' || review.status === 'cancelled' ? (
+        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--psy-lime)' }}>
+          <h2 className="h3">Partial results</h2>
+          <p className="sub">
+            This review did not finish, so the letter was not released. Everything produced before the halt is shown and downloadable below, and you can retry the failed phase from the run screen.
+          </p>
+        </div>
+      ) : null}
       <div className="card" style={{ marginBottom: 24 }}>
         <p className="eyebrow">Results</p>
         <h1 className="h1" style={{ marginBottom: 12 }}>{review.title ?? 'Review'}</h1>

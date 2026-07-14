@@ -30,7 +30,7 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
       return {
         seq: row.seq,
         event: failed ? 'run_failed' : 'run_complete',
-        data: payload,
+        data: { phase: row.phase, ...payload },
       };
     }
     default:
