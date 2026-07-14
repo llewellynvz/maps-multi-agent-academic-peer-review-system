@@ -8,6 +8,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
+    "worker": "tsx src/worker.ts",
     "exercise:slice-a": "tsx ./scripts/exercise-slice-a.ts",
     "exercise:slice-b": "tsx ./scripts/exercise-slice-b.ts",
     "exercise:slice-c": "tsx ./scripts/exercise-slice-c.ts",
@@ -35,6 +36,7 @@
     "docx": "9.7.1",
     "drizzle-orm": "^0.45.2",
     "fast-xml-parser": "^5.2.5",
+    "jszip": "^3.10.1",
     "mammoth": "^1.11.0",
     "ollama-ai-provider-v2": "4.0.1",
     "unpdf": "^1.4.0",
@@ -43,7 +45,6 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "drizzle-kit": "^0.31.10",
-    "jszip": "^3.10.1",
     "tsx": "^4.23.0",
     "vitest": "^4.1.10"
   }

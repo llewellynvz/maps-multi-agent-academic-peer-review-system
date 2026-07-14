@@ -2,8 +2,10 @@ node_modules/
 .env
 .env.*
 !.env.example
-data/
+/data/
 *.log
 .DS_Store
 STATE.md
 scratch/
+.next/
+next-env.d.ts
