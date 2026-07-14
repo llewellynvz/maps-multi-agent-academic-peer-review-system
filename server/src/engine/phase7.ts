@@ -400,9 +400,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       } else {
         released = true;
         releaseVerdict = 'arbitrated';
-        if (arbitration.narrowedRecommendation !== null) {
-          finalRecommendation = arbitration.narrowedRecommendation;
-        }
+        finalRecommendation = arbitration.narrowedRecommendation ?? currentMeta.recommendation;
       }
       recordGateCheckpoint(db, {
         reviewId,
