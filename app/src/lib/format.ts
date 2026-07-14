@@ -12,6 +12,18 @@ export const PHASES: Array<{ key: string; label: string; optional: boolean }> = 
   { key: 'phase_8', label: 'Production and close-out', optional: false },
 ];
 
+export const PHASE_DESCRIPTIONS: Record<string, string> = {
+  phase_0: 'The manuscript is screened for hidden instructions and prepared for review.',
+  phase_1: 'The manuscript is broken down into its structure, claims, and study design.',
+  phase_2: 'Field context and comparable published work are gathered.',
+  phase_3: 'Specialist reviewers examine the manuscript, each through one lens.',
+  phase_4: 'The manuscript is screened for integrity signals such as reporting gaps and similarity.',
+  phase_5: 'A simulated reviewer ensemble stress-tests which findings hold up.',
+  phase_6: 'The findings are assembled into a full internal review report.',
+  phase_7: 'The report is synthesised, scored, and checked at the release gate.',
+  phase_8: 'The author letter and editor summary are produced and the review is closed.',
+};
+
 export function phaseLabel(key: string | null): string {
   return PHASES.find((phase) => phase.key === key)?.label ?? 'Intake';
 }
@@ -50,6 +62,14 @@ export const RECOMMENDATION_LABEL: Record<string, string> = {
   major_revision: 'Major revision',
   reject_and_resubmit: 'Reject and resubmit',
   reject: 'Reject',
+};
+
+export const RECOMMENDATION_EXPLANATION: Record<string, string> = {
+  accept: 'The manuscript is ready to publish with no further changes.',
+  minor_revision: 'The manuscript needs small changes that do not require another full review.',
+  major_revision: 'The manuscript needs substantial changes and another round of review.',
+  reject_and_resubmit: 'The manuscript is not acceptable now but could return as a new submission after major rework.',
+  reject: 'The manuscript is not suitable for this journal.',
 };
 
 export type StatusTone = 'info' | 'success' | 'warn' | 'fail' | 'neutral';
