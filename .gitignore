@@ -9,3 +9,5 @@ STATE.md
 scratch/
 .next/
 next-env.d.ts
+REVIEW.md
+.claude/
