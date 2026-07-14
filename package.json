@@ -15,6 +15,7 @@
     "exercise:slice-c": "pnpm --filter server exercise:slice-c",
     "exercise:slice-d": "pnpm --filter server exercise:slice-d",
     "exercise:slice-e": "pnpm --filter server exercise:slice-e",
+    "exercise:slice-f": "pnpm --filter server exercise:slice-f",
     "worker": "pnpm --filter server worker"
   },
   "devDependencies": {
