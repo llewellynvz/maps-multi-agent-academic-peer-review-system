@@ -13,7 +13,9 @@
     "exercise:slice-a": "pnpm --filter server exercise:slice-a",
     "exercise:slice-b": "pnpm --filter server exercise:slice-b",
     "exercise:slice-c": "pnpm --filter server exercise:slice-c",
-    "exercise:slice-d": "pnpm --filter server exercise:slice-d"
+    "exercise:slice-d": "pnpm --filter server exercise:slice-d",
+    "exercise:slice-e": "pnpm --filter server exercise:slice-e",
+    "worker": "pnpm --filter server worker"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

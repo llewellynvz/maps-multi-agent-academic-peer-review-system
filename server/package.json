@@ -12,7 +12,8 @@
     "exercise:slice-a": "tsx ./scripts/exercise-slice-a.ts",
     "exercise:slice-b": "tsx ./scripts/exercise-slice-b.ts",
     "exercise:slice-c": "tsx ./scripts/exercise-slice-c.ts",
-    "exercise:slice-d": "tsx ./scripts/exercise-slice-d.ts"
+    "exercise:slice-d": "tsx ./scripts/exercise-slice-d.ts",
+    "exercise:slice-e": "tsx ./scripts/exercise-slice-e.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.12",

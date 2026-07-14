@@ -68,9 +68,9 @@ async function main(): Promise<void> {
 
   const registry = createRegistry({ env: process.env });
   const baseDispatch = createDispatchRunner({ db, registry });
-  const dispatchTimeoutMs = Number.parseInt(process.env.MARA_DISPATCH_TIMEOUT_MS ?? '120000', 10);
+  const dispatchTimeoutMs = Number.parseInt(process.env.MARA_DISPATCH_TIMEOUT_MS ?? '300000', 10);
   const runDispatch = superviseDispatch(baseDispatch, {
-    timeoutMs: Number.isFinite(dispatchTimeoutMs) ? dispatchTimeoutMs : 120000,
+    timeoutMs: Number.isFinite(dispatchTimeoutMs) ? dispatchTimeoutMs : 300000,
     onStale: (reason) => log(`stale dispatch (${reason}), re-issuing from checkpoint`),
   });
 
