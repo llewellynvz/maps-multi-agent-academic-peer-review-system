@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { MaraDatabase } from '../db/client';
 import { dispatches } from '../db/schema';
+import { estimateCostUsd } from './pricing';
 import type { Registry } from './registry';
 import type { DispatchProvider, ModelRef, Role } from './types';
 
@@ -185,7 +186,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
         tokensOut: tokens.outputTokens,
         tokensCached: tokens.cachedTokens,
         latencyMs,
-        costUsd: 0,
+        costUsd: estimateCostUsd(modelRef.model, tokens),
         retries: 0,
         status,
         errorClass,
