@@ -102,6 +102,9 @@ async function main(): Promise<void> {
   const runner = new WorkerRunner({
     client: { db, sqlite },
     pollMs: Number.parseInt(process.env.MARA_WORKER_POLL_MS ?? '500', 10),
+    ...(process.env.MARA_AWAITING_INPUT_TIMEOUT_MS !== undefined
+      ? { awaitingInputTimeoutMs: Number.parseInt(process.env.MARA_AWAITING_INPUT_TIMEOUT_MS, 10) }
+      : {}),
     onLog: log,
     processors: {
       startIngest: async (reviewId, args): Promise<IngestOutcome> => {
