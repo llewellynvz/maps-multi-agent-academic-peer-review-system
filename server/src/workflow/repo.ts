@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { manuscripts, phaseCheckpoints, reviewEvents, reviews } from '../db/schema';
+import { nowIso } from '../data/db';
+import type { ReviewStatus } from '../data/types';
 
 export type CheckpointStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
 
@@ -15,10 +17,6 @@ export type EventKind =
   | 'finding_recorded'
   | 'run_terminal'
   | 'error';
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 export interface ManuscriptRow {
   id: string;
@@ -239,16 +237,7 @@ export function insertEvent(
   );
 }
 
-export type ReviewStatusValue =
-  | 'created'
-  | 'queued'
-  | 'sanitizing'
-  | 'running'
-  | 'paused'
-  | 'awaiting_input'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+export type ReviewStatusValue = ReviewStatus;
 
 export function updateReview(
   db: MaraDatabase,

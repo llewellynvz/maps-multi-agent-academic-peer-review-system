@@ -41,6 +41,8 @@ export function openCitationCache(options: OpenCacheOptions = {}): CitationCache
     )`,
   );
 
+  db.prepare('DELETE FROM citation_cache WHERE fetched_at < ?').run(new Date(Date.now() - ttlMs).toISOString());
+
   const selectStmt = db.prepare('SELECT payload_json, fetched_at FROM citation_cache WHERE query_key = ?');
   const upsertStmt = db.prepare(
     `INSERT INTO citation_cache (query_key, source, payload_json, fetched_at)

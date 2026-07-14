@@ -71,15 +71,11 @@ export function createRotatingLog(name: string): RotatingLog {
     for (let index = maxFiles - 1; index >= 1; index -= 1) {
       try {
         renameSync(`${file}.${index}`, `${file}.${index + 1}`);
-      } catch {
-        /* rotated file absent */
-      }
+      } catch {}
     }
     try {
       renameSync(file, `${file}.1`);
-    } catch {
-      /* nothing to rotate */
-    }
+    } catch {}
   }
 
   return {

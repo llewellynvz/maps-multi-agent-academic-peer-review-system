@@ -10,14 +10,33 @@ import {
   type EngineDeps,
   loadBannedVerdictTerms,
   readArtefact,
-  runReviewEngine,
+  runPhase1,
+  runPhase2,
+  runPhase3,
+  runPhase4,
+  runPhase5,
+  runPhase6,
+  runPhase7,
+  runPhase8,
 } from '../src/engine';
 import { dataDir, fixturesDir, maraDbPath, mastraDbPath, repoRoot } from '../src/paths';
 import { createCitationClient } from '../src/citations';
 import { createDispatchRunner, createRegistry } from '../src/providers';
 import { initTracing, startRun, withPhase } from '../src/tracing';
 import { manuscriptBlobPath } from '../src/workflow/storage';
-import { buildIngestMastra, buildReviewEngineMastra, resumeIngest, startIngest, startReviewEngine } from '../src/workflow';
+import { buildIngestMastra, resumeIngest, startIngest } from '../src/workflow';
+import { type EnginePhaseStep, runEnginePhases } from '../src/worker/supervisor';
+
+const ENGINE_PHASES: Array<EnginePhaseStep<EngineDeps>> = [
+  { name: 'phase_1', run: runPhase1 },
+  { name: 'phase_2', run: runPhase2 },
+  { name: 'phase_3', run: runPhase3 },
+  { name: 'phase_4', run: runPhase4 },
+  { name: 'phase_5', run: runPhase5 },
+  { name: 'phase_6', run: runPhase6 },
+  { name: 'phase_7', run: runPhase7 },
+  { name: 'phase_8', run: runPhase8 },
+];
 
 const PLOS_DOI = '10.1371/journal.pone.0275925';
 const PLOS_PDF_URL = `https://journals.plos.org/plosone/article/file?id=${PLOS_DOI}&type=printable`;
@@ -240,15 +259,14 @@ async function main(): Promise<void> {
     }
 
     try {
-      await runReviewEngine(engineDeps, reviewId);
+      await runEnginePhases({ deps: engineDeps, reviewId, phases: ENGINE_PHASES, shouldStop: () => null });
     } catch (error) {
       engineError = error instanceof Error ? error.message : String(error);
     }
 
     if (engineError === null) {
-      const engineMastra = buildReviewEngineMastra({ db, runDispatch, citationClient, mastraDbPath: mastraDbPath() });
-      const workflowRun = await startReviewEngine(engineMastra, reviewId);
-      workflowStatus = workflowRun.status;
+      const rerun = await runEnginePhases({ deps: engineDeps, reviewId, phases: ENGINE_PHASES, shouldStop: () => null });
+      workflowStatus = rerun === 'completed' ? 'success' : rerun;
     }
   });
 

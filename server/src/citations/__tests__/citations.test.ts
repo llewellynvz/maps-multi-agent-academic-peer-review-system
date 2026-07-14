@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import DatabaseConstructor from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { assertAllowedHost, createGuardedFetch } from '../allowlist';
 import { openCitationCache } from '../cache';
@@ -129,6 +133,32 @@ describe('verifyReference', () => {
     const second = await client.verifyReference(seligman);
     expect(second.status).toBe('verified');
     cache.close();
+  });
+
+  it('purges rows older than the TTL when the cache is opened', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mara-cache-'));
+    const path = join(dir, 'cache.db');
+    const raw = new DatabaseConstructor(path);
+    raw.exec(
+      'CREATE TABLE citation_cache (query_key TEXT PRIMARY KEY, source TEXT, payload_json TEXT NOT NULL, fetched_at TEXT NOT NULL)',
+    );
+    const stale = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+    const fresh = new Date().toISOString();
+    raw.prepare('INSERT INTO citation_cache VALUES (?, ?, ?, ?)').run('stale', 'crossref', '{}', stale);
+    raw.prepare('INSERT INTO citation_cache VALUES (?, ?, ?, ?)').run('fresh', 'crossref', '{}', fresh);
+    raw.close();
+
+    const cache = openCitationCache({ path, ttlMs: 30 * 24 * 60 * 60 * 1000 });
+    cache.close();
+
+    const check = new DatabaseConstructor(path);
+    const keys = (check.prepare('SELECT query_key FROM citation_cache').all() as Array<{ query_key: string }>).map(
+      (row) => row.query_key,
+    );
+    check.close();
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(keys).toEqual(['fresh']);
   });
 
   it('serves a cache hit without any further network calls', async () => {

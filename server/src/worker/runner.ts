@@ -262,9 +262,7 @@ export class WorkerRunner {
           };
         }
       }
-    } catch {
-      /* ignore malformed options */
-    }
+    } catch {}
     return undefined;
   }
 

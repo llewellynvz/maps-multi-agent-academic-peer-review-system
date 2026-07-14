@@ -28,8 +28,6 @@ import { selectActiveLenses, selectChallengeLenses, swarmProfile } from './lense
 import { runAgent } from './dispatch-agent';
 import { upsertRubricScore } from './rubric';
 import type { EngineDeps } from './phases-shared';
-import { runPhase7 } from './phase7';
-import { runPhase8 } from './phase8';
 
 export type { EngineDeps } from './phases-shared';
 
@@ -701,17 +699,6 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
       },
     });
   });
-}
-
-export async function runReviewEngine(deps: EngineDeps, reviewId: string): Promise<void> {
-  await runPhase1(deps, reviewId);
-  await runPhase2(deps, reviewId);
-  await runPhase3(deps, reviewId);
-  await runPhase4(deps, reviewId);
-  await runPhase5(deps, reviewId);
-  await runPhase6(deps, reviewId);
-  await runPhase7(deps, reviewId);
-  await runPhase8(deps, reviewId);
 }
 
 export { runPhase7 } from './phase7';

@@ -41,9 +41,7 @@ const ENGINE_PHASES: Array<EnginePhaseStep<EngineDeps>> = [
 function loadEnv(): void {
   try {
     process.loadEnvFile(resolve(repoRoot, '.env'));
-  } catch {
-    /* no .env present */
-  }
+  } catch {}
   const cert = process.env.AZURE_CLIENT_CERT_PEM_PATH;
   if (cert !== undefined && cert !== '' && !isAbsolute(cert)) {
     process.env.AZURE_CLIENT_CERT_PEM_PATH = resolve(repoRoot, cert);
