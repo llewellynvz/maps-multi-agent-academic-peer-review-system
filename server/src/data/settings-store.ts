@@ -41,3 +41,7 @@ export function readAllSettings(db: MaraDatabase): Record<string, unknown> {
 export const SECRET_SETTING_KEYS = new Set(['passphrase', 'session_secret']);
 
 export const COST_CEILING_SETTING_KEY = 'cost_ceiling_usd';
+
+export function positiveUsd(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}

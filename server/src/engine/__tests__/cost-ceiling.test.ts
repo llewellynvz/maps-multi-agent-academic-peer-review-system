@@ -247,6 +247,30 @@ describe('PIPE-26 cost-ceiling pre-dispatch gate', () => {
     expect(getReviewOptions(client.db, id).pauseReason).toBe('cost_ceiling');
   });
 
+  it('projects from the costliest prior dispatch so zero-cost rows cannot dilute the estimate', async () => {
+    const id = reviewId();
+    insertReview(id);
+    writeSetting(client.db, 'cost_ceiling_usd', 0.8);
+    insertDispatch(id, 0);
+    insertDispatch(id, 0);
+    insertDispatch(id, 0);
+    insertDispatch(id, 0.5);
+    let issued = 0;
+    const deps = {
+      db: client.db,
+      runDispatch: async () => {
+        issued += 1;
+        return successResult();
+      },
+      preDispatch: createCostCeilingGate({ db: client.db }),
+    };
+
+    await expect(
+      runAgent(deps, { reviewId: id, phase: 'phase_3', agent: 'specialist-reviewer', artefactName: 'zc', assembleInput: { lens: 'Methods and design' } }),
+    ).rejects.toBeInstanceOf(DispatchPauseError);
+    expect(issued).toBe(0);
+  });
+
   it('re-checks the ceiling before every retry attempt inside runAgent', async () => {
     const id = reviewId();
     insertReview(id);

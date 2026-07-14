@@ -108,6 +108,7 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
   let lastError: unknown;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const { system, user } = assemble(params.agent, input);
     if (deps.preDispatch !== undefined) {
       const decision = deps.preDispatch({
         reviewId: params.reviewId,
@@ -119,7 +120,6 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
         throw new DispatchPauseError(decision.reason ?? 'cost_ceiling', decision.detail);
       }
     }
-    const { system, user } = assemble(params.agent, input);
     try {
       const result = await deps.runDispatch({
         reviewId: params.reviewId,
