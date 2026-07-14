@@ -212,28 +212,31 @@ export function insertEvent(
     egressQuery?: string | null;
   },
 ): number {
-  return db.transaction((tx) => {
-    const rows = tx
-      .select({ seq: reviewEvents.seq })
-      .from(reviewEvents)
-      .where(eq(reviewEvents.reviewId, input.reviewId))
-      .all();
-    const nextSeq = rows.reduce((max, row) => (row.seq > max ? row.seq : max), 0) + 1;
-    tx.insert(reviewEvents)
-      .values({
-        id: randomUUID(),
-        reviewId: input.reviewId,
-        seq: nextSeq,
-        ts: nowIso(),
-        kind: input.kind,
-        phase: input.phase ?? null,
-        payloadJson: JSON.stringify(input.payload ?? {}),
-        egressTarget: input.egressTarget ?? null,
-        egressQuery: input.egressQuery ?? null,
-      })
-      .run();
-    return nextSeq;
-  });
+  return db.transaction(
+    (tx) => {
+      const rows = tx
+        .select({ seq: reviewEvents.seq })
+        .from(reviewEvents)
+        .where(eq(reviewEvents.reviewId, input.reviewId))
+        .all();
+      const nextSeq = rows.reduce((max, row) => (row.seq > max ? row.seq : max), 0) + 1;
+      tx.insert(reviewEvents)
+        .values({
+          id: randomUUID(),
+          reviewId: input.reviewId,
+          seq: nextSeq,
+          ts: nowIso(),
+          kind: input.kind,
+          phase: input.phase ?? null,
+          payloadJson: JSON.stringify(input.payload ?? {}),
+          egressTarget: input.egressTarget ?? null,
+          egressQuery: input.egressQuery ?? null,
+        })
+        .run();
+      return nextSeq;
+    },
+    { behavior: 'immediate' },
+  );
 }
 
 export type ReviewStatusValue =

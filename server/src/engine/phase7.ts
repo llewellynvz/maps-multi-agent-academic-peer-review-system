@@ -183,7 +183,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     let released = false;
     let releaseVerdict: 'pass' | 'arbitrated' = 'pass';
     let finalRecommendation: Recommendation = currentMeta.recommendation;
-    const finalConfidence = currentMeta.recommendationConfidence;
+    let finalConfidence = currentMeta.recommendationConfidence;
     let arbitration: ArbitrationRecord | null = null;
     let blocked = false;
     let blockReason = '';
@@ -307,6 +307,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       if (critic.verdict === 'pass') {
         released = true;
         releaseVerdict = 'pass';
+        finalRecommendation = currentMeta.recommendation;
         recordGateCheckpoint(db, {
           reviewId,
           phase: checkpointKey('phase_7'),
@@ -436,6 +437,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       return;
     }
 
+    finalConfidence = currentMeta.recommendationConfidence;
     updateReview(db, reviewId, {
       recommendation: finalRecommendation,
       recommendationConfidence: finalConfidence,

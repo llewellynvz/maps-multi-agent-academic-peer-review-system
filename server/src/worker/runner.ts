@@ -133,14 +133,17 @@ export class WorkerRunner {
       const args = safeArgs(command.argsJson);
       if (command.command === 'run' || command.command === 'resume') {
         try {
-          this.db.transaction((tx) => {
-            this.applyDurable(tx, command.reviewId, command.command, args);
-            insertEvent(tx, {
-              reviewId: command.reviewId,
-              kind: 'control_ack',
-              payload: { commandId: command.id, command: command.command },
-            });
-          });
+          this.db.transaction(
+            (tx) => {
+              this.applyDurable(tx, command.reviewId, command.command, args);
+              insertEvent(tx, {
+                reviewId: command.reviewId,
+                kind: 'control_ack',
+                payload: { commandId: command.id, command: command.command },
+              });
+            },
+            { behavior: 'immediate' },
+          );
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           this.log(`could not apply ${command.command} for ${command.reviewId}: ${message}`);

@@ -9,7 +9,7 @@ import { mergeFindings } from '../../ledger';
 import type { DispatchInput, DispatchResult } from '../../providers/dispatch';
 import { blobDir } from '../../paths';
 import { writeManuscriptBlob } from '../../workflow/storage';
-import { writeArtefact } from '../artefacts';
+import { readArtefact, writeArtefact } from '../artefacts';
 import type { EngineDeps } from '../phases-shared';
 import { runPhase7 } from '../phase7';
 
@@ -150,13 +150,15 @@ function critic(verdict: ReviewFinalCriticOutput['verdict'], overrides: Partial<
 function mockDeps(
   criticVerdicts: ReviewFinalCriticOutput[],
   shippedOverride?: ReturnType<typeof shippedObject>,
+  metaSequence?: Array<ReturnType<typeof metaObject>>,
 ): { deps: EngineDeps; criticCalls: number; specialistCalls: string[]; writerInputs: string[] } {
-  const state = { criticCalls: 0, specialistCalls: [] as string[], writerInputs: [] as string[] };
+  const state = { criticCalls: 0, metaCalls: 0, specialistCalls: [] as string[], writerInputs: [] as string[] };
   const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
     let object: unknown;
     switch (input.agent) {
       case 'review-meta-reviewer':
-        object = metaObject();
+        object = metaSequence?.[Math.min(state.metaCalls, metaSequence.length - 1)] ?? metaObject();
+        state.metaCalls += 1;
         break;
       case 'swarm':
         object = swarmBObject();
@@ -327,6 +329,32 @@ describe('phase 7 release gate routing', () => {
       .all(reviewId) as Array<{ payload_json: string }>;
     const sources = gateEvents.map((row) => (JSON.parse(row.payload_json) as { source: string }).source);
     expect(sources).toContain('final-critic');
+  });
+
+  it('persists the refreshed meta after a revise-specialist re-dispatch, not the stale first meta', async () => {
+    const first = { ...metaObject(), recommendation: 'major_revision', recommendationConfidence: 0.8 };
+    const second = { ...metaObject(), recommendation: 'minor_revision', recommendationConfidence: 0.6 };
+    const harness = mockDeps(
+      [critic('revise-specialist', { lens: 'STAT', findingIdToSupersede: 'REV-STAT-0002' }), critic('pass')],
+      undefined,
+      [first, second],
+    );
+    await runPhase7(harness.deps, reviewId);
+
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
+    expect(cp.snapshot.recommendation).toBe('minor_revision');
+    expect(cp.snapshot.recommendationConfidence).toBeCloseTo(0.6);
+
+    const review = sqlite
+      .prepare('SELECT recommendation, recommendation_confidence FROM reviews WHERE id = ?')
+      .get(reviewId) as { recommendation: string; recommendation_confidence: number };
+    expect(review.recommendation).toBe('minor_revision');
+    expect(review.recommendation_confidence).toBeCloseTo(0.6);
+
+    const gateRecord = readArtefact<{ recommendation: string; recommendationConfidence: number }>(reviewId, 'p7-gate-record');
+    expect(gateRecord.recommendation).toBe('minor_revision');
+    expect(gateRecord.recommendationConfidence).toBeCloseTo(0.6);
   });
 
   it('never shows editor-only ids to the writer, even after a leak-triggered revise', async () => {
