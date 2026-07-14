@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
-import { updateReview } from '../../workflow/repo';
+import { pauseReview, updateReview } from '../../workflow/repo';
 import { WorkerRunner, type EngineResult, type WorkerProcessors } from '../runner';
 
 let tempDir: string;
@@ -197,5 +197,91 @@ describe('WorkerRunner single-slot queue (NFR-06)', () => {
       .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = 'rev-blocked' AND kind = 'run_terminal'")
       .get() as { n: number };
     expect(terminals.n).toBe(1);
+  });
+});
+
+function setAwaitingInput(id: string, updatedAt: string): void {
+  client.sqlite.prepare("UPDATE reviews SET status = 'awaiting_input', updated_at = ? WHERE id = ?").run(updatedAt, id);
+}
+
+function pauseReason(id: string): string | undefined {
+  const row = client.sqlite.prepare('SELECT options_json FROM reviews WHERE id = ?').get(id) as { options_json: string };
+  return (JSON.parse(row.options_json) as { pauseReason?: string }).pauseReason;
+}
+
+const countingProcessors = (engineOrder: string[]): WorkerProcessors => ({
+  startIngest: async () => 'ingested',
+  resumeIngest: async () => 'ingested',
+  runEngine: async (reviewId) => {
+    engineOrder.push(reviewId);
+    updateReview(client.db, reviewId, { status: 'completed' });
+    return 'completed';
+  },
+});
+
+describe('PIPE-27 awaiting_input timeout', () => {
+  const nowMs = Date.parse('2026-07-14T12:00:00.000Z');
+  const timeoutMs = 30 * 60_000;
+
+  it('pauses a review held in awaiting_input past the timeout, releases the slot, and starts no dispatch', async () => {
+    insertReview('rev-A', '2026-07-14T00:00:00.000Z');
+    setAwaitingInput('rev-A', '2026-07-14T11:00:00.000Z');
+    insertReview('rev-B', '2026-07-14T00:00:01.000Z');
+    completeIngest('rev-B');
+    insertRunCommand('rev-B', 'run');
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder), now: () => nowMs, awaitingInputTimeoutMs: timeoutMs });
+    await runner.runOnce();
+
+    expect(reviewStatus('rev-A')).toBe('paused');
+    expect(pauseReason('rev-A')).toBe('awaiting_input_timeout');
+    expect(engineOrder).toEqual(['rev-B']);
+    expect(reviewStatus('rev-B')).toBe('completed');
+  });
+
+  it('leaves an awaiting_input review untouched before the timeout elapses', async () => {
+    insertReview('rev-A', '2026-07-14T00:00:00.000Z');
+    setAwaitingInput('rev-A', '2026-07-14T11:55:00.000Z');
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder), now: () => nowMs, awaitingInputTimeoutMs: timeoutMs });
+    await runner.runOnce();
+
+    expect(reviewStatus('rev-A')).toBe('awaiting_input');
+    expect(engineOrder).toEqual([]);
+  });
+
+  it('keeps resume available after an awaiting_input timeout pause', async () => {
+    insertReview('rev-A', '2026-07-14T00:00:00.000Z');
+    setAwaitingInput('rev-A', '2026-07-14T10:00:00.000Z');
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder), now: () => nowMs, awaitingInputTimeoutMs: timeoutMs });
+    await runner.runOnce();
+    expect(reviewStatus('rev-A')).toBe('paused');
+
+    insertRunCommand('rev-A', 'resume');
+    await runner.runOnce();
+
+    expect(reviewStatus('rev-A')).toBe('completed');
+    expect(engineOrder).toEqual(['rev-A']);
+  });
+});
+
+describe('PIPE-26 cost-ceiling pause at the worker', () => {
+  it('requeues a cost_ceiling-paused review on a run command and hands it back to the engine', async () => {
+    insertReview('rev-A', '2026-07-14T00:00:00.000Z');
+    completeIngest('rev-A');
+    pauseReview(client.db, 'rev-A', { reason: 'cost_ceiling', phase: 'phase_3' });
+    expect(reviewStatus('rev-A')).toBe('paused');
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder) });
+    insertRunCommand('rev-A', 'run');
+    await runner.runOnce();
+
+    expect(reviewStatus('rev-A')).toBe('completed');
+    expect(engineOrder).toEqual(['rev-A']);
   });
 });

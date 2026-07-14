@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { asc, eq } from 'drizzle-orm';
 import type { MaraClient, MaraDatabase } from '../db/client';
 import { manuscripts, reviewEvents, reviews, runCommands } from '../db/schema';
-import { getReviewOptions, insertEvent, mergeReviewOptions, updateReview } from '../workflow/repo';
+import { getReviewOptions, insertEvent, mergeReviewOptions, pauseReview, updateReview } from '../workflow/repo';
 import { readSetting, writeSetting } from '../data/settings-store';
 import { writeHeartbeat } from '../data/heartbeat';
 import type { StopSignal } from './supervisor';
@@ -41,6 +41,7 @@ export interface WorkerRunnerOptions {
   pollMs?: number;
   onLog?: (message: string) => void;
   staleLeaseMs?: number;
+  awaitingInputTimeoutMs?: number;
   now?: () => number;
   workerId?: string;
 }
@@ -53,6 +54,7 @@ export class WorkerRunner {
   private readonly log: (message: string) => void;
   private readonly workerId: string;
   private readonly staleLeaseMs: number;
+  private readonly awaitingInputTimeoutMs: number;
   private readonly now: () => number;
 
   private activeReviewId: string | null = null;
@@ -74,6 +76,7 @@ export class WorkerRunner {
     this.log = options.onLog ?? (() => undefined);
     this.workerId = options.workerId ?? randomUUID();
     this.staleLeaseMs = options.staleLeaseMs ?? 60_000;
+    this.awaitingInputTimeoutMs = options.awaitingInputTimeoutMs ?? 86_400_000;
     this.now = options.now ?? Date.now;
   }
 
@@ -446,11 +449,29 @@ export class WorkerRunner {
     return row?.status === 'completed';
   }
 
+  scanAwaitingInputTimeouts(): void {
+    const nowMs = this.now();
+    const rows = this.db
+      .select({ id: reviews.id, updatedAt: reviews.updatedAt })
+      .from(reviews)
+      .where(eq(reviews.status, 'awaiting_input'))
+      .all();
+    for (const row of rows) {
+      const age = nowMs - Date.parse(row.updatedAt);
+      if (Number.isFinite(age) && age >= this.awaitingInputTimeoutMs) {
+        pauseReview(this.db, row.id, { reason: 'awaiting_input_timeout' });
+        this.intents.delete(row.id);
+        this.log(`review ${row.id} paused: awaiting_input timeout`);
+      }
+    }
+  }
+
   async tick(): Promise<void> {
     if (!this.ensureLease()) {
       return;
     }
     this.pollCommands();
+    this.scanAwaitingInputTimeouts();
     this.markQueued();
     if (this.activeReviewId === null && this.processing === null) {
       const next = this.pickNext();
@@ -467,6 +488,7 @@ export class WorkerRunner {
       return;
     }
     this.pollCommands();
+    this.scanAwaitingInputTimeouts();
     if (this.activeReviewId === null) {
       const next = this.pickNext();
       if (next !== null) {
