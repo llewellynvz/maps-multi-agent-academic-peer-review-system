@@ -1,3 +1,5 @@
+import { NoObjectGeneratedError } from 'ai';
+import type { z } from 'zod';
 import type { DispatchRunner } from '../providers';
 import { assemble, type AssembleInput, readManifest, roleFor, schemaFor } from '../prompts';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
@@ -18,6 +20,54 @@ export interface RunAgentParams {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function bandFor(confidence: number): 'Green' | 'Yellow' | 'Red' {
+  if (confidence >= 0.98) {
+    return 'Green';
+  }
+  if (confidence >= 0.7) {
+    return 'Yellow';
+  }
+  return 'Red';
+}
+
+function normalizeBands(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeBands);
+  }
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      out[key] = normalizeBands(entry);
+    }
+    if (typeof out.confidence === 'number' && typeof out.band === 'string') {
+      out.band = bandFor(out.confidence);
+    }
+    return out;
+  }
+  return value;
+}
+
+function salvageObject(error: unknown, schema: z.ZodType): { value?: unknown; defect?: string } {
+  if (!NoObjectGeneratedError.isInstance(error) || typeof error.text !== 'string') {
+    return {};
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(error.text);
+  } catch {
+    return {};
+  }
+  const repaired = schema.safeParse(normalizeBands(raw));
+  if (repaired.success) {
+    return { value: repaired.data };
+  }
+  const issues = repaired.error.issues
+    .slice(0, 8)
+    .map((issue) => `${issue.path.join('.')} ${issue.message}`)
+    .join('; ');
+  return { defect: `schema validation failed: ${issues}` };
 }
 
 const OUTPUT_DISCIPLINE =
@@ -82,7 +132,19 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
       return parsed.data as T;
     } catch (error) {
       lastError = error;
-      const defect = describeError(error);
+      let defect = describeError(error);
+      const rescue = salvageObject(error, schema);
+      if (rescue.value !== undefined) {
+        try {
+          params.validate?.(rescue.value);
+          writeArtefact(params.reviewId, params.artefactName, rescue.value);
+          return rescue.value as T;
+        } catch (contractError) {
+          defect = describeError(contractError);
+        }
+      } else if (rescue.defect !== undefined) {
+        defect = rescue.defect;
+      }
       const priorNote = input.routingNote ?? '';
       input = {
         ...input,
@@ -91,5 +153,5 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
     }
   }
 
-  throw new Error(`Agent ${params.agent} (${params.phase}) failed after 2 attempts: ${describeError(lastError)}`);
+  throw new Error(`Agent ${params.agent} (${params.phase}) failed after ${MAX_ATTEMPTS} attempts: ${describeError(lastError)}`);
 }
