@@ -1,9 +1,10 @@
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { repoRoot } from '../paths';
 import { createDefaultClient, type MaraDatabase } from './client';
 
-const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'drizzle');
+const migrationsFolder = resolve(repoRoot, 'server', 'drizzle');
 
 export function runMigrations(db: MaraDatabase): void {
   migrate(db, { migrationsFolder });

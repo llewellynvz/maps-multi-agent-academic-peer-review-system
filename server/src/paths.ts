@@ -2,7 +2,11 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const envRoot = process.env.MARA_ROOT_DIR;
+export const repoRoot =
+  envRoot !== undefined && envRoot !== ''
+    ? resolve(envRoot)
+    : resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export function dataDir(): string {
   return resolve(repoRoot, 'data');
