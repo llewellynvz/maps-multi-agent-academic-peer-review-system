@@ -75,17 +75,23 @@ export function redactSupersededIds(content: string, currentIds: Set<string>): s
   return content.replace(FINDING_ID_TOKEN, (id) => (currentIds.has(id) ? id : '[SUPERSEDED]'));
 }
 
+const QUARANTINE_MARKER = /\[\[?QUARANTINED:[^\]]*\]?\]/g;
+
+function stripQuarantineMarkers(content: string): string {
+  return content.replace(QUARANTINE_MARKER, '[QUARANTINED]');
+}
+
 export function validateGrounding(input: GroundingInput): GroundingResult {
   const failures: string[] = [];
   let kind: GroundingFailureKind = null;
 
   const authorIds = new Set<string>([
     ...input.authorFacingCitedIds,
-    ...extractFindingIds(input.authorFacingBody),
+    ...extractFindingIds(stripQuarantineMarkers(input.authorFacingBody)),
   ]);
   const privateIds = new Set<string>([
     ...input.privateNotesReferencedIds,
-    ...extractFindingIds(input.privateNotesBody),
+    ...extractFindingIds(stripQuarantineMarkers(input.privateNotesBody)),
   ]);
 
   const ungrounded = [...authorIds, ...privateIds].filter((id) => !input.ledgerIds.has(id));

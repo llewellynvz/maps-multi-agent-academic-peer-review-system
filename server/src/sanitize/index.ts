@@ -41,7 +41,7 @@ export interface SanitizeOptions {
 }
 
 function itemId(sequence: number): string {
-  return `REV-SAN-${String(sequence).padStart(4, '0')}`;
+  return `Q-${String(sequence).padStart(2, '0')}`;
 }
 
 function statusForTier(tier: 0 | 1 | 2 | 3): SanitizeStatus {

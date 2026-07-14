@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadBannedVerdictTerms, redactEditorOnlyIds, validateGrounding } from '../grounding';
+import { loadBannedVerdictTerms, redactEditorOnlyIds, redactSupersededIds, validateGrounding } from '../grounding';
 
 const ledgerIds = new Set(['REV-STAT-0001', 'REV-MAP-0001', 'REV-SIM-0001']);
 const editorOnlyIds = new Set(['REV-SIM-0001']);
@@ -29,6 +29,30 @@ describe('deterministic grounding validator', () => {
     expect(result.ok).toBe(false);
     expect(result.kind).toBe('ungrounded-id');
     expect(result.failures.join(' ')).toContain('REV-ZZZ-9999');
+  });
+
+  it('ignores id-shaped tokens inside quarantine markers quoted from the manuscript', () => {
+    const input = base();
+    input.authorFacingBody = 'The abstract carries the marker [[QUARANTINED:REV-SAN-0001]] which the authors must address.';
+    input.privateNotesBody = "Anchor: Abstract, marker '[QUARANTINED:REV-SAN-0001]'.";
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(true);
+  });
+
+  it('still catches a naked stale id even when a quarantine marker is present', () => {
+    const input = base();
+    input.authorFacingBody = 'See [[QUARANTINED:REV-SAN-0001]] and also the earlier REV-SAN-0001 reading.';
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kind).toBe('ungrounded-id');
+  });
+
+  it('masks superseded ids in artefact content while keeping current ids', () => {
+    const current = new Set(['REV-STAT-0001']);
+    const masked = redactSupersededIds('Cites REV-STAT-0001 and stale REV-STAT-0009.', current);
+    expect(masked).toContain('REV-STAT-0001');
+    expect(masked).not.toContain('REV-STAT-0009');
+    expect(masked).toContain('[SUPERSEDED]');
   });
 
   it('catches a planted editor-only id leaked into author-facing text', () => {
