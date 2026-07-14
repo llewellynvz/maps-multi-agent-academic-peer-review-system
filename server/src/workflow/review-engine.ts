@@ -16,11 +16,13 @@ import {
   runPhase8,
 } from '../engine';
 import type { DispatchRunner } from '../providers';
+import type { EgressController } from '../security';
 
 export interface ReviewEngineDeps {
   db: MaraDatabase;
   runDispatch: DispatchRunner;
   citationClient?: CitationClient;
+  egress?: EgressController;
 }
 
 const engineIo = z.object({ reviewId: z.string() });
@@ -32,6 +34,7 @@ export function createReviewEngineWorkflow(deps: ReviewEngineDeps) {
     db: deps.db,
     runDispatch: deps.runDispatch,
     ...(deps.citationClient !== undefined ? { citationClient: deps.citationClient } : {}),
+    ...(deps.egress !== undefined ? { egress: deps.egress } : {}),
   };
 
   const phaseStep = (id: string, run: PhaseRunner) =>

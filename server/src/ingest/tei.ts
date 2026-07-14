@@ -124,6 +124,15 @@ function yearFrom(node: XmlNode): number | null {
   return null;
 }
 
+function venueFrom(monogr: XmlNode, analyticTitle: string | null): string | null {
+  const monogrTitle = pickMainTitle(findFirst(monogr, 'title'));
+  if (analyticTitle !== null && monogrTitle !== null && monogrTitle !== analyticTitle) {
+    return monogrTitle;
+  }
+  const publisher = normalizeInline(textOf(findFirst(findFirst(monogr, 'imprint'), 'publisher')));
+  return publisher.length > 0 ? publisher : null;
+}
+
 function referencesFrom(root: XmlNode): ManuscriptReference[] {
   const listBibl = findFirst(root, 'listBibl');
   const entries = asArray(findFirst(listBibl, 'biblStruct'));
@@ -131,8 +140,9 @@ function referencesFrom(root: XmlNode): ManuscriptReference[] {
   entries.forEach((entry, index) => {
     const analytic = isRecord(entry) ? entry['analytic'] : undefined;
     const monogr = isRecord(entry) ? entry['monogr'] : undefined;
-    const title =
-      pickMainTitle(findFirst(analytic, 'title')) ?? pickMainTitle(findFirst(monogr, 'title'));
+    const analyticTitle = pickMainTitle(findFirst(analytic, 'title'));
+    const title = analyticTitle ?? pickMainTitle(findFirst(monogr, 'title'));
+    const venue = venueFrom(monogr, analyticTitle);
     const doi = doiFrom(entry);
     const year = yearFrom(entry);
     const authors = authorsFrom(entry);
@@ -142,7 +152,7 @@ function referencesFrom(root: XmlNode): ManuscriptReference[] {
       title ?? '',
     ].filter((part) => part.length > 0);
     const raw = rawParts.length > 0 ? rawParts.join(' ') : `Reference ${index + 1}`;
-    references.push({ index, raw, title: title ?? null, doi, year, authors });
+    references.push({ index, raw, title: title ?? null, doi, year, venue, authors });
   });
   return references;
 }

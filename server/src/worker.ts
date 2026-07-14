@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from 'node:path';
 import type { Mastra } from '@mastra/core';
-import { createCitationClient } from './citations';
+import { createCitationClient, defaultFetch } from './citations';
+import { createEgressController } from './security';
 import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { citationCachePath, maraDbPath, mastraDbPath, repoRoot } from './paths';
@@ -74,11 +75,13 @@ async function main(): Promise<void> {
     onStale: (reason) => log(`stale dispatch (${reason}), re-issuing from checkpoint`),
   });
 
+  const egress = createEgressController(defaultFetch);
   const citationClient = createCitationClient({
+    fetchImpl: egress.fetch,
     cachePath: citationCachePath(),
     ...(process.env.MARA_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MARA_CONTACT_EMAIL } : {}),
   });
-  const engineDeps: EngineDeps = { db, runDispatch, citationClient };
+  const engineDeps: EngineDeps = { db, runDispatch, citationClient, egress };
 
   const grobidUrl = (process.env.GROBID_URL ?? 'http://127.0.0.1:8070').replace('localhost', '127.0.0.1');
   const grobid = createGrobidClient({ baseUrl: grobidUrl });

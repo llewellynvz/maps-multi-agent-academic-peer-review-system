@@ -15,7 +15,7 @@ export {
   openCitationCache,
   type OpenCacheOptions,
 } from './cache';
-export { type CitationClient, type CitationClientOptions, createCitationClient } from './client';
+export { type CitationClient, type CitationClientOptions, createCitationClient, defaultFetch } from './client';
 export { createRateLimiter, type RateLimiter, type RateLimiterOptions } from './rate-limiter';
 export { type CandidateScore, scoreCandidate } from './scoring';
 export { normalizeDoi, normalizeText, titleSimilarity } from './text';

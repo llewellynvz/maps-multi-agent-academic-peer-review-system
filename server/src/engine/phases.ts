@@ -9,8 +9,10 @@ import type {
   SpecialistReviewerOutput,
   SwarmEvaluation,
 } from '@mara/shared';
+import { randomBytes } from 'node:crypto';
 import type { MaraDatabase } from '../db/client';
 import { getCurrentFindings } from '../ledger';
+import { buildProtectedCorpus } from '../security';
 import { withPhase } from '../tracing';
 import { getCheckpoint, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
 import { readArtefact, writeArtefact } from './artefacts';
@@ -167,17 +169,38 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
 
     const clientVerdicts: ClientVerdict[] = [];
     if (deps.citationClient !== undefined) {
-      for (const reference of referencesForVerification(ctx.sectionMap)) {
-        const { index, ...metadata } = reference;
-        const verdict = await deps.citationClient.verifyReference(metadata);
-        clientVerdicts.push({
-          referenceIndex: index,
-          title: metadata.title,
-          status: verdict.status,
-          source: verdict.source,
-          confidence: verdict.confidence,
-          matchedDoi: verdict.matchedDoi ?? null,
+      const references = referencesForVerification(ctx.sectionMap);
+      if (deps.egress !== undefined) {
+        deps.egress.begin({
+          reviewId,
+          signingKey: randomBytes(32),
+          corpus: buildProtectedCorpus(ctx.sectionMap),
+          log: (entry) =>
+            insertEvent(db, {
+              reviewId,
+              kind: 'web_query',
+              phase: 'phase_2',
+              egressTarget: entry.target,
+              egressQuery: entry.query,
+              payload: { blocked: entry.blocked, reason: entry.reason, signature: entry.signature },
+            }),
         });
+      }
+      try {
+        for (const reference of references) {
+          const { index, ...metadata } = reference;
+          const verdict = await deps.citationClient.verifyReference(metadata);
+          clientVerdicts.push({
+            referenceIndex: index,
+            title: metadata.title,
+            status: verdict.status,
+            source: verdict.source,
+            confidence: verdict.confidence,
+            matchedDoi: verdict.matchedDoi ?? null,
+          });
+        }
+      } finally {
+        deps.egress?.end();
       }
     }
     const clientVerdictJson = JSON.stringify(clientVerdicts, null, 2);

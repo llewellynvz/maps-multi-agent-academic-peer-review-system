@@ -203,7 +203,14 @@ export function recordGateCheckpoint(
 
 export function insertEvent(
   db: MaraDatabase,
-  input: { reviewId: string; kind: EventKind; phase?: string; payload?: unknown },
+  input: {
+    reviewId: string;
+    kind: EventKind;
+    phase?: string;
+    payload?: unknown;
+    egressTarget?: string | null;
+    egressQuery?: string | null;
+  },
 ): number {
   return db.transaction((tx) => {
     const rows = tx
@@ -221,6 +228,8 @@ export function insertEvent(
         kind: input.kind,
         phase: input.phase ?? null,
         payloadJson: JSON.stringify(input.payload ?? {}),
+        egressTarget: input.egressTarget ?? null,
+        egressQuery: input.egressQuery ?? null,
       })
       .run();
     return nextSeq;

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { type ParseQuality, type SectionMap, sectionMapSchema } from '@mara/shared';
 import type { Reference } from '../citations';
 import type { MaraDatabase } from '../db/client';
+import { isPublishedReference } from '../security';
 import { getReviewOptions } from '../workflow/repo';
 import { manuscriptBlobPath, readManuscriptBlobText } from '../workflow/storage';
 import { normalisePreset, type Preset } from './lenses';
@@ -70,6 +71,9 @@ export function referencesForVerification(sectionMap: SectionMap): Array<Referen
   const usable: Array<Reference & { index: number }> = [];
   for (const reference of sectionMap.references) {
     if (reference.title === null || reference.title.trim().length < 6) {
+      continue;
+    }
+    if (!isPublishedReference(reference)) {
       continue;
     }
     usable.push({

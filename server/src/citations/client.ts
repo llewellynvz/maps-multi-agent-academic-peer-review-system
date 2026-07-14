@@ -22,7 +22,7 @@ export interface CitationClient {
   close: () => void;
 }
 
-const globalFetch: FetchLike = async (url, init) => {
+export const defaultFetch: FetchLike = async (url, init) => {
   const response = await fetch(url, { ...init, redirect: 'manual' });
   return { ok: response.ok, status: response.status, json: (): Promise<unknown> => response.json() };
 };
@@ -42,7 +42,7 @@ function buildResult(
 }
 
 export function createCitationClient(options: CitationClientOptions = {}): CitationClient {
-  const fetchImpl = options.fetchImpl ?? globalFetch;
+  const fetchImpl = options.fetchImpl ?? defaultFetch;
   const rateLimiter = options.rateLimiter ?? createRateLimiter();
   const guardedFetch = createGuardedFetch(fetchImpl, rateLimiter);
   const backends =

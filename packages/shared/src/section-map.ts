@@ -22,6 +22,7 @@ export const manuscriptReferenceSchema = z.object({
   title: z.string().nullable(),
   doi: z.string().nullable(),
   year: z.number().int().nullable(),
+  venue: z.string().nullable().default(null),
   authors: z.array(z.string()),
 });
 
