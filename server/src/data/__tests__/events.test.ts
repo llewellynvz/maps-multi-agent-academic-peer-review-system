@@ -159,8 +159,39 @@ describe('editor-only masking (API-25, UI-33)', () => {
 
   it('produces an author-facing headline that omits the raw claim', () => {
     const headline = findingHeadline({ id: 'REV-STAT-0001', type: 'statistics', severity: 'moderate', scope: 'author_facing' });
-    expect(headline.headline).toBe('moderate statistics finding');
+    expect(headline.headline).toBe('Statistical recorded a moderate issue');
+    expect(headline.lensPrefix).toBe('STAT');
+    expect(headline.lensDisplay).toBe('Statistical');
     expect(headline.headline).not.toContain('underpowered');
+  });
+});
+
+describe('finding announcements (B2)', () => {
+  it('never announces severity-none findings', () => {
+    insertReview('rev-none');
+    insertFinding('REV-STAT-0001', 'rev-none', 'author_facing', 'A small wording nit.', 'minor');
+    insertFinding('REV-METH-0001', 'rev-none', 'author_facing', 'No issue was found here.', 'none');
+
+    announceFindings(client.db, 'rev-none', new Set());
+
+    const events = replayEvents(client.db, 'rev-none', 0).filter((e) => e.event === 'finding_headline');
+    const ids = events.map((e) => (e.data as { findingId: string }).findingId);
+    expect(ids).toContain('REV-STAT-0001');
+    expect(ids).not.toContain('REV-METH-0001');
+  });
+
+  it('carries the lens prefix and display in the payload with a template headline, not the claim', () => {
+    insertReview('rev-lens');
+    insertFinding('REV-STAT-0001', 'rev-lens', 'author_facing', 'The sample size is underpowered.', 'moderate');
+
+    announceFindings(client.db, 'rev-lens', new Set());
+
+    const event = replayEvents(client.db, 'rev-lens', 0).find((e) => e.event === 'finding_headline');
+    const data = event?.data as { lensPrefix: string; lensDisplay: string; headline: string };
+    expect(data.lensPrefix).toBe('STAT');
+    expect(data.lensDisplay).toBe('Statistical');
+    expect(data.headline).toBe('Statistical recorded a moderate issue');
+    expect(JSON.stringify(event)).not.toContain('underpowered');
   });
 });
 

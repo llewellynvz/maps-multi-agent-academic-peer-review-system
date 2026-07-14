@@ -21,6 +21,23 @@ export const LENSES: LensDef[] = [
 
 export const CORE_LENSES: LensDef[] = LENSES.filter((lens) => lens.core);
 
+const NON_LENS_DISPLAY: Record<string, string> = {
+  MAP: 'Manuscript mapping',
+  CTX: 'Field context',
+  REF: 'Reference audit',
+  RPT: 'Reporting standards',
+  RPX: 'Reproducibility',
+  SIM: 'Integrity screening',
+  AIC: 'AI-content screening',
+  SWM: 'Reviewer ensemble',
+  SAN: 'Manuscript screening',
+};
+
+export const PREFIX_DISPLAY: Record<string, string> = {
+  ...Object.fromEntries(LENSES.map((lens) => [lens.prefix, lens.display])),
+  ...NON_LENS_DISPLAY,
+};
+
 export type Preset = 'fast' | 'balanced' | 'thorough';
 
 export function normalisePreset(value: unknown): Preset {
