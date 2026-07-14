@@ -72,6 +72,48 @@ export const RECOMMENDATION_EXPLANATION: Record<string, string> = {
   reject: 'The manuscript is not suitable for this journal.',
 };
 
+export function confidenceBandPhrase(confidence: number | null): string {
+  if (confidence === null) {
+    return 'not yet rated';
+  }
+  if (confidence >= 0.9) {
+    return 'high confidence';
+  }
+  if (confidence >= 0.7) {
+    return 'reasonable confidence';
+  }
+  return 'with reservations';
+}
+
+export function confidenceSentence(confidence: number | null): string {
+  if (confidence === null) {
+    return 'Confidence in this recommendation is not yet rated.';
+  }
+  if (confidence < 0.7) {
+    return 'This recommendation is offered with reservations.';
+  }
+  return `This recommendation is made with ${confidenceBandPhrase(confidence)}.`;
+}
+
+export function hasFindingIds(text: string): boolean {
+  return /REV-[A-Z]{3,4}-\d{4}/.test(text);
+}
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 KB';
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const kb = bytes / 1024;
+  if (kb < 1024) {
+    return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+  }
+  const mb = kb / 1024;
+  return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
+}
+
 export type StatusTone = 'info' | 'success' | 'warn' | 'fail' | 'neutral';
 
 export function statusTone(status: ReviewStatus): { tone: StatusTone; label: string } {

@@ -43,6 +43,7 @@ export interface PhaseCheckpointView {
 export interface ReviewDetail extends Review {
   severityCounts: Record<string, number>;
   checkpoints: PhaseCheckpointView[];
+  rubricAverage: number | null;
 }
 
 export interface ReviewOptions {

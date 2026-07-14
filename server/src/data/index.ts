@@ -20,6 +20,12 @@ export {
   purgeReview,
   requireReview,
 } from './reviews';
+export {
+  type EvidenceData,
+  type EvidenceFinding,
+  type EvidenceMapView,
+  getEvidenceData,
+} from './evidence';
 export { hasManuscript, uploadManuscript, type UploadResult } from './manuscripts';
 export { insertRunCommand, type RunCommand, type RunControlResult, submitRunControl } from './commands';
 export { getQuestions, loadRawQuestions } from './questions';

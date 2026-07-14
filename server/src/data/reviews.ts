@@ -132,7 +132,7 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
     gateVerdict: row.gateVerdict,
     fixCycleCount: row.fixCycleCount,
   }));
-  return { ...review, severityCounts, checkpoints };
+  return { ...review, severityCounts, checkpoints, rubricAverage: rubricAverage(db, id) };
 }
 
 export function purgeReview(client: MaraClient, id: string): void {

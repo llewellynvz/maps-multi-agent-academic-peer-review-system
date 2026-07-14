@@ -335,6 +335,22 @@ main.page { flex: 1; padding: 40px 0 80px; }
 .report-body h3 { font-size: 1.2rem; color: var(--fg-1); margin: 20px 0 8px; }
 .report-body code, .report-body .fid { font-family: var(--font-mono); color: var(--psy-teal-light); cursor: pointer; }
 .report-body p { margin: 0 0 14px; }
+.report-body ul, .report-body ol { padding-left: 1.4em; margin: 0 0 14px; }
+.report-body ul { list-style: disc; }
+.report-body ol { list-style: decimal; }
+.report-body li { margin: 0 0 6px; line-height: 1.6; }
+.report-body strong { color: var(--fg-1); font-weight: 600; }
+.report-body a { color: var(--psy-teal-light); text-decoration: underline; text-underline-offset: 2px; }
+.report-body .card-inset { margin: 0 0 16px; }
+.report-body .table { font-size: 15px; }
+.report-primer {
+  margin: 0 0 16px; padding: 14px 18px;
+  background: var(--surface-glass-1);
+  border-left: 3px solid var(--psy-lime);
+  border-radius: var(--radius-md);
+  color: var(--fg-2);
+}
+.report-primer p:last-child { margin-bottom: 0; }
 
 .viewport-notice { display: none; }
 @media (max-width: 767px) {

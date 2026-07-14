@@ -36,6 +36,7 @@ export interface ReviewSummary {
 export interface ReviewDetail extends Review {
   severityCounts: Record<string, number>;
   checkpoints: Array<{ phase: string; status: string; gateVerdict: string | null; fixCycleCount: number }>;
+  rubricAverage: number | null;
 }
 
 export interface Detected {
@@ -78,6 +79,28 @@ export interface RunStats {
   tokensCached: number;
   retryRate: number;
   timeToFirstReviewMs: number | null;
+}
+
+export interface EvidenceFinding {
+  id: string;
+  lensPrefix: string;
+  lensDisplay: string;
+  severity: string;
+  anchor: string;
+  claim: string;
+  recommendedAction: string | null;
+}
+
+export interface EvidenceMapView {
+  section: string;
+  label: string;
+  anchor: string;
+  findingIds: string[];
+}
+
+export interface EvidenceData {
+  evidenceMap: EvidenceMapView[];
+  findings: EvidenceFinding[];
 }
 
 export interface InstanceStats {
@@ -184,6 +207,8 @@ export const api = {
   listDeliverables: (id: string) => request<{ deliverables: DeliverableView[] }>('GET', `/api/reviews/${id}/deliverables`),
   deliverableUrl: (id: string, kind: string, format?: string) =>
     `/api/reviews/${id}/deliverables/${kind}${format !== undefined ? `?format=${format}` : ''}`,
+
+  getEvidence: (id: string) => request<EvidenceData>('GET', `/api/reviews/${id}/evidence`),
 
   getRunStats: (id: string) => request<RunStats>('GET', `/api/reviews/${id}/stats`),
   getInstanceStats: () => request<InstanceStats>('GET', '/api/stats'),

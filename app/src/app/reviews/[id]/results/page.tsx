@@ -2,49 +2,31 @@
 
 import { useParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { api, type DeliverableView, type ReviewDetail, type RunStats } from '@/lib/api';
-import { confidenceBand, formatDuration, formatUsd, RECOMMENDATION_LABEL } from '@/lib/format';
+import { api, type DeliverableView, type EvidenceData, type ReviewDetail, type RunStats } from '@/lib/api';
+import {
+  confidenceSentence,
+  formatBytes,
+  formatDuration,
+  formatUsd,
+  hasFindingIds,
+  RECOMMENDATION_EXPLANATION,
+  RECOMMENDATION_LABEL,
+} from '@/lib/format';
 import { Icon, Pill, Spinner, StatTile } from '@/components/ui';
+import { PageHeader } from '@/components/PageHeader';
+import { Section } from '@/components/Section';
 import { SideDrawer } from '@/components/SideDrawer';
+import { ReportMarkdown } from '@/components/ReportMarkdown';
+import { ChipReport } from '@/components/ChipReport';
+import { EvidenceIndex } from '@/components/EvidenceIndex';
+import { EvidencePanel } from '@/components/EvidencePanel';
 
-const FINDING_RE = /REV-[A-Z]{3,4}-\d{4}/g;
-
-function Markdown({ text, onFinding }: { text: string; onFinding: (id: string) => void }): ReactNode {
-  const blocks = text.split(/\n{2,}/);
-  return (
-    <div className="report-body">
-      {blocks.map((block, index) => {
-        const trimmed = block.trim();
-        if (trimmed.startsWith('### ')) {
-          return <h3 key={index}>{trimmed.slice(4)}</h3>;
-        }
-        if (trimmed.startsWith('## ')) {
-          return <h2 key={index}>{trimmed.slice(3)}</h2>;
-        }
-        if (trimmed.startsWith('# ')) {
-          return <h2 key={index}>{trimmed.slice(2)}</h2>;
-        }
-        const parts = trimmed.split(FINDING_RE);
-        const ids = trimmed.match(FINDING_RE) ?? [];
-        return (
-          <p key={index}>
-            {parts.map((part, partIndex) => (
-              <span key={partIndex}>
-                {part.replace(/\*\*(.+?)\*\*/g, '$1')}
-                {ids[partIndex] !== undefined ? (
-                  <span className="fid" role="button" tabIndex={0} onClick={() => onFinding(ids[partIndex] as string)}
-                    onKeyDown={(event) => { if (event.key === 'Enter') onFinding(ids[partIndex] as string); }}>
-                    {ids[partIndex]}
-                  </span>
-                ) : null}
-              </span>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
+const DELIVERABLE_LABEL: Record<string, string> = {
+  peer_review_report: 'Peer review report',
+  reviewer_private_notes: "Reviewer's private notes",
+  ledger_export: 'Evidence ledger',
+  run_archive: 'Review archive',
+};
 
 export default function ResultsPage(): ReactNode {
   const params = useParams<{ id: string }>();
@@ -53,10 +35,10 @@ export default function ResultsPage(): ReactNode {
   const [deliverables, setDeliverables] = useState<DeliverableView[]>([]);
   const [report, setReport] = useState<string | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceData | null>(null);
   const [tab, setTab] = useState<'report' | 'notes'>('report');
   const [notesBannerSeen, setNotesBannerSeen] = useState(false);
   const [drawerFinding, setDrawerFinding] = useState<string | null>(null);
-  const [downloadOpen, setDownloadOpen] = useState(false);
   const [runStats, setRunStats] = useState<RunStats | null>(null);
 
   useEffect(() => {
@@ -67,6 +49,8 @@ export default function ResultsPage(): ReactNode {
       setRunStats(stats);
       const list = await api.listDeliverables(id).catch(() => ({ deliverables: [] }));
       setDeliverables(list.deliverables);
+      const evidenceData = await api.getEvidence(id).catch(() => null);
+      setEvidence(evidenceData);
       const reportText = await fetch(api.deliverableUrl(id, 'peer_review_report', 'md'), { credentials: 'include' })
         .then((response) => (response.ok ? response.text() : null))
         .catch(() => null);
@@ -79,59 +63,135 @@ export default function ResultsPage(): ReactNode {
     void load();
   }, [id]);
 
-  const band = useMemo(() => confidenceBand(review?.recommendationConfidence ?? null), [review]);
+  const findingsById = useMemo(() => {
+    const map = new Map<string, EvidenceData['findings'][number]>();
+    for (const finding of evidence?.findings ?? []) {
+      map.set(finding.id, finding);
+    }
+    return map;
+  }, [evidence]);
+
+  const legacy = useMemo(() => hasFindingIds(report ?? ''), [report]);
+  const visibleEvidence = useMemo(
+    () => (evidence?.evidenceMap ?? []).filter((entry) => (report ?? '').includes(entry.label)),
+    [evidence, report],
+  );
+
   const reportReleased = deliverables.some((d) => d.kind === 'peer_review_report' && d.released);
 
   if (review === null) {
     return <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Spinner /> Loading results</div>;
   }
 
+  const recommendationLabel = review.recommendation !== null
+    ? RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation
+    : null;
+
+  const hasEvidence = visibleEvidence.length > 0;
+  let n = 2;
+  const evidenceNum = hasEvidence ? (n += 1) : 0;
+  const statsNum = runStats !== null ? (n += 1) : 0;
+  const downloadsNum = (n += 1);
+
   return (
     <div>
+      <PageHeader
+        eyebrow="Results"
+        title={review.title ?? 'Review'}
+        sub="Your developmental review, the evidence behind each point, and everything to download."
+        actions={
+          <a
+            className="btn btn-primary"
+            href={api.deliverableUrl(id, 'peer_review_report', 'docx')}
+            aria-disabled={!reportReleased}
+            style={reportReleased ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+          >
+            <Icon name="download" /> Download letter (.docx)
+          </a>
+        }
+      />
+
       {review.status === 'failed' || review.status === 'cancelled' ? (
-        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--psy-lime)' }}>
+        <div className="card" style={{ marginBottom: 24, borderLeft: '3px solid var(--psy-lime)' }}>
           <h2 className="h3">Partial results</h2>
           <p className="sub">
-            This review did not finish, so the letter was not released. Everything produced before the halt is shown and downloadable below, and you can retry the failed phase from the run screen.
+            This review did not finish, so the letter was not released. Everything produced before the halt is shown and
+            downloadable below, and you can retry the failed phase from the run screen.
           </p>
         </div>
       ) : null}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <p className="eyebrow">Results</p>
-        <h1 className="h1" style={{ marginBottom: 12 }}>{review.title ?? 'Review'}</h1>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {review.recommendation !== null ? <Pill tone="info" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} /> : null}
-          <Pill tone={band.tone} label={`Confidence ${band.label}`} />
-          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="mono stat-num" style={{ fontSize: 32 }}>
-              {review.recommendationConfidence !== null ? (review.recommendationConfidence * 5).toFixed(1) : '--'}
-            </span>
-            <span className="muted">/ 5</span>
-          </span>
+
+      <Section number={1} eyebrow="Recommendation" title={recommendationLabel ?? 'Review outcome'}>
+        <div className="stack-16">
+          {recommendationLabel !== null ? (
+            <div className="row wrap">
+              <Pill tone="info" label={recommendationLabel} />
+            </div>
+          ) : null}
+          {review.recommendation !== null && RECOMMENDATION_EXPLANATION[review.recommendation] !== undefined ? (
+            <p className="sub" style={{ margin: 0 }}>{RECOMMENDATION_EXPLANATION[review.recommendation]}</p>
+          ) : null}
+          <p className="sub" style={{ margin: 0 }}>{confidenceSentence(review.recommendationConfidence)}</p>
+          {review.rubricAverage !== null ? (
+            <div className="card-inset row" style={{ gap: 'var(--space-4)', alignItems: 'baseline', width: 'fit-content' }}>
+              <span className="mono stat-num" style={{ fontSize: 32 }}>{review.rubricAverage.toFixed(1)}</span>
+              <span className="muted">/ 5 rubric average across the fifteen review criteria</span>
+            </div>
+          ) : null}
         </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
-          <a className="btn btn-primary" href={api.deliverableUrl(id, 'peer_review_report', 'docx')} aria-disabled={!reportReleased}>
-            <Icon name="download" /> Download report (.docx)
-          </a>
-          <div style={{ position: 'relative' }}>
-            <button className="btn btn-secondary" onClick={() => setDownloadOpen((open) => !open)} aria-expanded={downloadOpen}>
-              More formats <Icon name="chevron" />
-            </button>
-            {downloadOpen ? (
-              <div className="popover" style={{ top: '110%', right: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <a href={api.deliverableUrl(id, 'reviewer_private_notes', 'docx')}>Reviewer&apos;s private notes (.docx)</a>
-                <a href={api.deliverableUrl(id, 'peer_review_report', 'md')}>Report (.md)</a>
-                <a href={api.deliverableUrl(id, 'ledger_export', 'md')}>Evidence ledger (.md)</a>
-                <a href={api.deliverableUrl(id, 'run_archive', 'zip')}>Review archive (.zip)</a>
-              </div>
+      </Section>
+
+      <Section number={2} eyebrow="The review" title="Developmental letter">
+        <div className="tabs" role="tablist">
+          <button className="tab" role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>
+            Letter
+          </button>
+          <button
+            className="tab"
+            role="tab"
+            aria-selected={tab === 'notes'}
+            onClick={() => {
+              setTab('notes');
+              setNotesBannerSeen(false);
+            }}
+          >
+            Reviewer&apos;s private notes
+          </button>
+        </div>
+
+        {tab === 'report' ? (
+          report === null ? (
+            reportReleased ? <Spinner /> : <Pill tone="warn" label="The letter has not been released yet." />
+          ) : legacy ? (
+            <ChipReport text={report} onFinding={setDrawerFinding} />
+          ) : (
+            <ReportMarkdown text={report} />
+          )
+        ) : (
+          <div className="stack-16">
+            {!notesBannerSeen ? (
+              <Pill tone="neutral" label="These are editorial signals, not verdicts." icon="shield" />
             ) : null}
+            {notes === null ? (
+              <Pill tone="warn" label="No private notes available." />
+            ) : (
+              <ChipReport text={notes} onFinding={setDrawerFinding} />
+            )}
           </div>
-        </div>
-      </div>
+        )}
+      </Section>
+
+      {hasEvidence ? (
+        <EvidenceIndex
+          number={evidenceNum}
+          entries={visibleEvidence}
+          findingsById={findingsById}
+          onFinding={setDrawerFinding}
+        />
+      ) : null}
 
       {runStats !== null ? (
-        <div className="card" style={{ marginBottom: 24 }} aria-label="Run statistics">
-          <p className="eyebrow" style={{ marginBottom: 14 }}>This review</p>
+        <Section number={statsNum} eyebrow="Run" title="This review">
           <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
             <StatTile label="Cost" value={formatUsd(runStats.costUsd)} />
             <StatTile label="Tokens in / out" value={`${runStats.tokensIn.toLocaleString()} / ${runStats.tokensOut.toLocaleString()}`} />
@@ -148,39 +208,42 @@ export default function ResultsPage(): ReactNode {
               ))}
             </div>
           ) : null}
-        </div>
+        </Section>
       ) : null}
 
-      <div className="tabs" role="tablist">
-        <button className="tab" role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>Report</button>
-        <button className="tab" role="tab" aria-selected={tab === 'notes'} onClick={() => { setTab('notes'); setNotesBannerSeen(false); }}>Reviewer&apos;s private notes</button>
-      </div>
-
-      {tab === 'report' ? (
-        <div className="card">
-          {report === null ? (
-            reportReleased ? <Spinner /> : <Pill tone="warn" label="The report has not been released yet." />
-          ) : (
-            <Markdown text={report} onFinding={setDrawerFinding} />
-          )}
+      <Section number={downloadsNum} eyebrow="Downloads" title="Take the review with you">
+        <div className="grid-2">
+          {deliverables.map((d) => {
+            const label = DELIVERABLE_LABEL[d.kind] ?? d.kind;
+            return (
+              <a
+                key={`${d.kind}-${d.format}`}
+                className="card-inset spread"
+                href={api.deliverableUrl(id, d.kind, d.format)}
+                aria-disabled={!d.released}
+                style={d.released ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+              >
+                <div className="stack-8">
+                  <span style={{ fontWeight: 500, color: 'var(--fg-1)' }}>{label}</span>
+                  <span className="chip-hint">
+                    {d.format.toUpperCase()} · {d.released ? formatBytes(d.byteSize) : 'Pending release'}
+                  </span>
+                </div>
+                <Icon name="download" />
+              </a>
+            );
+          })}
         </div>
-      ) : (
-        <div className="card">
-          {!notesBannerSeen ? (
-            <div style={{ marginBottom: 16 }}>
-              <Pill tone="neutral" label="These are editorial signals, not verdicts." icon="shield" />
-            </div>
-          ) : null}
-          {notes === null ? <Pill tone="warn" label="No private notes available." /> : <Markdown text={notes} onFinding={setDrawerFinding} />}
-        </div>
-      )}
+      </Section>
 
       <SideDrawer open={drawerFinding !== null} title="Evidence" onClose={() => setDrawerFinding(null)}>
-        <p className="mono" style={{ fontSize: 18, color: 'var(--psy-teal-light)' }}>{drawerFinding}</p>
-        <p className="sub" style={{ marginTop: 12 }}>The full ledger row and its manuscript anchor are available in the evidence ledger download.</p>
-        <a className="btn btn-secondary" style={{ marginTop: 12 }} href={api.deliverableUrl(id, 'ledger_export', 'md')}>
-          <Icon name="download" /> Evidence ledger
-        </a>
+        {drawerFinding !== null ? (
+          <EvidencePanel
+            finding={findingsById.get(drawerFinding) ?? null}
+            fallbackId={drawerFinding}
+            ledgerHref={api.deliverableUrl(id, 'ledger_export', 'md')}
+          />
+        ) : null}
       </SideDrawer>
     </div>
   );
