@@ -1,6 +1,11 @@
 #!/bin/bash
 set -uo pipefail
 
+if [ "$(id -u)" = "0" ]; then
+  chown -R node:node /app/data
+  exec setpriv --reuid node --regid node --init-groups "$0" "$@"
+fi
+
 cd /app/server
 if ! node --import tsx ./src/db/migrate.ts; then
   echo "[entrypoint] database migration failed" >&2
