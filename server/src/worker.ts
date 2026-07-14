@@ -4,6 +4,7 @@ import { createCitationClient, defaultFetch } from './citations';
 import { createEgressController } from './security';
 import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
+import { createRotatingLog } from './logging/rotating-log';
 import { citationCachePath, maraDbPath, mastraDbPath, repoRoot } from './paths';
 import {
   type EngineDeps,
@@ -49,8 +50,10 @@ function loadEnv(): void {
   }
 }
 
+const fileLog = createRotatingLog('worker');
 function log(message: string): void {
   process.stdout.write(`[worker] ${new Date().toISOString()} ${message}\n`);
+  fileLog.write('info', 'worker', message);
 }
 
 function mapIngest(summary: { status: string; result: unknown }): IngestOutcome {

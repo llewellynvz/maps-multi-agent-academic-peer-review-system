@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { api, type ReviewSummary } from '@/lib/api';
-import { formatDate, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
-import { Icon, Pill, Spinner } from '@/components/ui';
+import { api, type InstanceStats, type ReviewSummary } from '@/lib/api';
+import { formatDate, formatDuration, formatUsd, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
+import { Icon, Pill, Spinner, StatTile } from '@/components/ui';
 
 function isRunning(status: string): boolean {
   return status === 'running' || status === 'sanitizing' || status === 'awaiting_input' || status === 'queued';
@@ -50,6 +50,7 @@ function ReviewCard({ review }: { review: ReviewSummary }): ReactNode {
 
 export default function LibraryPage(): ReactNode {
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);
+  const [stats, setStats] = useState<InstanceStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -61,6 +62,10 @@ export default function LibraryPage(): ReactNode {
         if (active) {
           setReviews(result.reviews);
           setError(null);
+        }
+        const instanceStats = await api.getInstanceStats().catch(() => null);
+        if (active && instanceStats !== null) {
+          setStats(instanceStats);
         }
       } catch (err) {
         if (active) {
@@ -101,6 +106,19 @@ export default function LibraryPage(): ReactNode {
           </Link>
         </div>
       </div>
+
+      {stats !== null && stats.runCount > 0 ? (
+        <div className="card" style={{ marginBottom: 24 }} aria-label="Instance statistics">
+          <p className="eyebrow" style={{ marginBottom: 14 }}>Across all reviews</p>
+          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+            <StatTile label="Reviews" value={String(stats.runCount)} />
+            <StatTile label="Completion rate" value={`${Math.round(stats.completionRate * 100)}%`} />
+            <StatTile label="Cost per run" value={formatUsd(stats.costPerRun)} />
+            <StatTile label="Retry rate" value={`${Math.round(stats.retryRate * 100)}%`} />
+            <StatTile label="Avg time to complete" value={formatDuration(stats.timeToFirstReviewMs)} />
+          </div>
+        </div>
+      ) : null}
 
       {error !== null ? <Pill tone="fail" label={error} /> : null}
 

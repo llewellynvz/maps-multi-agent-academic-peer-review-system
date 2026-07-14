@@ -93,3 +93,12 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
     </nav>
   );
 }
+
+export function StatTile({ label, value }: { label: string; value: string }): ReactNode {
+  return (
+    <div>
+      <p className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.12em', margin: 0 }}>{label}</p>
+      <span className="mono stat-num" style={{ fontSize: 22 }}>{value}</span>
+    </div>
+  );
+}

@@ -80,6 +80,14 @@ export interface RunStats {
   timeToFirstReviewMs: number | null;
 }
 
+export interface InstanceStats {
+  costPerRun: number;
+  completionRate: number;
+  retryRate: number;
+  timeToFirstReviewMs: number | null;
+  runCount: number;
+}
+
 export interface ProviderKeyView {
   id: string;
   provider: string;
@@ -178,6 +186,7 @@ export const api = {
     `/api/reviews/${id}/deliverables/${kind}${format !== undefined ? `?format=${format}` : ''}`,
 
   getRunStats: (id: string) => request<RunStats>('GET', `/api/reviews/${id}/stats`),
+  getInstanceStats: () => request<InstanceStats>('GET', '/api/stats'),
 
   getSettings: () => request<PublicSettings>('GET', '/api/settings'),
   putSettings: (body: Partial<{ telemetry: boolean; presetDefault: string; providerProfile: string; passphrase: string | null }>) =>

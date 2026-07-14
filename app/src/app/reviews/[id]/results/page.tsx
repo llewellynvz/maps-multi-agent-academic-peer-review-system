@@ -2,9 +2,9 @@
 
 import { useParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { api, type DeliverableView, type ReviewDetail } from '@/lib/api';
-import { confidenceBand, RECOMMENDATION_LABEL } from '@/lib/format';
-import { Icon, Pill, Spinner } from '@/components/ui';
+import { api, type DeliverableView, type ReviewDetail, type RunStats } from '@/lib/api';
+import { confidenceBand, formatDuration, formatUsd, RECOMMENDATION_LABEL } from '@/lib/format';
+import { Icon, Pill, Spinner, StatTile } from '@/components/ui';
 import { SideDrawer } from '@/components/SideDrawer';
 
 const FINDING_RE = /REV-[A-Z]{3,4}-\d{4}/g;
@@ -57,11 +57,14 @@ export default function ResultsPage(): ReactNode {
   const [notesBannerSeen, setNotesBannerSeen] = useState(false);
   const [drawerFinding, setDrawerFinding] = useState<string | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [runStats, setRunStats] = useState<RunStats | null>(null);
 
   useEffect(() => {
     const load = async (): Promise<void> => {
       const detail = await api.getReview(id).catch(() => null);
       setReview(detail);
+      const stats = await api.getRunStats(id).catch(() => null);
+      setRunStats(stats);
       const list = await api.listDeliverables(id).catch(() => ({ deliverables: [] }));
       setDeliverables(list.deliverables);
       const reportText = await fetch(api.deliverableUrl(id, 'peer_review_report', 'md'), { credentials: 'include' })
@@ -117,6 +120,28 @@ export default function ResultsPage(): ReactNode {
           </div>
         </div>
       </div>
+
+      {runStats !== null ? (
+        <div className="card" style={{ marginBottom: 24 }} aria-label="Run statistics">
+          <p className="eyebrow" style={{ marginBottom: 14 }}>This review</p>
+          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+            <StatTile label="Cost" value={formatUsd(runStats.costUsd)} />
+            <StatTile label="Tokens in / out" value={`${runStats.tokensIn.toLocaleString()} / ${runStats.tokensOut.toLocaleString()}`} />
+            <StatTile label="Tokens cached" value={runStats.tokensCached.toLocaleString()} />
+            <StatTile label="Retry rate" value={`${Math.round(runStats.retryRate * 100)}%`} />
+            <StatTile label="Time to complete" value={formatDuration(runStats.timeToFirstReviewMs)} />
+          </div>
+          {Object.keys(runStats.costByPhase).length > 0 ? (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
+              {Object.entries(runStats.costByPhase).map(([phase, cost]) => (
+                <span key={phase} className="pill pill-neutral" style={{ fontSize: 11 }}>
+                  {phase} <span className="mono">{formatUsd(cost)}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="tabs" role="tablist">
         <button className="tab" role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>Report</button>
