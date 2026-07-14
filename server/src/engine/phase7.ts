@@ -19,8 +19,8 @@ import {
   updateReview,
   upsertCheckpoint,
 } from '../workflow/repo';
-import type { EngineDeps } from './phases-shared';
-import { readArtefact, writeArtefact } from './artefacts';
+import { DispatchPauseError, type EngineDeps } from './phases-shared';
+import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
@@ -427,6 +427,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         alignAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
       );
       const alignAuthorFacing = alignAll.filter((finding) => finding.scope !== 'editor_only');
+      const alignmentReplayed = artefactExists(reviewId, 'p7-shipped-aligned');
       try {
         const aligned = await runAgent<ShippedReportEnvelope>(deps, {
           reviewId,
@@ -479,21 +480,26 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           blockReason = `Arbitration narrowed the recommendation to ${narrowed} but the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
         }
       } catch (error) {
+        if (error instanceof DispatchPauseError) {
+          throw error;
+        }
         released = false;
         blocked = true;
         blockReason = `Arbitration narrowed the recommendation to ${narrowed} but no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
       }
-      insertEvent(db, {
-        reviewId,
-        kind: 'gate_verdict',
-        phase: 'phase_7',
-        payload: {
-          cycle: fixCycles,
-          source: 'arbitration-alignment',
-          verdict: blocked ? 'block' : 'aligned',
-          narrowedRecommendation: narrowed,
-        },
-      });
+      if (!alignmentReplayed || blocked) {
+        insertEvent(db, {
+          reviewId,
+          kind: 'gate_verdict',
+          phase: 'phase_7',
+          payload: {
+            cycle: fixCycles,
+            source: 'arbitration-alignment',
+            verdict: blocked ? 'block' : 'aligned',
+            narrowedRecommendation: narrowed,
+          },
+        });
+      }
     }
 
     if (blocked) {

@@ -10,7 +10,7 @@ import type { DispatchInput, DispatchResult } from '../../providers/dispatch';
 import { blobDir } from '../../paths';
 import { writeManuscriptBlob } from '../../workflow/storage';
 import { readArtefact, writeArtefact } from '../artefacts';
-import type { EngineDeps } from '../phases-shared';
+import { DispatchPauseError, type EngineDeps } from '../phases-shared';
 import { runPhase7 } from '../phase7';
 
 let tempDir: string;
@@ -380,6 +380,38 @@ describe('phase 7 release gate routing', () => {
       .all(reviewId)
       .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source: string; verdict: string });
     expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'aligned')).toBe(true);
+  });
+
+  it('propagates a cost-ceiling pause at the alignment dispatch instead of blocking the release', async () => {
+    const narrowedEnvelope = { ...shippedObject(), recommendation: 'reject_and_resubmit' };
+    const harness = mockDeps(
+      [critic('revise'), critic('revise')],
+      undefined,
+      undefined,
+      [shippedObject(), shippedObject(), shippedObject(), narrowedEnvelope],
+    );
+    let writerGateCalls = 0;
+    const deps: EngineDeps = {
+      ...harness.deps,
+      preDispatch: (info) => {
+        if (info.agent === 'review-report-writer') {
+          writerGateCalls += 1;
+          if (writerGateCalls >= 4) {
+            return { pause: true, reason: 'cost_ceiling' };
+          }
+        }
+        return { pause: false };
+      },
+    };
+    await expect(runPhase7(deps, reviewId)).rejects.toBeInstanceOf(DispatchPauseError);
+    const review = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(reviewId) as { status: string };
+    expect(review.status).toBe('running');
+    const gateEvents = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'gate_verdict'")
+      .all(reviewId)
+      .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source?: string; verdict?: string });
+    expect(gateEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'block')).toBe(false);
+    expect(eventKinds()).not.toContain('run_terminal');
   });
 
   it('halts instead of releasing a report that cannot be aligned with the narrowed recommendation', async () => {
