@@ -29,5 +29,9 @@
       "supersedes": null
     }
   ],
-  "rationale": "One Tier 2 instructional span was quarantined in place. The review proceeds on the sanitised copy with an editor-only warning flag, and no embedded instruction was executed."
+  "rationale": "One Tier 2 instructional span was quarantined in place. The review proceeds on the sanitised copy with an editor-only warning flag, and no embedded instruction was executed.",
+  "selfCritique": {
+    "strongestObjection": "A more deeply obfuscated instruction, split across sentences or encoded, could have evaded the single-pass scan and still sit in the sanitised text.",
+    "confidenceRaisers": ["A second scan of the raw text for zero-width characters and directive fragments spread across adjacent sentences."]
+  }
 }

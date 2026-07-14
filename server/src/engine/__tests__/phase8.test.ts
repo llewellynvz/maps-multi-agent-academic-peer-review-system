@@ -40,6 +40,8 @@ function finding(overrides: Partial<Finding>): Finding {
   } as Finding;
 }
 
+const selfCritique = { strongestObjection: 'Mock output; not derived from evidence.', confidenceRaisers: ['A real dispatch'] };
+
 function metaObject() {
   return {
     rubric: Array.from({ length: 15 }, (_u, index) => ({ criterion: index + 1, score: 3, supportingIds: ['REV-STAT-0001'], opposingIds: [] })),
@@ -49,6 +51,7 @@ function metaObject() {
     recommendationConfidence: 0.8,
     scopeFit: { score: 0.7, factorsUsed: ['topic-fit'] },
     decisionHinges: [{ findingId: 'REV-STAT-0001', hinge: 'Cannot advance beyond major revision until resolved.' }],
+    selfCritique,
   };
 }
 
@@ -62,6 +65,12 @@ function shippedObject() {
     references: [],
     citedFindingIds: ['REV-STAT-0001', 'REV-METH-0001'],
     editorOnlyLeak: false,
+    humanizePairs: [
+      { before: 'a', after: 'b' },
+      { before: 'c', after: 'd' },
+      { before: 'e', after: 'f' },
+    ],
+    selfCritique,
   };
 }
 
@@ -74,15 +83,16 @@ function qualityObject() {
     unsupportedClaimCount: 1,
     weights: { evidenceGroundingRate: 0.3, actionabilityIndex: 0.25, decisionStability: 0.2, toneRiskScore: 0.15, unsupportedClaimPenalty: 0.1 },
     composite: 0.82,
+    selfCritique,
   };
 }
 
 function scopeObject() {
-  return { score: 0.72, factorsUsed: ['topic-fit'], confidence: 0.6, scopeTextAvailable: false, noveltyPenaltyApplied: false, rationale: 'Topic fits the journal aims.' };
+  return { score: 0.72, factorsUsed: ['topic-fit'], confidence: 0.6, scopeTextAvailable: false, noveltyPenaltyApplied: false, rationale: 'Topic fits the journal aims.', selfCritique };
 }
 
 function calibrationObject() {
-  return { mode: 'cross-journal-fallback', completedReviewsForJournal: 0, journalSpecificThresholdMet: false, benchmarkComparison: 'In line with cross-journal benchmarks.', drift: [] };
+  return { mode: 'cross-journal-fallback', completedReviewsForJournal: 0, journalSpecificThresholdMet: false, benchmarkComparison: 'In line with cross-journal benchmarks.', drift: [], selfCritique };
 }
 
 function criticPass() {
@@ -94,6 +104,7 @@ function criticPass() {
     failureConstructionAttempt: 'I could not build a failing input.',
     escalatedInconsistencies: [],
     mostDangerousDefect: null,
+    selfCritique,
   };
 }
 
@@ -101,7 +112,7 @@ function deps(): EngineDeps {
   const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
     const object = ({
       'review-meta-reviewer': metaObject(),
-      swarm: { mode: 'B', critique: [] },
+      swarm: { mode: 'B', critique: [], selfCritique },
       'review-report-writer': shippedObject(),
       'review-final-critic': criticPass(),
       'quality-metrics-engine': qualityObject(),

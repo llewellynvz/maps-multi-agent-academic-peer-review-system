@@ -5,5 +5,9 @@
   "findingIdToSupersede": "REV-STAT-0001",
   "failureConstructionAttempt": "I tried to trace the recommendation to the ledger and found the descriptive in REV-STAT-0001 records an impossible mean, so the finding itself is defective rather than badly reported.",
   "escalatedInconsistencies": ["The rubric average of 2.9 is consistent with the major-revision recommendation."],
-  "mostDangerousDefect": "A defective finding drives a major concern that an author would act on without the corrected statistic."
+  "mostDangerousDefect": "A defective finding drives a major concern that an author would act on without the corrected statistic.",
+  "selfCritique": {
+    "strongestObjection": "Routing to revise-specialist assumes the defect sits in the statistical finding itself; if the fault is in the report's paraphrase, a plain revise would have been the correct route.",
+    "confidenceRaisers": ["A direct comparison of REV-STAT-0001's ledger text against the report line that cites it."]
+  }
 }

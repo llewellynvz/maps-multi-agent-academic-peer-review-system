@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findingIdSchema, findingSchema } from './finding';
+import { selfCritiqueSchema } from './self-critique';
 
 export const specialistReviewerSchema = z.object({
   lens: z.string(),
@@ -11,6 +12,7 @@ export const specialistReviewerSchema = z.object({
       dissentPreserved: z.array(z.object({ id: findingIdSchema, whyItHolds: z.string() })),
     })
     .nullable(),
+  selfCritique: selfCritiqueSchema,
 });
 
 export type SpecialistReviewerOutput = z.infer<typeof specialistReviewerSchema>;

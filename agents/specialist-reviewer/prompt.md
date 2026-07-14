@@ -52,3 +52,7 @@ Canonical: "REV-CAUS-0002 [major | fixability: easy | scope: author-facing | Kno
 ## Output contract
 
 Return one structured object with `lens`, `coreContributionReading` (your one-sentence reading of the paper's contribution), `findings` (full findings in the shared format, lens-prefixed ids), and, in the challenge round, `challengeRound` (`updated` findings with the evidence that changed them, and `dissentPreserved` findings with why they still hold). Leave `challengeRound` empty on the first pass.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this review could be wrong: the assumption, missing section, or reading that would most undermine your central finding. Set `selfCritique.confidenceRaisers` to the specific manuscript evidence or checks that would most raise your confidence if you had them.

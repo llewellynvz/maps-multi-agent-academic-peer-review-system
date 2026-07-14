@@ -37,3 +37,7 @@ Weak (rejected): "The statistics and theory lenses disagreed on the mediation cl
 ## Output contract
 
 Return one structured object with `rubric` (15 rows, each with criterion, score, supporting finding ids, and opposing finding ids), `average`, `bottlenecks` (the three lowest criteria), `recommendation`, `recommendationConfidence`, `scopeFit` (score and factors used), and `decisionHinges` (one per major finding, each naming the finding id and the hinge sentence).
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this synthesis could be wrong: the misweighted finding, scoring anchor, or recommendation hinge that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific findings or evidence that would most raise your confidence if you had them.

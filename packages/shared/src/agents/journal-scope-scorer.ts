@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { selfCritiqueSchema } from './self-critique';
 
 export const journalScopeFactorSchema = z.enum([
   'topic-fit',
@@ -14,6 +15,7 @@ export const journalScopeScorerSchema = z.object({
   scopeTextAvailable: z.boolean(),
   noveltyPenaltyApplied: z.boolean(),
   rationale: z.string(),
+  selfCritique: selfCritiqueSchema,
 });
 
 export type JournalScopeScorerOutput = z.infer<typeof journalScopeScorerSchema>;

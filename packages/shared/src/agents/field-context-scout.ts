@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findingSchema } from './finding';
+import { selfCritiqueSchema } from './self-critique';
 
 export const retrievalLogEntrySchema = z.object({
   query: z.string(),
@@ -41,6 +42,7 @@ export const fieldContextScoutSchema = z.object({
   benchmarks: z.array(benchmarkSchema),
   sourceAvailability: z.array(sourceAvailabilityItemSchema),
   findings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export type FieldContextScoutOutput = z.infer<typeof fieldContextScoutSchema>;

@@ -4,5 +4,9 @@
   "confidence": 0.55,
   "scopeTextAvailable": false,
   "noveltyPenaltyApplied": false,
-  "rationale": "The wellbeing-intervention topic fits the journal aims and the trial design matches its stated methodological preferences. The full scope text was unavailable, so confidence is lowered rather than the score."
+  "rationale": "The wellbeing-intervention topic fits the journal aims and the trial design matches its stated methodological preferences. The full scope text was unavailable, so confidence is lowered rather than the score.",
+  "selfCritique": {
+    "strongestObjection": "Without the journal's full scope text, the topic-fit score is inferred from the aims summary and could misjudge article-type compatibility.",
+    "confidenceRaisers": ["The journal's published aims-and-scope statement to confirm the fit factors."]
+  }
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { findingIdSchema, findingSchema } from './finding';
 import { recommendationSchema } from './recommendation';
+import { selfCritiqueSchema } from './self-critique';
 
 export const swarmRoleSchema = z.enum([
   'seed-constructor',
@@ -44,6 +45,7 @@ export const swarmEvaluationSchema = z.object({
   strongestMinorityReport: z.string(),
   herdingRisk: z.enum(['low', 'moderate', 'high']),
   surfacedFindings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export const swarmReportCritiqueItemSchema = z.object({
@@ -61,6 +63,7 @@ export const swarmReportCritiqueItemSchema = z.object({
 export const swarmReportCritiqueSchema = z.object({
   mode: z.literal('B'),
   critique: z.array(swarmReportCritiqueItemSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export const swarmSchema = z.discriminatedUnion('mode', [swarmEvaluationSchema, swarmReportCritiqueSchema]);

@@ -21,5 +21,9 @@
       "leanestFix": "Editor requests the raw data and recomputed descriptive statistics from the authors.",
       "supersedes": null
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "The figure-integrity check could not run without raw figure files, so a figure-level inconsistency behind the reported statistic may be unscreened.",
+    "confidenceRaisers": ["The publication-resolution figure files to complete the REV-FIG rubric."]
+  }
 }

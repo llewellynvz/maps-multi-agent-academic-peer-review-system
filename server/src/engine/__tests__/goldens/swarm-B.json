@@ -13,5 +13,9 @@
       "findingId": "REV-REF-0001",
       "recommendation": "Add the unlocated-reference concern to the developmental feedback."
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "The critique targets the two most visible defects; a subtler overstatement elsewhere in the report could pass unflagged.",
+    "confidenceRaisers": ["A line-by-line pass of the full report body against every cited finding id."]
+  }
 }

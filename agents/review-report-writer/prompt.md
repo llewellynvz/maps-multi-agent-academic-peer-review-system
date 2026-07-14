@@ -76,4 +76,8 @@ Same severity, threat named, fix concrete, hinge attached, scannable, human.
 Return one structured object, tagged with your mode.
 
 - Mode A: `bodyMarkdown` (the full internal report), `provisionalRubric` (15 rows, each citing supporting finding ids), `provisionalAverage`, `bottlenecks` (the three lowest criteria), `citedFindingIds`.
-- Mode B: `recommendation`, `recommendationConfidence`, `bodyMarkdown` (the seven-part report), `rubricTable` (15 rows: criterion, score, justification), `references` (APA 7), `citedFindingIds` (every id referenced in the body), and `editorOnlyLeak` asserted false. As evidence the humanize pass ran, be prepared to produce, on request, the before-and-after sentence pairs it changed. A self-attested "the pass ran" without them is not accepted.
+- Mode B: `recommendation`, `recommendationConfidence`, `bodyMarkdown` (the seven-part report), `rubricTable` (15 rows: criterion, score, justification), `references` (APA 7), `citedFindingIds` (every id referenced in the body), `humanizePairs`, and `editorOnlyLeak` asserted false. Return at least three before-and-after sentence pairs in `humanizePairs` as proof the humanise pass ran; a self-attested pass without the pairs is rejected.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this report could be unfair, overconfident, or under-evidenced: the framing, severity read, or missing anchor that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific ledger evidence or checks that would most raise your confidence if you had them.

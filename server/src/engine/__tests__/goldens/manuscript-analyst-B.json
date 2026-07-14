@@ -55,5 +55,9 @@
       "leanestFix": "Complete the CONSORT checklist and add the participant flow diagram.",
       "supersedes": null
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "The design classification rests on the abstract's wording; a Methods section describing quasi-randomisation would move this away from a clean randomised trial.",
+    "confidenceRaisers": ["The full Methods text on allocation and sequence generation to confirm the CONSORT mapping."]
+  }
 }

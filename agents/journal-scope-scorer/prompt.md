@@ -25,3 +25,7 @@ The global constitution frame and the knowledge modules listed in your manifest 
 ## Output contract
 
 Return one structured object with `score`, `factorsUsed` (only from the legitimate list), `confidence`, `scopeTextAvailable`, `noveltyPenaltyApplied` (false unless the journal's own scope requires novelty and the manuscript does not claim it), and `rationale`.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this scope score could be wrong: the missing scope text, inferred preference, or factor reading that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific scope material or evidence that would most raise your confidence if you had it.

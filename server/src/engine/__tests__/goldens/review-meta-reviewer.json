@@ -24,5 +24,9 @@
   "decisionHinges": [
     { "findingId": "REV-STAT-0001", "hinge": "If the impossible descriptive is not reconciled, the recommendation cannot advance beyond major revision." },
     { "findingId": "REV-REF-0001", "hinge": "If the unlocated reference is not replaced, the evidence base cannot support the central claim." }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "The 2.9 average and major-revision call hinge on REV-STAT-0001; if that finding is downgraded, the recommendation could move to minor revision.",
+    "confidenceRaisers": ["The corrected descriptive statistics to confirm the severity of the statistical bottleneck."]
+  }
 }

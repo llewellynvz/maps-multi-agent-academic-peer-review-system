@@ -28,5 +28,9 @@
     "REV-CTX-0001",
     "REV-SWM-0001",
     "REV-MAP-0001"
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "The provisional rubric leans on the statistical bottleneck; if REV-STAT-0001 is later reconciled, several scores would rise and the narrative emphasis would shift.",
+    "confidenceRaisers": ["The corrected descriptive statistics, which would confirm or retire the central concern before the scores settle."]
+  }
 }

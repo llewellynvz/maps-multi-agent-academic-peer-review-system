@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findingIdSchema } from './finding';
+import { selfCritiqueSchema } from './self-critique';
 
 export const criticVerdictKindSchema = z.enum(['pass', 'revise', 'revise-specialist', 'block']);
 
@@ -12,6 +13,7 @@ export const reviewFinalCriticSchema = z
     failureConstructionAttempt: z.string(),
     escalatedInconsistencies: z.array(z.string()),
     mostDangerousDefect: z.string().nullable(),
+    selfCritique: selfCritiqueSchema,
   })
   .refine((verdict) => verdict.verdict !== 'revise-specialist' || verdict.lens !== null, {
     message: 'a revise-specialist verdict must name the lens (PRD 5.6 gate machinery)',

@@ -35,5 +35,9 @@
       "supersedes": null
     }
   ],
-  "challengeRound": null
+  "challengeRound": null,
+  "selfCritique": {
+    "strongestObjection": "If the stated 1 to 7 scale is a typo for a longer WEMWBS form, the mean would be plausible and the impossible-value finding would collapse.",
+    "confidenceRaisers": ["The Methods measure description and the raw item range to confirm the scale actually used."]
+  }
 }

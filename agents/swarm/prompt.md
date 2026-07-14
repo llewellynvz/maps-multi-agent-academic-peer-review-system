@@ -50,3 +50,7 @@ Return one structured object, tagged with your mode.
 
 - Mode A: `populationSize`, `topology`, `recommendationDistribution` (round 0 versus final, per category), `consensusEntropy`, `decisionStability`, `stableFindings` and `fragileFindings` (with round-by-round support), `strongestMinorityReport`, `herdingRisk`, and `surfacedFindings` (any finding the swarm found that no specialist logged).
 - Mode B: `critique`, one item per defect found, each with its defect type, the quoted report line, the finding id it fails against (or null), and the recommended fix.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this simulation could mislead: the population size, topology, or stability read that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific re-runs or inputs that would most raise your confidence if you had them.

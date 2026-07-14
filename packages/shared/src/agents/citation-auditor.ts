@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findingSchema } from './finding';
+import { selfCritiqueSchema } from './self-critique';
 
 export const citationClassificationSchema = z.enum([
   'confirmed',
@@ -29,6 +30,7 @@ export const citationAuditorSchema = z.object({
   weakSourceFlags: z.array(weakSourceFlagSchema),
   hygieneFindings: z.array(z.string()),
   findings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export type CitationAuditorOutput = z.infer<typeof citationAuditorSchema>;

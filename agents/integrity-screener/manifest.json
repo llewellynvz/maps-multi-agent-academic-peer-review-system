@@ -1,7 +1,7 @@
 {
   "name": "integrity-screener",
-  "promptVersion": "1.0.0",
+  "promptVersion": "1.1.0",
   "phase": [4],
   "role": "cheap",
-  "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md", "05_REVIEW_TEMPLATES.md"]
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md", "05_REVIEW_TEMPLATES.md", "04_DEVELOPMENTAL_VOICE.md"]
 }

@@ -42,3 +42,7 @@ Canonical: "REV-CON-0003 [signal: serious | severity: major | fixability: unclea
 ## Output contract
 
 Return one structured object with `cluster`, `checks` (every rubric's outcome: ran, not-applicable, or not-run, with the missing artifact named where relevant), and `findings` (rubric-prefixed ids, signal classifications, editor-only scope on serious signals).
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason a signal here could be wrong or a real one missed: the absent artifact, detector limitation, or reading that would most undermine the screen. Set `selfCritique.confidenceRaisers` to the specific artifacts or checks that would most raise your confidence if you had them.

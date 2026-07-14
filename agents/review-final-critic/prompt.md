@@ -45,3 +45,7 @@ Weak (rejected): "The report's tone feels harsh in places." Strong (canonical): 
 ## Output contract
 
 Return one structured object with `verdict` (pass, revise, revise-specialist, or block), `lens` (named only for revise-specialist), `sectionsToRework` (named only for revise), `findingIdToSupersede` (named only for revise-specialist), `failureConstructionAttempt`, `escalatedInconsistencies`, and `mostDangerousDefect`.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this verdict could be wrong: the misread defect, mis-routed fix, or overlooked inconsistency that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific re-runs or ledger checks that would most raise your confidence if you had them.

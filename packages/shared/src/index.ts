@@ -13,6 +13,7 @@ export {
 
 export * from './agents/finding';
 export * from './agents/recommendation';
+export * from './agents/self-critique';
 export * from './agents/manuscript-sanitizer';
 export * from './agents/manuscript-analyst';
 export * from './agents/field-context-scout';

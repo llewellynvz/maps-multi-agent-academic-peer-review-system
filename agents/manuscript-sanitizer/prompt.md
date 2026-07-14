@@ -49,3 +49,7 @@ Return one structured object with:
 - `quarantineLog`: one item per finding at every tier, with id, tier, quote, location, and reason.
 - `findings`: the `REV-SAN` findings, editor-only scope, empty on a clean or Tier-1-only run.
 - `rationale`: the single worst signal in one line, or a clean-run statement.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this screen could have missed or misclassified an item: the obfuscation, hidden layer, or reading that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific scans or source access that would most raise your confidence if you had them.

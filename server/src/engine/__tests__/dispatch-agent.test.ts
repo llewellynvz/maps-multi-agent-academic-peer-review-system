@@ -46,6 +46,7 @@ function specialistPayload(findings: Array<Record<string, unknown>>): Record<str
     coreContributionReading: 'A cross-sectional survey of stress and wellbeing.',
     findings,
     challengeRound: null,
+    selfCritique: { strongestObjection: 'Mock output; not derived from evidence.', confidenceRaisers: ['A real dispatch'] },
   };
 }
 

@@ -41,5 +41,9 @@
       "leanestFix": "Situate the 0.42 SD effect against comparable brief-intervention studies and discuss why it is larger.",
       "supersedes": null
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "With no external retrieval, the benchmark rests only on the manuscript's own references, which may over-represent supportive effects and understate the true comparator range.",
+    "confidenceRaisers": ["A live search of the brief-intervention literature to anchor the 0.42 SD effect against an independent benchmark."]
+  }
 }

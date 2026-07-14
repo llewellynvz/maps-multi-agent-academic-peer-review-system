@@ -20,6 +20,8 @@ let reviewId: string;
 
 const AUTHOR_IDS = ['REV-STAT-0001', 'REV-STAT-0002', 'REV-METH-0001'];
 
+const selfCritique = { strongestObjection: 'Mock output; not derived from evidence.', confidenceRaisers: ['A real dispatch'] };
+
 function finding(overrides: Partial<Finding>): Finding {
   return {
     id: 'REV-XXX-0001',
@@ -101,6 +103,7 @@ function metaObject() {
       { findingId: 'REV-STAT-0001', hinge: 'Until resolved, cannot advance beyond major revision.' },
       { findingId: 'REV-METH-0001', hinge: 'Sampling must be clarified.' },
     ],
+    selfCritique,
   };
 }
 
@@ -118,11 +121,17 @@ function shippedObject() {
     references: [],
     citedFindingIds: AUTHOR_IDS,
     editorOnlyLeak: false,
+    humanizePairs: [
+      { before: 'a', after: 'b' },
+      { before: 'c', after: 'd' },
+      { before: 'e', after: 'f' },
+    ],
+    selfCritique,
   };
 }
 
 function swarmBObject() {
-  return { mode: 'B', critique: [] };
+  return { mode: 'B', critique: [], selfCritique };
 }
 
 function specialistObject() {
@@ -131,6 +140,7 @@ function specialistObject() {
     coreContributionReading: 'A brief wellbeing effect.',
     findings: [finding({ claim: 'Corrected statistic reported for the record.', supersedes: null })],
     challengeRound: null,
+    selfCritique,
   };
 }
 
@@ -143,6 +153,7 @@ function critic(verdict: ReviewFinalCriticOutput['verdict'], overrides: Partial<
     failureConstructionAttempt: 'I tried to build a failing input.',
     escalatedInconsistencies: [],
     mostDangerousDefect: null,
+    selfCritique,
     ...overrides,
   };
 }

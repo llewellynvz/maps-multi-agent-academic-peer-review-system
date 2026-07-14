@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { selfCritiqueSchema } from './self-critique';
 
 export const qualityMetricsWeightsSchema = z.object({
   evidenceGroundingRate: z.literal(0.3),
@@ -16,6 +17,7 @@ export const qualityMetricsEngineSchema = z.object({
   unsupportedClaimCount: z.number().int().nonnegative(),
   weights: qualityMetricsWeightsSchema,
   composite: z.number().min(0).max(1),
+  selfCritique: selfCritiqueSchema,
 });
 
 export type QualityMetricsEngineOutput = z.infer<typeof qualityMetricsEngineSchema>;

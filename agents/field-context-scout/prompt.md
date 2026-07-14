@@ -44,3 +44,7 @@ The manuscript tests psychological capital as a buffer against burnout in nurses
 Return one structured object with `queryVocabulary`, the full `retrievalLog`, included `comparators` with relevance rationale, `gapMap`, `biasStatement`, `benchmarks` with norm tensions stated, `sourceAvailability` for every checked link (url, date, summary, stability class, broken flag), and `findings` (`REV-CTX` prefixed).
 
 Success is a reproducible, confidentiality-clean context package the reviewers can lean on. Not a verdict, not a review.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this context package could mislead the reviewers: the retrieval gap, declared bias, or missing comparator that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific searches, sources, or benchmarks that would most raise your confidence if you had them.

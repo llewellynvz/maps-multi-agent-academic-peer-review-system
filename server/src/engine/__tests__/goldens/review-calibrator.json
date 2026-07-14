@@ -5,5 +5,9 @@
   "benchmarkComparison": "The major-revision recommendation and the 2.9 rubric average sit within the range of published peer-review and LLM-review benchmarks for brief-intervention trials.",
   "drift": [
     { "metric": "rubric-average", "observed": "2.9", "benchmark": "3.1 cross-journal median" }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "With only three completed reviews for this journal, the cross-journal benchmark may not reflect this venue's actual severity norms.",
+    "confidenceRaisers": ["More completed reviews for this journal to cross the ten-review threshold and enable journal-specific calibration."]
+  }
 }

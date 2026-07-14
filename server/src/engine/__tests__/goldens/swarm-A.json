@@ -36,5 +36,9 @@
       "leanestFix": "Re-derive the effect from corrected descriptives before making any practical-significance claim.",
       "supersedes": null
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "A twelve-agent population is small, so the fragile-versus-stable split for borderline findings could shift under a larger or differently stratified population.",
+    "confidenceRaisers": ["A re-run at a larger population size to confirm the stability classification of REV-CTX-0001."]
+  }
 }

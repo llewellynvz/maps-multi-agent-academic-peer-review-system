@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findingSchema } from './finding';
+import { selfCritiqueSchema } from './self-critique';
 
 export const integrityRubricSchema = z.enum(['REV-RPT', 'REV-SIM', 'REV-AIC', 'REV-FIG', 'REV-CON', 'REV-RPX']);
 
@@ -15,6 +16,7 @@ export const integrityScreenerSchema = z.object({
   cluster: z.string(),
   checks: z.array(integrityCheckResultSchema),
   findings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export type IntegrityScreenerOutput = z.infer<typeof integrityScreenerSchema>;

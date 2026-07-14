@@ -22,5 +22,23 @@
   ],
   "references": ["Author, A. (2024). A brief wellbeing intervention. Journal of Wellbeing Science, 12(3), 200-215."],
   "citedFindingIds": ["REV-STAT-0001", "REV-STAT-0002", "REV-REF-0001", "REV-CTX-0001", "REV-SWM-0001", "REV-MAP-0001"],
-  "editorOnlyLeak": false
+  "editorOnlyLeak": false,
+  "humanizePairs": [
+    {
+      "before": "This manuscript delivers a transformative and unprecedented contribution to the wellbeing literature.",
+      "after": "This manuscript reports a clean brief-intervention trial with a clear central effect worth strengthening."
+    },
+    {
+      "before": "The authors fail to report the test statistic.",
+      "after": "The significance claim would be easier to check with the test statistic and degrees of freedom reported."
+    },
+    {
+      "before": "The impossible mean renders the entire analysis worthless.",
+      "after": "The mean above the scale ceiling means the descriptives need recomputing before the effect can be trusted."
+    }
+  ],
+  "selfCritique": {
+    "strongestObjection": "The developmental framing could read as softer than the major-revision severity warrants if the impossible mean is a data-integrity failure rather than a reporting slip.",
+    "confidenceRaisers": ["Confirmation from the raw data on whether REV-STAT-0001 is a reporting slip or a deeper data-integrity problem."]
+  }
 }

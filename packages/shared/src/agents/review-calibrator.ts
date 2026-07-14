@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { selfCritiqueSchema } from './self-critique';
 
 export const calibrationModeSchema = z.enum(['journal-specific', 'cross-journal-fallback']);
 
@@ -9,6 +10,7 @@ export const reviewCalibratorSchema = z
     journalSpecificThresholdMet: z.boolean(),
     benchmarkComparison: z.string(),
     drift: z.array(z.object({ metric: z.string(), observed: z.string(), benchmark: z.string() })),
+    selfCritique: selfCritiqueSchema,
   })
   .refine((report) => report.journalSpecificThresholdMet === report.completedReviewsForJournal >= 10, {
     message: 'journalSpecificThresholdMet must equal (completedReviewsForJournal >= 10) per AGENT-20',

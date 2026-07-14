@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findingSchema, severitySchema } from './finding';
+import { selfCritiqueSchema } from './self-critique';
 
 export const manuscriptSectionExtractSchema = z.object({
   heading: z.string(),
@@ -67,6 +68,7 @@ export const manuscriptStructureSchema = z.object({
   figureTableInventory: z.array(figureTableItemSchema),
   ambiguityFindings: z.array(ambiguityFindingSchema),
   findings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export const claimSupportLevelSchema = z.enum(['direct', 'partial', 'indirect', 'absent', 'contradicted']);
@@ -135,6 +137,7 @@ export const claimDesignAnalysisSchema = z.object({
   reportingChecklist: z.array(reportingChecklistItemSchema),
   activationMap: z.array(activationMapEntrySchema),
   findings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export const manuscriptAnalystSchema = z.discriminatedUnion('mode', [

@@ -11,5 +11,9 @@
     "toneRiskScore": 0.15,
     "unsupportedClaimPenalty": 0.1
   },
-  "composite": 0.82
+  "composite": 0.82,
+  "selfCritique": {
+    "strongestObjection": "The tone-risk and actionability scores rest on lexical checks that can miss context, so a genuinely destructive sentence phrased neutrally could inflate the composite.",
+    "confidenceRaisers": ["A human read of the flagged sentences to confirm the tone-risk score."]
+  }
 }

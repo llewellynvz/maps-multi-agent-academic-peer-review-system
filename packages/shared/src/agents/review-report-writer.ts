@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { findingIdSchema } from './finding';
 import { recommendationSchema } from './recommendation';
+import { selfCritiqueSchema } from './self-critique';
 
 export const rubricRowSchema = z.object({
   criterion: z.number().int().min(1).max(15),
@@ -15,6 +16,7 @@ export const fullReportEnvelopeSchema = z.object({
   provisionalAverage: z.number(),
   bottlenecks: z.array(z.number().int()).length(3),
   citedFindingIds: z.array(findingIdSchema),
+  selfCritique: selfCritiqueSchema,
 });
 
 export const shippedReportEnvelopeSchema = z.object({
@@ -34,6 +36,8 @@ export const shippedReportEnvelopeSchema = z.object({
   references: z.array(z.string()),
   citedFindingIds: z.array(findingIdSchema),
   editorOnlyLeak: z.literal(false),
+  humanizePairs: z.array(z.object({ before: z.string().min(1), after: z.string().min(1) })).min(3),
+  selfCritique: selfCritiqueSchema,
 });
 
 export const reviewReportWriterSchema = z.discriminatedUnion('mode', [

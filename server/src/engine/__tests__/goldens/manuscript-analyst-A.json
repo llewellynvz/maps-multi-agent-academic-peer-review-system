@@ -77,5 +77,9 @@
       "leanestFix": "Recompute the descriptive statistics from the raw responses and reconcile the reported scale range.",
       "supersedes": null
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "If the parser dropped a table or a declaration block, the section inventory and metadata status could record an author omission that is only a parse artefact.",
+    "confidenceRaisers": ["The raw pages for the Results tables and the declarations section to confirm nothing was lost in extraction."]
+  }
 }

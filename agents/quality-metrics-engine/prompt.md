@@ -29,3 +29,7 @@ The global constitution frame and the knowledge modules listed in your manifest 
 ## Output contract
 
 Return one structured object with `evidenceGroundingRate`, `actionabilityIndex`, `decisionStability`, `toneRiskScore`, `unsupportedClaimCount`, `weights` (the five fixed allocations, unchanged run to run), and `composite`.
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this composite could misrepresent the review's quality: the lexical blind spot, input, or weighting artefact that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific checks or inputs that would most raise your confidence if you had them.

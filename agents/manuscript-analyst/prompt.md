@@ -49,3 +49,7 @@ Return one structured object, tagged with your mode.
 
 - Mode A: `manuscriptMap` (the segmented sections with anchors), `sectionInventory`, `metadataDeclarations`, `figureTableInventory` (with mismatch classifications), `ambiguityFindings` (the four-type taxonomy), and `findings` (`REV-MAP` prefixed, continuing the sequence mode B will extend).
 - Mode B: `claimEvidenceMatrix`, `peripheralClaims`, `studyDesign` with `designConfidence` and `nearestAlternativeDesign`, `reportingGuidelines` and `reportingChecklist`, `activationMap`, and `findings` (`REV-MAP` prefixed, sequential from mode A's).
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this structured reading could be wrong or incomplete: the parse gap, misclassification, or assumption that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific sections, raw pages, or inputs that would most raise your confidence if you had them.

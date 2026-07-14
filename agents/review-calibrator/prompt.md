@@ -24,3 +24,7 @@ The global constitution frame and the knowledge modules listed in your manifest 
 ## Output contract
 
 Return one structured object with `mode` (journal-specific or cross-journal-fallback), `completedReviewsForJournal`, `journalSpecificThresholdMet`, `benchmarkComparison`, and `drift` (each entry naming the metric, the observed value, and the benchmark value).
+
+## Self-critique (mandatory)
+
+Before you return, set `selfCritique.strongestObjection` to the single strongest reason this calibration could mislead: the thin sample, benchmark mismatch, or drift reading that would most undermine it. Set `selfCritique.confidenceRaisers` to the specific prior reviews or benchmarks that would most raise your confidence if you had them.

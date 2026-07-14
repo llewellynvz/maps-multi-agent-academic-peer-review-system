@@ -38,5 +38,9 @@
       "leanestFix": "Provide a resolvable DOI or replace the reference with a verifiable source.",
       "supersedes": null
     }
-  ]
+  ],
+  "selfCritique": {
+    "strongestObjection": "The possible-fabrication signal depends on three backends that can lag on very recent or regional publications, so a real reference could read as unlocated.",
+    "confidenceRaisers": ["A direct publisher or DOI lookup for reference 17, and a wider sample than the first twenty references."]
+  }
 }
