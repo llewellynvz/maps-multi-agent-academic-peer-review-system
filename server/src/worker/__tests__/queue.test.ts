@@ -265,9 +265,14 @@ describe('retry_phase recovery semantics', () => {
     insertFinding(id, 'REV-STAT-0001', null);
     insertFinding(id, 'REV-STAT-0002', 'REV-STAT-0001');
     insertFinding(id, 'REV-MEAS-0001', null);
+    insertFinding(id, 'REV-CAUS-0001', null);
+    insertFinding(id, 'REV-CAUS-0002', 'REV-CAUS-0001');
     client.sqlite
       .prepare('INSERT INTO merge_markers (id, review_id, marker, merged_ids_json, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(randomUUID(), id, 'p7-respecialist-MEAS', JSON.stringify(['REV-MEAS-0001']), new Date().toISOString());
+    client.sqlite
+      .prepare('INSERT INTO merge_markers (id, review_id, marker, merged_ids_json, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(randomUUID(), id, 'p7-respecialist-CAUS', JSON.stringify(['REV-CAUS-0001', 'REV-CAUS-0002']), new Date().toISOString());
     client.sqlite
       .prepare('INSERT INTO merge_markers (id, review_id, marker, created_at) VALUES (?, ?, ?, ?)')
       .run(randomUUID(), id, 'p3-STAT-first', new Date().toISOString());

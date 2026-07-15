@@ -155,6 +155,18 @@ describe('activity log stream confidentiality (H2c)', () => {
 });
 
 describe('editor-only masking (API-25, UI-33)', () => {
+  it('excludes editor-only findings from the lens status counts', () => {
+    insertReview('rev-lens-mask');
+    insertFinding('REV-STAT-0001', 'rev-lens-mask', 'author_facing', 'The sample size is underpowered.', 'moderate');
+    insertFinding('REV-SIM-0001', 'rev-lens-mask', 'editor_only', 'Overlap with an unpublished thesis.', 'major');
+    const ephemeral = deriveEphemeral(client.db, 'rev-lens-mask');
+    const lenses = ephemeral
+      .filter((event) => event.event === 'lens_status')
+      .map((event) => (event.data as { lens: string }).lens);
+    expect(lenses).toContain('STAT');
+    expect(lenses).not.toContain('SIM');
+  });
+
   it('never puts editor-only finding text into the finding_headline stream', () => {
     insertReview('rev-3');
     insertFinding('REV-STAT-0001', 'rev-3', 'author_facing', 'The sample size is underpowered.', 'moderate');

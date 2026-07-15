@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CROSSREF_HOST, OPENALEX_HOST } from '../allowlist';
+import { createRateLimiter } from '../rate-limiter';
 import { reconstructAbstract, searchTopics } from '../topic-search';
 import type { FetchLike, HttpResponse } from '../types';
 
@@ -158,6 +159,22 @@ describe('searchTopics', () => {
     await searchTopics(['one', 'two'], fetchImpl, { maxQueries: 5, rateLimiter: limiter });
     expect(acquired.filter((host) => host === OPENALEX_HOST)).toHaveLength(2);
     expect(acquired.filter((host) => host === CROSSREF_HOST)).toHaveLength(2);
+  });
+
+  it('waits out the minimum interval on the second same-host request', async () => {
+    let clock = 0;
+    const waits: number[] = [];
+    const limiter = createRateLimiter({
+      minIntervalMs: 1000,
+      now: () => clock,
+      sleep: async (ms) => {
+        waits.push(ms);
+        clock += ms;
+      },
+    });
+    const { fetchImpl } = routedFetch(openAlexBody([]), crossrefBody([]));
+    await searchTopics(['one', 'two'], fetchImpl, { maxQueries: 5, rateLimiter: limiter });
+    expect(waits.filter((ms) => ms >= 1000).length).toBeGreaterThanOrEqual(1);
   });
 
   it('enforces the maxQueries cap and runs only the supplied fetch', async () => {

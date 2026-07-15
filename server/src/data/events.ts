@@ -169,6 +169,9 @@ export function deriveEphemeral(db: MaraDatabase, reviewId: string): EphemeralEv
   const findings = getCurrentFindings(db, reviewId);
   const byLens = new Map<string, number>();
   for (const finding of findings) {
+    if (finding.scope === 'editor_only') {
+      continue;
+    }
     const lens = finding.id.split('-')[1] ?? 'GEN';
     byLens.set(lens, (byLens.get(lens) ?? 0) + 1);
   }

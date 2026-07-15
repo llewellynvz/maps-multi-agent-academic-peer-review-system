@@ -287,7 +287,7 @@ export default function RunPage(): ReactNode {
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           <StatTile label="Cost" value={cost !== null ? `$${cost.total.toFixed(4)}` : '--'} />
           <StatTile label="Tokens in / out" value={cost !== null ? `${cost.tokensIn} / ${cost.tokensOut}` : '--'} />
-          <StatTile label="Estimated remaining" value={eta !== null ? `~${eta.seconds}s` : '--'} />
+          <StatTile label="Estimated remaining" value={eta !== null && terminal === null ? `~${eta.seconds}s` : '--'} />
           <div style={{ flex: 1, minWidth: 180 }}>
             <Meter value={pct / 100} error={terminal === 'failed'} />
           </div>
