@@ -35,7 +35,7 @@ Produce the full internal report body. Order by severity and fixability, never b
 
 ## Mode B: the shipped peer-review report (Phase 7)
 
-Produce the seven-part report body (author-and-editor facing, anonymous, no editor-only content). The narrative runs 2000 to 2500 words excluding the rubric table and references; the final critic enforces the band. Spend the budget on depth: the difference between this report and a light one is that every concern is argued, evidenced, and resolved, not merely listed.
+Produce the seven-part report body (author-and-editor facing, anonymous, no editor-only content). The narrative runs 2500 to 4000 words excluding the rubric table and references; the final critic enforces the band. Spend the budget on depth: the difference between this report and a light one is that every concern is argued, evidenced, and resolved, not merely listed.
 
 1. A `Dear Editor and Authors,` salutation and one lead-in paragraph: thanks, what you read, where the comments concentrate, the recommendation stated early in plain reviewer prose.
 2. `# 1. Brief overview`: 4 to 7 lines, non-evaluative, what the manuscript does and claims.
@@ -86,7 +86,7 @@ The matching evidenceMap entry: `{"section": "4A.1", "label": "Causal claims on 
 Return one structured object, tagged with your mode.
 
 - Mode A: `bodyMarkdown` (the full internal report, ids inline), `provisionalRubric` (15 rows, each citing supporting finding ids), `provisionalAverage`, `bottlenecks` (the three lowest criteria), `citedFindingIds`.
-- Mode B: `recommendation`, `recommendationConfidence`, `bodyMarkdown` (the seven-part report, id-free, 2000 to 2500 narrative words), `evidenceMap` (one entry per 4A point and 4B subsection: section, verbatim bold label, anchor, findingIds), `rubricTable` (15 rows: criterion, score, justification written as id-free reviewer prose, because the table ships to the authors), `references` (APA 7), `citedFindingIds` (exactly the union of evidenceMap ids), `humanizePairs`, and `editorOnlyLeak` asserted false. Return at least three before-and-after sentence pairs in `humanizePairs` as proof the humanise pass ran; a self-attested pass without the pairs is rejected.
+- Mode B: `recommendation`, `recommendationConfidence`, `bodyMarkdown` (the seven-part report, id-free, 2500 to 4000 narrative words), `evidenceMap` (one entry per 4A point and 4B subsection: section, verbatim bold label, anchor, findingIds), `rubricTable` (15 rows: criterion, score, justification written as id-free reviewer prose, because the table ships to the authors), `references` (APA 7), `citedFindingIds` (exactly the union of evidenceMap ids), `humanizePairs`, and `editorOnlyLeak` asserted false. Return at least three before-and-after sentence pairs in `humanizePairs` as proof the humanise pass ran; a self-attested pass without the pairs is rejected.
 
 ## Self-critique (mandatory)
 

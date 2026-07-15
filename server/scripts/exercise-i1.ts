@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixturesDir, repoRoot } from '../src/paths';
 import { artefactExists, readArtefact } from '../src/engine/artefacts';
-import { scanMachineTokens } from '../src/engine/grounding';
+import { labelAppearsInBody, scanMachineTokens } from '../src/engine/grounding';
 
 const BASE = `http://127.0.0.1:${process.env.MARA_PORT ?? '3500'}`;
 const PRESET = process.env.I1_PRESET ?? 'balanced';
@@ -158,14 +158,18 @@ async function watchAndVerify(reviewId: string): Promise<void> {
   check('idFreeProse', inlineIds.length === 0, inlineIds.length === 0 ? 'zero REV tokens' : inlineIds.slice(0, 5).join(','));
   const tokens = scanMachineTokens(body);
   check('machineTokens', tokens.length === 0, tokens.length === 0 ? 'clean' : tokens.slice(0, 5).join(';'));
-  const words = body.split(/\s+/).filter(Boolean).length;
-  check('wordBudget', words >= 1600 && words <= 4200, `${words} words total doc (2000-2500 narrative band, critic-enforced)`);
+  const narrative = body
+    .replace(/# 5\. Rubric scores[\s\S]*?(?=# 6\.)/, '')
+    .replace(/# References[\s\S]*/, '')
+    .replace(/\|[^\n]*\|/g, '');
+  const words = narrative.split(/\s+/).filter(Boolean).length;
+  check('wordBudget', words >= 2000 && words <= 4400, `${words} narrative words (band 2500-4000, critic-enforced)`);
   check('fourA', body.includes('4A'), body.includes('4A') ? '4A present' : 'missing 4A');
   check('fourB', body.includes('4B'), body.includes('4B') ? '4B present' : 'missing 4B');
   check('discussion', /###?\s*.*Discussion/i.test(body), 'Discussion subsection');
   check('evidenceMap', shipped.evidenceMap.length >= 5, `${shipped.evidenceMap.length} entries`);
-  const labelsOk = shipped.evidenceMap.every((e) => body.includes(`**${e.label}`));
-  check('mapLabels', labelsOk, labelsOk ? 'every label bold in body' : 'label missing from body');
+  const labelsOk = shipped.evidenceMap.every((e) => labelAppearsInBody(body, e.label));
+  check('mapLabels', labelsOk, labelsOk ? 'every label present as bold or heading' : 'label missing from body');
   check('humanizePairs', shipped.humanizePairs.length >= 3, `${shipped.humanizePairs.length} pairs`);
   check('references', shipped.references.length > 0, `${shipped.references.length} references`);
 

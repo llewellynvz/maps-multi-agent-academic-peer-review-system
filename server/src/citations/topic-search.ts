@@ -5,10 +5,13 @@ export interface TopicSearchItem {
   title: string;
   year: number | null;
   doi: string | null;
+  authors?: string[];
   venue?: string;
   citedByCount?: number;
   abstract?: string;
 }
+
+const AUTHOR_CAP = 3;
 
 export interface TopicSearchResult {
   query: string;
@@ -88,6 +91,13 @@ function openAlexItem(work: Record<string, unknown>): TopicSearchItem | undefine
   if (citedBy !== undefined) {
     item.citedByCount = citedBy;
   }
+  const authors = asArray(work.authorships)
+    .map((entry) => asString(asRecord(asRecord(entry)?.author)?.display_name))
+    .filter((name): name is string => name !== undefined)
+    .slice(0, AUTHOR_CAP);
+  if (authors.length > 0) {
+    item.authors = authors;
+  }
   const abstract = reconstructAbstract(work.abstract_inverted_index);
   if (abstract !== undefined) {
     item.abstract = abstract;
@@ -121,6 +131,18 @@ function crossrefItem(item: Record<string, unknown>): TopicSearchItem | undefine
   if (venue !== undefined) {
     result.venue = venue;
   }
+  const authors = asArray(item.author)
+    .map((entry) => {
+      const record = asRecord(entry);
+      const family = asString(record?.family);
+      const given = asString(record?.given);
+      return family !== undefined ? [given, family].filter(Boolean).join(' ') : undefined;
+    })
+    .filter((name): name is string => name !== undefined)
+    .slice(0, AUTHOR_CAP);
+  if (authors.length > 0) {
+    result.authors = authors;
+  }
   return result;
 }
 
@@ -153,7 +175,7 @@ async function searchOpenAlex(query: string, fetchImpl: FetchLike, keep: number)
     url.searchParams.set('per-page', '5');
     url.searchParams.set(
       'select',
-      'id,title,display_name,publication_year,doi,abstract_inverted_index,cited_by_count',
+      'id,title,display_name,publication_year,doi,abstract_inverted_index,cited_by_count,authorships',
     );
     const results = asArray(asRecord(await readJson(fetchImpl, url.toString()))?.results);
     return collect(results, openAlexItem, keep);
