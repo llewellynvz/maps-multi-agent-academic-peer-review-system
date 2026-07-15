@@ -1,0 +1,24 @@
+{
+  "verdict": "redispatch",
+  "defects": [
+    {
+      "kind": "missing-coverage",
+      "severity": "material",
+      "description": "The statistical lens returned nothing on the reported mean that sits above the response-scale ceiling, though the Results table plainly offers it.",
+      "redispatchTarget": "REV-STAT",
+      "fixInstruction": "Re-run the statistical lens on the Results table mean and, if it exceeds the scale ceiling, supersede REV-STAT-0001 with a finding anchored to Table 2."
+    },
+    {
+      "kind": "generic-feedback",
+      "severity": "note",
+      "description": "One methods finding restates a boilerplate call for more sampling detail without naming the manuscript's actual sampling frame.",
+      "redispatchTarget": null,
+      "fixInstruction": "Name the specific under-reported sampling detail in the Methods section rather than a generic request for more detail."
+    }
+  ],
+  "strongestGap": "The statistical lens never tested the out-of-range mean in the Results table, so the most consequential validity threat is unexamined.",
+  "selfCritique": {
+    "strongestObjection": "The out-of-range value may be a typographical slip rather than a data problem, which would make the re-dispatch low value.",
+    "confidenceRaisers": ["A direct read of the Results table against the stated response-scale bounds."]
+  }
+}

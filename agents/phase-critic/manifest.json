@@ -1,0 +1,7 @@
+{
+  "name": "phase-critic",
+  "promptVersion": "1.0.0",
+  "phase": [1, 2, 3, 4, 5, 6],
+  "role": "cheap",
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md"]
+}

@@ -28,6 +28,7 @@ import {
 } from './context';
 import { selectActiveLenses, selectChallengeLenses, swarmProfile } from './lenses';
 import { runAgent } from './dispatch-agent';
+import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
 import { upsertRubricScore } from './rubric';
 import type { EngineDeps } from './phases-shared';
 
@@ -112,6 +113,10 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
         activeLensCount: analystB.activationMap.filter((entry) => entry.active).length,
       },
     });
+    await runPhaseCritique(deps, reviewId, 'phase_1', [
+      { label: 'Manuscript analyst mode A output', content: JSON.stringify(analystA) },
+      { label: 'Manuscript analyst mode B output', content: JSON.stringify(analystB) },
+    ]);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_1'),
@@ -358,6 +363,14 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
       phase: 'phase_2',
       payload: { referencesChecked: clientVerdicts.length, comparators: scout.comparators.length },
     });
+    const phase2Critique: PhaseCritiqueInput[] = [
+      { label: 'Field context dossier', content: JSON.stringify(scout) },
+      { label: 'Citation audit', content: JSON.stringify({ ...citation, verifications: reconciled }) },
+    ];
+    if (scoutPlan !== null) {
+      phase2Critique.push({ label: 'Topic search results', content: JSON.stringify(topicResultsPayload) });
+    }
+    await runPhaseCritique(deps, reviewId, 'phase_2', phase2Critique);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_2'),
@@ -507,6 +520,26 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
         dissentPreserved: dissentPreserved.length,
       },
     });
+    const phase3Findings = getCurrentFindings(db, reviewId).filter((finding) =>
+      activePrefixes.has(finding.id.split('-')[1] ?? ''),
+    );
+    await runPhaseCritique(deps, reviewId, 'phase_3', [
+      {
+        label: 'Merged specialist findings',
+        content: JSON.stringify(
+          phase3Findings.map((finding) => ({
+            id: finding.id,
+            lens: finding.type,
+            claim: finding.claim,
+            anchor: finding.manuscriptAnchor,
+            severity: finding.severity,
+            scope: finding.scope,
+            confidence: finding.confidence,
+          })),
+        ),
+      },
+      { label: 'Specialist activation map', content: JSON.stringify(analystB.activationMap) },
+    ]);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_3'),
@@ -611,6 +644,19 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
       phase: 'phase_4',
       payload: { clusters: INTEGRITY_CLUSTERS.map((cluster) => cluster.name) },
     });
+    await runPhaseCritique(deps, reviewId, 'phase_4', [
+      {
+        label: 'Integrity cluster outputs',
+        content: JSON.stringify(
+          results.map((entry) => ({
+            cluster: entry.cluster.name,
+            selfCritique: entry.result.selfCritique,
+            checks: entry.result.checks,
+            findings: entry.result.findings,
+          })),
+        ),
+      },
+    ]);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_4'),
@@ -688,6 +734,9 @@ export async function runPhase5(deps: EngineDeps, reviewId: string): Promise<voi
         herdingRisk: swarm.herdingRisk,
       },
     });
+    await runPhaseCritique(deps, reviewId, 'phase_5', [
+      { label: 'Swarm evaluation summary', content: JSON.stringify(swarm) },
+    ]);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_5'),
@@ -788,6 +837,9 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
       phase: 'phase_6',
       payload: { provisionalAverage: report.provisionalAverage, composite: composite.composite },
     });
+    await runPhaseCritique(deps, reviewId, 'phase_6', [
+      { label: 'Full internal report', content: report.bodyMarkdown },
+    ]);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_6'),

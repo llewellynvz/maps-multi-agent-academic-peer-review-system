@@ -126,6 +126,10 @@ function harness(planQueries: Array<{ query: string; purpose: string }>, egress:
       order.push('citation');
       return successResult(citationObject());
     }
+    if (input.agent === 'phase-critic') {
+      order.push('phase-critic');
+      return successResult({ verdict: 'clean', defects: [], strongestGap: 'No material gap in the phase 2 outputs.', selfCritique });
+    }
     throw new Error(`unexpected agent ${input.agent}`);
   };
   return { deps: { db, runDispatch, ...(egress !== undefined ? { egress } : {}) }, order };

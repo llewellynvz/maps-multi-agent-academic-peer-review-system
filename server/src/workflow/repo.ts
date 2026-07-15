@@ -16,6 +16,7 @@ export type EventKind =
   | 'deliverable_released'
   | 'finding_recorded'
   | 'run_terminal'
+  | 'phase_critique'
   | 'error';
 
 export interface ManuscriptRow {

@@ -15,6 +15,13 @@
       "when": 1783889733675,
       "tag": "0001_append_only_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784025600000,
+      "tag": "0002_phase_critique_event",
+      "breakpoints": true
     }
   ]
 }

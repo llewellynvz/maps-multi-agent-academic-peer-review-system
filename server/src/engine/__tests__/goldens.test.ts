@@ -11,6 +11,7 @@ import type {
   JournalScopeScorerOutput,
   ManuscriptSanitizerOutput,
   ManuscriptStructure,
+  PhaseCriticOutput,
   QualityMetricsEngineOutput,
   ReviewCalibratorOutput,
   ReviewFinalCriticOutput,
@@ -226,6 +227,19 @@ const bindings: GoldenBinding[] = [
       expect(value.verdict).toBe('revise-specialist');
       expect(value.lens).not.toBeNull();
       expect(value.findingIdToSupersede).toBe('REV-STAT-0001');
+    },
+  },
+  {
+    label: 'phase critic flags a material coverage gap and routes a re-dispatch',
+    agent: 'phase-critic',
+    file: 'phase-critic.json',
+    assert: (output) => {
+      const value = output as PhaseCriticOutput;
+      expect(value.verdict).toBe('redispatch');
+      expect(value.defects.some((defect) => defect.severity === 'material' && defect.redispatchTarget !== null)).toBe(
+        true,
+      );
+      expect(value.strongestGap.length).toBeGreaterThan(0);
     },
   },
   {

@@ -24,6 +24,7 @@ export * from './agents/swarm';
 export * from './agents/review-report-writer';
 export * from './agents/review-meta-reviewer';
 export * from './agents/review-final-critic';
+export * from './agents/phase-critic';
 export * from './agents/journal-scope-scorer';
 export * from './agents/quality-metrics-engine';
 export * from './agents/review-calibrator';

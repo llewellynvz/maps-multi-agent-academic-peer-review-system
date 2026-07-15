@@ -164,7 +164,7 @@ export const reviewEvents = sqliteTable(
   (t) => [
     check(
       'review_events_kind_check',
-      sql`${t.kind} in ('phase_transition','gate_verdict','arbitration','web_query','control_ack','deliverable_released','finding_recorded','run_terminal','error')`,
+      sql`${t.kind} in ('phase_transition','gate_verdict','arbitration','web_query','control_ack','deliverable_released','finding_recorded','run_terminal','phase_critique','error')`,
     ),
     check('review_events_egress_target_check', sql`${t.egressTarget} in ('crossref','openalex','semantic_scholar')`),
     uniqueIndex('idx_events_review_seq').on(t.reviewId, t.seq),

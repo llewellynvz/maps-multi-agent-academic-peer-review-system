@@ -12,6 +12,7 @@ const STREAMED_KINDS_LIST = [
   'run_terminal',
   'web_query',
   'arbitration',
+  'phase_critique',
   'error',
 ] as const;
 const STREAMED_KINDS = new Set<string>(STREAMED_KINDS_LIST);
@@ -59,6 +60,14 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
         seq: row.seq,
         event: 'log_event',
         data: { ts: row.ts, kind: 'arbitration', message: `Gate arbitration: ${outcome}` },
+      };
+    }
+    case 'phase_critique': {
+      const headline = (payload as { headline?: string }).headline ?? 'Phase critic reviewed the phase outputs';
+      return {
+        seq: row.seq,
+        event: 'log_event',
+        data: { ts: row.ts, kind: 'phase_critique', message: truncate(headline, 160) },
       };
     }
     case 'error': {
