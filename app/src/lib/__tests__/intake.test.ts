@@ -37,12 +37,12 @@ const TODAY: Question[] = [
 
 const ENRICHED: Question[] = [
   ...TODAY,
-  question({ id: 'reviewTitle', kind: 'text', detectedValue: 'On flourishing', default: '' }),
-  question({ id: 'paperType', kind: 'choice', options: ['empirical', 'theoretical', 'case-study'], detectedValue: 'empirical', default: 'empirical' }),
-  question({ id: 'referenceAudit', kind: 'choice', options: ['standard', 'forensic'], detectedValue: 'standard', default: 'standard' }),
-  question({ id: 'claimCheck', kind: 'choice', options: ['no', 'yes'], detectedValue: 'no', default: 'no' }),
-  question({ id: 'aiDetection', kind: 'choice', options: ['yes', 'no'], detectedValue: 'yes', default: 'yes' }),
-  question({ id: 'userPrior', kind: 'choice', options: ['none', 'accept', 'minor-revision'], detectedValue: 'none', default: 'none' }),
+  question({ id: 'review-title', kind: 'text', detectedValue: 'On flourishing', default: '' }),
+  question({ id: 'paper-type', kind: 'choice', options: ['empirical', 'theoretical', 'case-study'], detectedValue: 'empirical', default: 'empirical' }),
+  question({ id: 'reference-audit', kind: 'choice', options: ['standard', 'forensic'], detectedValue: 'standard', default: 'standard' }),
+  question({ id: 'claim-check', kind: 'choice', options: ['no', 'yes'], detectedValue: 'no', default: 'no' }),
+  question({ id: 'ai-detection', kind: 'choice', options: ['yes', 'no'], detectedValue: 'yes', default: 'yes' }),
+  question({ id: 'user-prior', kind: 'choice', options: ['none', 'accept', 'minor-revision'], detectedValue: 'none', default: 'none' }),
 ];
 
 describe('resolveIntake', () => {
@@ -64,12 +64,12 @@ describe('resolveIntake', () => {
   it('surfaces every new control on the enriched payload', () => {
     const layout = resolveIntake(response(ENRICHED));
     expect(layout.metadataQuestions.map((q) => q.id)).toEqual(['field-confirm', 'title']);
-    expect(layout.reviewTitle?.id).toBe('reviewTitle');
-    expect(layout.paperType?.id).toBe('paperType');
-    expect(layout.referenceAudit?.id).toBe('referenceAudit');
-    expect(layout.claimCheck?.id).toBe('claimCheck');
-    expect(layout.aiDetection?.id).toBe('aiDetection');
-    expect(layout.userPrior?.id).toBe('userPrior');
+    expect(layout.reviewTitle?.id).toBe('review-title');
+    expect(layout.paperType?.id).toBe('paper-type');
+    expect(layout.referenceAudit?.id).toBe('reference-audit');
+    expect(layout.claimCheck?.id).toBe('claim-check');
+    expect(layout.aiDetection?.id).toBe('ai-detection');
+    expect(layout.userPrior?.id).toBe('user-prior');
     expect(layout.showVerification).toBe(true);
     expect(layout.showAssessment).toBe(true);
   });
@@ -82,7 +82,7 @@ describe('resolveIntake', () => {
 
   it('shows verification when only one of its checks is present', () => {
     const layout = resolveIntake(response([
-      question({ id: 'aiDetection', kind: 'choice', options: ['yes', 'no'], default: 'yes' }),
+      question({ id: 'ai-detection', kind: 'choice', options: ['yes', 'no'], default: 'yes' }),
     ]));
     expect(layout.showVerification).toBe(true);
     expect(layout.referenceAudit).toBeNull();
@@ -120,40 +120,40 @@ describe('buildAnswersPayload', () => {
   it('records the detected or default value for every new id even when untouched', () => {
     const payload = buildAnswersPayload(ENRICHED, untouched);
     const byId = new Map(payload.map((entry) => [entry.questionId, entry.value]));
-    expect(byId.get('aiDetection')).toBe('yes');
-    expect(byId.get('referenceAudit')).toBe('standard');
-    expect(byId.get('claimCheck')).toBe('no');
-    expect(byId.get('userPrior')).toBe('none');
-    expect(byId.get('paperType')).toBe('empirical');
-    expect(byId.get('reviewTitle')).toBe('On flourishing');
+    expect(byId.get('ai-detection')).toBe('yes');
+    expect(byId.get('reference-audit')).toBe('standard');
+    expect(byId.get('claim-check')).toBe('no');
+    expect(byId.get('user-prior')).toBe('none');
+    expect(byId.get('paper-type')).toBe('empirical');
+    expect(byId.get('review-title')).toBe('On flourishing');
   });
 
   it('posts the toggled verification values over their defaults', () => {
     const payload = buildAnswersPayload(ENRICHED, {
       ...untouched,
-      answers: { referenceAudit: 'forensic', aiDetection: 'no', claimCheck: 'yes' },
+      answers: { 'reference-audit': 'forensic', 'ai-detection': 'no', 'claim-check': 'yes' },
     });
     const byId = new Map(payload.map((entry) => [entry.questionId, entry.value]));
-    expect(byId.get('referenceAudit')).toBe('forensic');
-    expect(byId.get('aiDetection')).toBe('no');
-    expect(byId.get('claimCheck')).toBe('yes');
+    expect(byId.get('reference-audit')).toBe('forensic');
+    expect(byId.get('ai-detection')).toBe('no');
+    expect(byId.get('claim-check')).toBe('yes');
   });
 
   it('drops a new id whose resolved value is empty', () => {
     const payload = buildAnswersPayload(
-      [question({ id: 'reviewTitle', kind: 'text', default: '' })],
+      [question({ id: 'review-title', kind: 'text', default: '' })],
       untouched,
     );
-    expect(payload.some((entry) => entry.questionId === 'reviewTitle')).toBe(false);
+    expect(payload.some((entry) => entry.questionId === 'review-title')).toBe(false);
   });
 });
 
 describe('resolveAnswer', () => {
   it('resolves the answer, then the detected value, then the default', () => {
-    const q = question({ id: 'referenceAudit', detectedValue: 'forensic', default: 'standard' });
-    expect(resolveAnswer(q, { referenceAudit: 'standard' })).toBe('standard');
+    const q = question({ id: 'reference-audit', detectedValue: 'forensic', default: 'standard' });
+    expect(resolveAnswer(q, { 'reference-audit': 'standard' })).toBe('standard');
     expect(resolveAnswer(q, {})).toBe('forensic');
-    expect(resolveAnswer(question({ id: 'referenceAudit', default: 'standard' }), {})).toBe('standard');
+    expect(resolveAnswer(question({ id: 'reference-audit', default: 'standard' }), {})).toBe('standard');
   });
 });
 

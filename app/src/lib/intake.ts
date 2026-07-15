@@ -3,23 +3,23 @@ import type { EvidenceData, Question, QuestionsResponse } from './api';
 export const INTAKE_SPECIAL_IDS = [
   'preset',
   'journal',
-  'reviewTitle',
-  'paperType',
-  'referenceAudit',
-  'claimCheck',
-  'aiDetection',
-  'userPrior',
+  'review-title',
+  'paper-type',
+  'reference-audit',
+  'claim-check',
+  'ai-detection',
+  'user-prior',
 ] as const;
 
 const SPECIAL = new Set<string>(INTAKE_SPECIAL_IDS);
 
 export const NEW_INTAKE_IDS = new Set<string>([
-  'reviewTitle',
-  'paperType',
-  'referenceAudit',
-  'claimCheck',
-  'aiDetection',
-  'userPrior',
+  'review-title',
+  'paper-type',
+  'reference-audit',
+  'claim-check',
+  'ai-detection',
+  'user-prior',
 ]);
 
 export interface IntakeLayout {
@@ -42,16 +42,16 @@ function findQuestion(questions: Question[], id: string): Question | null {
 
 export function resolveIntake(response: QuestionsResponse): IntakeLayout {
   const questions = response.questions;
-  const referenceAudit = findQuestion(questions, 'referenceAudit');
-  const claimCheck = findQuestion(questions, 'claimCheck');
-  const aiDetection = findQuestion(questions, 'aiDetection');
-  const userPrior = findQuestion(questions, 'userPrior');
+  const referenceAudit = findQuestion(questions, 'reference-audit');
+  const claimCheck = findQuestion(questions, 'claim-check');
+  const aiDetection = findQuestion(questions, 'ai-detection');
+  const userPrior = findQuestion(questions, 'user-prior');
   return {
     metadataQuestions: questions.filter((question) => !SPECIAL.has(question.id)),
-    reviewTitle: findQuestion(questions, 'reviewTitle'),
+    reviewTitle: findQuestion(questions, 'review-title'),
     preset: findQuestion(questions, 'preset'),
     journal: findQuestion(questions, 'journal'),
-    paperType: findQuestion(questions, 'paperType'),
+    paperType: findQuestion(questions, 'paper-type'),
     referenceAudit,
     claimCheck,
     aiDetection,
@@ -108,7 +108,7 @@ export function humanizeOption(value: string): string {
 }
 
 export function detectedTitle(response: QuestionsResponse): string | null {
-  for (const id of ['reviewTitle', 'title']) {
+  for (const id of ['review-title', 'title']) {
     const question = response.questions.find((candidate) => candidate.id === id);
     if (question?.detectedValue !== undefined && question.detectedValue.length > 0) {
       return question.detectedValue;
