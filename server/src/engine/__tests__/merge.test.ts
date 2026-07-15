@@ -7,6 +7,7 @@ import { createDb, type MaraDatabase, type SqliteConnection } from '../../db/cli
 import { runMigrations } from '../../db/migrate';
 import { getCurrentFindings } from '../../ledger';
 import { blobDir } from '../../paths';
+import { artefactExists, writeArtefact } from '../artefacts';
 import { mergeFindingsOnce } from '../merge';
 
 let tempDir: string;
@@ -85,6 +86,57 @@ describe('idempotent ledger merge on phase re-entry', () => {
       fragments: [finding({ claim: 'A challenge-round update.' })],
       marker: 'p3-STAT-challenge',
     });
+    expect(getCurrentFindings(db, reviewId)).toHaveLength(2);
+  });
+
+  it('records the marker in the database inside the merge transaction, not the filesystem', () => {
+    mergeFindingsOnce(db, {
+      reviewId,
+      lensPrefix: 'STAT',
+      phase: 'phase_3',
+      agent: 'specialist-reviewer',
+      fragments: [finding()],
+      marker: 'p3-STAT-first',
+    });
+    const rows = sqlite
+      .prepare('SELECT marker, merged_ids_json FROM merge_markers WHERE review_id = ?')
+      .all(reviewId) as Array<{ marker: string; merged_ids_json: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.marker).toBe('p3-STAT-first');
+    expect(JSON.parse(rows[0]!.merged_ids_json)).toEqual(['REV-STAT-0001']);
+    expect(artefactExists(reviewId, 'merge-p3-STAT-first')).toBe(false);
+  });
+
+  it('honours a legacy filesystem marker from a pre-migration review', () => {
+    writeArtefact(reviewId, 'merge-p3-STAT-legacy', { mergedIds: ['REV-STAT-0001'] });
+    const merged = mergeFindingsOnce(db, {
+      reviewId,
+      lensPrefix: 'STAT',
+      phase: 'phase_3',
+      agent: 'specialist-reviewer',
+      fragments: [finding()],
+      marker: 'p3-STAT-legacy',
+    });
+    expect(merged).toEqual([]);
+    expect(getCurrentFindings(db, reviewId)).toHaveLength(0);
+  });
+
+  it('re-merges after a gate-retry deletes the marker row', () => {
+    const input = {
+      reviewId,
+      lensPrefix: 'STAT',
+      phase: 'phase_7',
+      agent: 'specialist-reviewer',
+      fragments: [finding()],
+      marker: 'p7-respecialist-STAT',
+    };
+    mergeFindingsOnce(db, input);
+    sqlite.prepare("DELETE FROM merge_markers WHERE review_id = ? AND marker LIKE 'p7-%'").run(reviewId);
+    const again = mergeFindingsOnce(db, {
+      ...input,
+      fragments: [finding({ claim: 'A corrected concern from the retried specialist.' })],
+    });
+    expect(again).toEqual(['REV-STAT-0002']);
     expect(getCurrentFindings(db, reviewId)).toHaveLength(2);
   });
 });

@@ -1,0 +1,1445 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "6289889f-8a5e-4b22-afca-2cecc26d3bdf",
+  "prevId": "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
+  "tables": {
+    "deliverables": {
+      "name": "deliverables",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "format": {
+          "name": "format",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "path": {
+          "name": "path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "checksum": {
+          "name": "checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "byte_size": {
+          "name": "byte_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "released": {
+          "name": "released",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "released_at": {
+          "name": "released_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_deliverables_review": {
+          "name": "idx_deliverables_review",
+          "columns": [
+            "review_id"
+          ],
+          "isUnique": false
+        },
+        "deliverables_review_kind_format_unique": {
+          "name": "deliverables_review_kind_format_unique",
+          "columns": [
+            "review_id",
+            "kind",
+            "format"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "deliverables_review_id_reviews_id_fk": {
+          "name": "deliverables_review_id_reviews_id_fk",
+          "tableFrom": "deliverables",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "deliverables_kind_check": {
+          "name": "deliverables_kind_check",
+          "value": "\"deliverables\".\"kind\" in ('peer_review_report','reviewer_private_notes','ledger_export','run_archive')"
+        },
+        "deliverables_format_check": {
+          "name": "deliverables_format_check",
+          "value": "\"deliverables\".\"format\" in ('docx','md','zip')"
+        },
+        "deliverables_checksum_length_check": {
+          "name": "deliverables_checksum_length_check",
+          "value": "length(\"deliverables\".\"checksum\") = 64"
+        }
+      }
+    },
+    "dispatches": {
+      "name": "dispatches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phase": {
+          "name": "phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "agent": {
+          "name": "agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prompt_version": {
+          "name": "prompt_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tokens_in": {
+          "name": "tokens_in",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "tokens_out": {
+          "name": "tokens_out",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "tokens_cached": {
+          "name": "tokens_cached",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "latency_ms": {
+          "name": "latency_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cost_usd": {
+          "name": "cost_usd",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "retries": {
+          "name": "retries",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "error_class": {
+          "name": "error_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "langfuse_trace_id": {
+          "name": "langfuse_trace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_dispatches_review_phase": {
+          "name": "idx_dispatches_review_phase",
+          "columns": [
+            "review_id",
+            "phase"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "dispatches_review_id_reviews_id_fk": {
+          "name": "dispatches_review_id_reviews_id_fk",
+          "tableFrom": "dispatches",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "dispatches_provider_check": {
+          "name": "dispatches_provider_check",
+          "value": "\"dispatches\".\"provider\" in ('anthropic','openai','google','local','azure')"
+        },
+        "dispatches_status_check": {
+          "name": "dispatches_status_check",
+          "value": "\"dispatches\".\"status\" in ('success','error')"
+        }
+      }
+    },
+    "findings": {
+      "name": "findings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "agent": {
+          "name": "agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phase": {
+          "name": "phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "claim": {
+          "name": "claim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "manuscript_anchor": {
+          "name": "manuscript_anchor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "epistemic_status": {
+          "name": "epistemic_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confidence_band": {
+          "name": "confidence_band",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fixability": {
+          "name": "fixability",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "narrative_context": {
+          "name": "narrative_context",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recommended_action": {
+          "name": "recommended_action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "supersedes_id": {
+          "name": "supersedes_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_findings_review": {
+          "name": "idx_findings_review",
+          "columns": [
+            "review_id"
+          ],
+          "isUnique": false
+        },
+        "idx_findings_review_phase": {
+          "name": "idx_findings_review_phase",
+          "columns": [
+            "review_id",
+            "phase"
+          ],
+          "isUnique": false
+        },
+        "idx_findings_supersedes": {
+          "name": "idx_findings_supersedes",
+          "columns": [
+            "supersedes_id"
+          ],
+          "isUnique": false
+        },
+        "idx_findings_severity": {
+          "name": "idx_findings_severity",
+          "columns": [
+            "review_id",
+            "severity"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "findings_review_id_reviews_id_fk": {
+          "name": "findings_review_id_reviews_id_fk",
+          "tableFrom": "findings",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "findings_supersedes_id_findings_id_fk": {
+          "name": "findings_supersedes_id_findings_id_fk",
+          "tableFrom": "findings",
+          "tableTo": "findings",
+          "columnsFrom": [
+            "supersedes_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "findings_epistemic_status_check": {
+          "name": "findings_epistemic_status_check",
+          "value": "\"findings\".\"epistemic_status\" in ('Known','Inferred','Assumption')"
+        },
+        "findings_confidence_check": {
+          "name": "findings_confidence_check",
+          "value": "\"findings\".\"confidence\" >= 0 and \"findings\".\"confidence\" <= 1"
+        },
+        "findings_confidence_band_check": {
+          "name": "findings_confidence_band_check",
+          "value": "\"findings\".\"confidence_band\" in ('Green','Yellow','Red')"
+        },
+        "findings_severity_check": {
+          "name": "findings_severity_check",
+          "value": "\"findings\".\"severity\" in ('none','minor','moderate','major','fatal')"
+        },
+        "findings_fixability_check": {
+          "name": "findings_fixability_check",
+          "value": "\"findings\".\"fixability\" in ('easy','moderate','hard','not_fixable_from_current_study','unclear')"
+        },
+        "findings_scope_check": {
+          "name": "findings_scope_check",
+          "value": "\"findings\".\"scope\" in ('author_facing','editor_only','both')"
+        }
+      }
+    },
+    "manuscripts": {
+      "name": "manuscripts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_filename": {
+          "name": "original_filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "blob_path": {
+          "name": "blob_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "byte_size": {
+          "name": "byte_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sanitized_text": {
+          "name": "sanitized_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "tei_structure_path": {
+          "name": "tei_structure_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "quarantine_tier": {
+          "name": "quarantine_tier",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "quarantine_log_json": {
+          "name": "quarantine_log_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sanitized_at": {
+          "name": "sanitized_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_manuscripts_review": {
+          "name": "idx_manuscripts_review",
+          "columns": [
+            "review_id"
+          ],
+          "isUnique": false
+        },
+        "manuscripts_review_sha256_unique": {
+          "name": "manuscripts_review_sha256_unique",
+          "columns": [
+            "review_id",
+            "sha256"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "manuscripts_review_id_reviews_id_fk": {
+          "name": "manuscripts_review_id_reviews_id_fk",
+          "tableFrom": "manuscripts",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "manuscripts_quarantine_tier_check": {
+          "name": "manuscripts_quarantine_tier_check",
+          "value": "\"manuscripts\".\"quarantine_tier\" in (1,2,3)"
+        },
+        "manuscripts_sha256_length_check": {
+          "name": "manuscripts_sha256_length_check",
+          "value": "length(\"manuscripts\".\"sha256\") = 64"
+        }
+      }
+    },
+    "merge_markers": {
+      "name": "merge_markers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "marker": {
+          "name": "marker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "merged_ids_json": {
+          "name": "merged_ids_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "merge_markers_review_marker_unique": {
+          "name": "merge_markers_review_marker_unique",
+          "columns": [
+            "review_id",
+            "marker"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "merge_markers_review_id_reviews_id_fk": {
+          "name": "merge_markers_review_id_reviews_id_fk",
+          "tableFrom": "merge_markers",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "phase_checkpoints": {
+      "name": "phase_checkpoints",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phase": {
+          "name": "phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "gate_verdict": {
+          "name": "gate_verdict",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fix_cycle_count": {
+          "name": "fix_cycle_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "snapshot_json": {
+          "name": "snapshot_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_checkpoints_review": {
+          "name": "idx_checkpoints_review",
+          "columns": [
+            "review_id"
+          ],
+          "isUnique": false
+        },
+        "phase_checkpoints_review_phase_unique": {
+          "name": "phase_checkpoints_review_phase_unique",
+          "columns": [
+            "review_id",
+            "phase"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "phase_checkpoints_review_id_reviews_id_fk": {
+          "name": "phase_checkpoints_review_id_reviews_id_fk",
+          "tableFrom": "phase_checkpoints",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "phase_checkpoints_status_check": {
+          "name": "phase_checkpoints_status_check",
+          "value": "\"phase_checkpoints\".\"status\" in ('pending','in_progress','completed','failed','skipped')"
+        },
+        "phase_checkpoints_gate_verdict_check": {
+          "name": "phase_checkpoints_gate_verdict_check",
+          "value": "\"phase_checkpoints\".\"gate_verdict\" in ('pass','revise','revise_specialist','block','arbitrated')"
+        }
+      }
+    },
+    "provider_keys": {
+      "name": "provider_keys",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "iv": {
+          "name": "iv",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "auth_tag": {
+          "name": "auth_tag",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "wrapped_dek": {
+          "name": "wrapped_dek",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "dek_iv": {
+          "name": "dek_iv",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "dek_auth_tag": {
+          "name": "dek_auth_tag",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_url": {
+          "name": "base_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "provider_keys_provider_label_unique": {
+          "name": "provider_keys_provider_label_unique",
+          "columns": [
+            "provider",
+            "label"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "provider_keys_provider_check": {
+          "name": "provider_keys_provider_check",
+          "value": "\"provider_keys\".\"provider\" in ('anthropic','openai','google','local')"
+        },
+        "provider_keys_iv_length_check": {
+          "name": "provider_keys_iv_length_check",
+          "value": "length(\"provider_keys\".\"iv\") = 12"
+        },
+        "provider_keys_auth_tag_length_check": {
+          "name": "provider_keys_auth_tag_length_check",
+          "value": "length(\"provider_keys\".\"auth_tag\") = 16"
+        },
+        "provider_keys_dek_iv_length_check": {
+          "name": "provider_keys_dek_iv_length_check",
+          "value": "length(\"provider_keys\".\"dek_iv\") = 12"
+        },
+        "provider_keys_dek_auth_tag_length_check": {
+          "name": "provider_keys_dek_auth_tag_length_check",
+          "value": "length(\"provider_keys\".\"dek_auth_tag\") = 16"
+        }
+      }
+    },
+    "review_events": {
+      "name": "review_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seq": {
+          "name": "seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ts": {
+          "name": "ts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phase": {
+          "name": "phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payload_json": {
+          "name": "payload_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "egress_target": {
+          "name": "egress_target",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "egress_query": {
+          "name": "egress_query",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_events_review_seq": {
+          "name": "idx_events_review_seq",
+          "columns": [
+            "review_id",
+            "seq"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "review_events_review_id_reviews_id_fk": {
+          "name": "review_events_review_id_reviews_id_fk",
+          "tableFrom": "review_events",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "review_events_kind_check": {
+          "name": "review_events_kind_check",
+          "value": "\"review_events\".\"kind\" in ('phase_transition','gate_verdict','arbitration','web_query','control_ack','deliverable_released','finding_recorded','run_terminal','phase_critique','error')"
+        },
+        "review_events_egress_target_check": {
+          "name": "review_events_egress_target_check",
+          "value": "\"review_events\".\"egress_target\" in ('crossref','openalex','semantic_scholar')"
+        }
+      }
+    },
+    "reviews": {
+      "name": "reviews",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'created'"
+        },
+        "current_phase": {
+          "name": "current_phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recommendation": {
+          "name": "recommendation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recommendation_confidence": {
+          "name": "recommendation_confidence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "provider_profile": {
+          "name": "provider_profile",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'default'"
+        },
+        "options_json": {
+          "name": "options_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "error_class": {
+          "name": "error_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "reviews_slug_unique": {
+          "name": "reviews_slug_unique",
+          "columns": [
+            "slug"
+          ],
+          "isUnique": true
+        },
+        "idx_reviews_status": {
+          "name": "idx_reviews_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "idx_reviews_created_at": {
+          "name": "idx_reviews_created_at",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "reviews_status_check": {
+          "name": "reviews_status_check",
+          "value": "\"reviews\".\"status\" in ('created','queued','sanitizing','running','paused','awaiting_input','completed','failed','cancelled')"
+        },
+        "reviews_current_phase_check": {
+          "name": "reviews_current_phase_check",
+          "value": "\"reviews\".\"current_phase\" in ('phase_0','phase_1','phase_2','phase_3','phase_4','phase_5','phase_6','phase_7','phase_8')"
+        },
+        "reviews_recommendation_check": {
+          "name": "reviews_recommendation_check",
+          "value": "\"reviews\".\"recommendation\" in ('accept','minor_revision','major_revision','reject_and_resubmit','reject')"
+        },
+        "reviews_recommendation_confidence_check": {
+          "name": "reviews_recommendation_confidence_check",
+          "value": "\"reviews\".\"recommendation_confidence\" >= 0 and \"reviews\".\"recommendation_confidence\" <= 1"
+        }
+      }
+    },
+    "rubric_scores": {
+      "name": "rubric_scores",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "criterion": {
+          "name": "criterion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "criterion_index": {
+          "name": "criterion_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "score": {
+          "name": "score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "justifying_finding_ids": {
+          "name": "justifying_finding_ids",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_rubric_review": {
+          "name": "idx_rubric_review",
+          "columns": [
+            "review_id"
+          ],
+          "isUnique": false
+        },
+        "rubric_scores_review_criterion_unique": {
+          "name": "rubric_scores_review_criterion_unique",
+          "columns": [
+            "review_id",
+            "criterion_index"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "rubric_scores_review_id_reviews_id_fk": {
+          "name": "rubric_scores_review_id_reviews_id_fk",
+          "tableFrom": "rubric_scores",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "rubric_scores_criterion_index_check": {
+          "name": "rubric_scores_criterion_index_check",
+          "value": "\"rubric_scores\".\"criterion_index\" >= 1 and \"rubric_scores\".\"criterion_index\" <= 15"
+        },
+        "rubric_scores_score_check": {
+          "name": "rubric_scores_score_check",
+          "value": "\"rubric_scores\".\"score\" >= 0 and \"rubric_scores\".\"score\" <= 5"
+        },
+        "rubric_scores_state_check": {
+          "name": "rubric_scores_state_check",
+          "value": "\"rubric_scores\".\"state\" in ('provisional','final')"
+        }
+      }
+    },
+    "run_commands": {
+      "name": "run_commands",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "command": {
+          "name": "command",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "args_json": {
+          "name": "args_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_run_commands_review": {
+          "name": "idx_run_commands_review",
+          "columns": [
+            "review_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "run_commands_review_id_reviews_id_fk": {
+          "name": "run_commands_review_id_reviews_id_fk",
+          "tableFrom": "run_commands",
+          "tableTo": "reviews",
+          "columnsFrom": [
+            "review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "run_commands_command_check": {
+          "name": "run_commands_command_check",
+          "value": "\"run_commands\".\"command\" in ('run','pause','resume','cancel','retry_phase')"
+        }
+      }
+    },
+    "settings": {
+      "name": "settings",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value_json": {
+          "name": "value_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

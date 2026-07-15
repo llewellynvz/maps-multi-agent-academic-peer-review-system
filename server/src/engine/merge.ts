@@ -1,6 +1,6 @@
 import type { MaraDatabase } from '../db/client';
 import { mergeFindings } from '../ledger';
-import { artefactExists, writeArtefact } from './artefacts';
+import { artefactExists } from './artefacts';
 
 export interface MergeOnceInput {
   reviewId: string;
@@ -12,8 +12,7 @@ export interface MergeOnceInput {
 }
 
 export function mergeFindingsOnce(db: MaraDatabase, input: MergeOnceInput): string[] {
-  const markerName = `merge-${input.marker}`;
-  if (artefactExists(input.reviewId, markerName)) {
+  if (artefactExists(input.reviewId, `merge-${input.marker}`)) {
     return [];
   }
   const merged = mergeFindings(db, {
@@ -22,7 +21,7 @@ export function mergeFindingsOnce(db: MaraDatabase, input: MergeOnceInput): stri
     phase: input.phase,
     agent: input.agent,
     fragments: input.fragments,
+    marker: input.marker,
   });
-  writeArtefact(input.reviewId, markerName, { mergedIds: merged.map((entry) => entry.id), at: new Date().toISOString() });
   return merged.map((entry) => entry.id);
 }

@@ -22,6 +22,13 @@
       "when": 1784025600000,
       "tag": "0002_phase_critique_event",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784090177241,
+      "tag": "0003_merge_markers",
+      "breakpoints": true
     }
   ]
 }

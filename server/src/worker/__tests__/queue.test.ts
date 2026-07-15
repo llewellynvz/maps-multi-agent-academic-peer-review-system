@@ -233,6 +233,17 @@ describe('retry_phase recovery semantics', () => {
     }
   }
 
+  function insertFinding(reviewId: string, findingId: string, supersedesId: string | null): void {
+    client.sqlite
+      .prepare(
+        `INSERT INTO findings (id, review_id, agent, phase, type, claim, manuscript_anchor, epistemic_status,
+         confidence, confidence_band, severity, fixability, scope, supersedes_id, created_at)
+         VALUES (?, ?, 'specialist-reviewer', 'phase_7', 'statistical', 'A concern.', 'Table 1', 'Known',
+         0.9, 'Yellow', 'major', 'moderate', 'author_facing', ?, ?)`,
+      )
+      .run(findingId, reviewId, supersedesId, new Date().toISOString());
+  }
+
   function checkpointStatus(id: string, phase: string): string | undefined {
     const row = client.sqlite
       .prepare('SELECT status FROM phase_checkpoints WHERE review_id = ? AND phase = ?')
@@ -249,6 +260,17 @@ describe('retry_phase recovery semantics', () => {
     writeArtefact(id, 'p7-shipped-0', { stale: true });
     writeArtefact(id, 'p7-critic-1', { stale: true });
     writeArtefact(id, 'p8-quality-metrics', { stale: true });
+    writeArtefact(id, 'merge-p7-respecialist-STAT', { legacy: true, mergedIds: ['REV-STAT-0002'] });
+    writeArtefact(id, 'merge-p3-STAT-first', { keep: true, mergedIds: ['REV-STAT-0001'] });
+    insertFinding(id, 'REV-STAT-0001', null);
+    insertFinding(id, 'REV-STAT-0002', 'REV-STAT-0001');
+    insertFinding(id, 'REV-MEAS-0001', null);
+    client.sqlite
+      .prepare('INSERT INTO merge_markers (id, review_id, marker, merged_ids_json, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(randomUUID(), id, 'p7-respecialist-MEAS', JSON.stringify(['REV-MEAS-0001']), new Date().toISOString());
+    client.sqlite
+      .prepare('INSERT INTO merge_markers (id, review_id, marker, created_at) VALUES (?, ?, ?, ?)')
+      .run(randomUUID(), id, 'p3-STAT-first', new Date().toISOString());
     insertRunCommand(id, 'retry_phase', { phase: 'phase_7' });
 
     const engineOrder: string[] = [];
@@ -259,6 +281,16 @@ describe('retry_phase recovery semantics', () => {
     expect(artefactExists(id, 'p7-shipped-0')).toBe(false);
     expect(artefactExists(id, 'p7-critic-1')).toBe(false);
     expect(artefactExists(id, 'p8-quality-metrics')).toBe(false);
+    expect(artefactExists(id, 'merge-p7-respecialist-STAT')).toBe(false);
+    expect(artefactExists(id, 'merge-p3-STAT-first')).toBe(true);
+    const markers = client.sqlite
+      .prepare('SELECT marker FROM merge_markers WHERE review_id = ? ORDER BY marker')
+      .all(id) as Array<{ marker: string }>;
+    expect(markers.map((row) => row.marker)).toEqual(['p3-STAT-first']);
+    const remainingFindings = client.sqlite
+      .prepare('SELECT id FROM findings WHERE review_id = ? ORDER BY id')
+      .all(id) as Array<{ id: string }>;
+    expect(remainingFindings.map((row) => row.id)).toEqual(['REV-STAT-0001']);
     expect(checkpointStatus(id, 'engine_phase_7')).toBe('pending');
     expect(checkpointStatus(id, 'engine_phase_8')).toBe('pending');
     const errorClass = (client.sqlite.prepare('SELECT error_class FROM reviews WHERE id = ?').get(id) as { error_class: string | null }).error_class;

@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { type Finding, findingSchema } from '@mara/shared';
 import type { MaraDatabase } from '../db/client';
-import { findings } from '../db/schema';
+import { findings, mergeMarkers } from '../db/schema';
 
 const FIXABILITY_TO_DB: Record<Finding['fixability'], string> = {
   easy: 'easy',
@@ -25,6 +26,7 @@ export interface MergeFindingsInput {
   phase: string;
   agent: string;
   fragments: unknown[];
+  marker?: string;
 }
 
 export interface MergedFinding {
@@ -95,6 +97,14 @@ export function mergeFindings(db: MaraDatabase, input: MergeFindingsInput): Merg
   });
 
   return db.transaction((tx) => {
+    if (input.marker !== undefined) {
+      const done = tx.all(
+        sql`SELECT id FROM merge_markers WHERE review_id = ${input.reviewId} AND marker = ${input.marker}`,
+      ) as Array<{ id: string }>;
+      if (done.length > 0) {
+        return [];
+      }
+    }
     const known = existingIds(tx, input.reviewId);
     let seq = maxSequenceForPrefix(tx, input.lensPrefix);
     const merged: MergedFinding[] = [];
@@ -138,6 +148,18 @@ export function mergeFindings(db: MaraDatabase, input: MergeFindingsInput): Merg
 
       known.add(id);
       merged.push({ id, supersedesId });
+    }
+
+    if (input.marker !== undefined) {
+      tx.insert(mergeMarkers)
+        .values({
+          id: randomUUID(),
+          reviewId: input.reviewId,
+          marker: input.marker,
+          mergedIdsJson: JSON.stringify(merged.map((entry) => entry.id)),
+          createdAt,
+        })
+        .run();
     }
 
     return merged;

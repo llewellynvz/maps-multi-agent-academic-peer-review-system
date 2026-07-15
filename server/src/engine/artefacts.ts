@@ -21,6 +21,20 @@ export function deleteArtefactsByPrefix(reviewId: string, prefix: string): strin
   return removed;
 }
 
+export function readArtefactsByPrefix(reviewId: string, prefix: string): Array<{ name: string; value: unknown }> {
+  const engineDir = dirname(manuscriptBlobPath(reviewId, artefactRelativePath('any')));
+  if (!existsSync(engineDir)) {
+    return [];
+  }
+  const entries: Array<{ name: string; value: unknown }> = [];
+  for (const file of readdirSync(engineDir)) {
+    if (file.startsWith(prefix) && file.endsWith('.json')) {
+      entries.push({ name: file.slice(0, -'.json'.length), value: JSON.parse(readManuscriptBlobText(reviewId, `engine/${file}`)) });
+    }
+  }
+  return entries;
+}
+
 export function artefactExists(reviewId: string, name: string): boolean {
   return existsSync(manuscriptBlobPath(reviewId, artefactRelativePath(name)));
 }

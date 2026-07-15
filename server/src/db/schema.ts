@@ -171,6 +171,20 @@ export const reviewEvents = sqliteTable(
   ],
 );
 
+export const mergeMarkers = sqliteTable(
+  'merge_markers',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => reviews.id, { onDelete: 'cascade' }),
+    marker: text('marker').notNull(),
+    mergedIdsJson: text('merged_ids_json').notNull().default('[]'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [unique('merge_markers_review_marker_unique').on(t.reviewId, t.marker)],
+);
+
 export const dispatches = sqliteTable(
   'dispatches',
   {

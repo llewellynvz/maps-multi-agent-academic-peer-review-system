@@ -4,7 +4,7 @@ import type { MaraClient, MaraDatabase } from '../db/client';
 import { manuscripts, reviewEvents, reviews, runCommands } from '../db/schema';
 import { getReviewOptions, insertEvent, mergeReviewOptions, pauseReview, updateReview } from '../workflow/repo';
 import { readSetting, writeSetting } from '../data/settings-store';
-import { deleteArtefactsByPrefix } from '../engine/artefacts';
+import { deleteArtefactsByPrefix, readArtefactsByPrefix } from '../engine/artefacts';
 import { writeHeartbeat } from '../data/heartbeat';
 import type { StopSignal } from './supervisor';
 
@@ -260,12 +260,52 @@ export class WorkerRunner {
   private invalidateFromPhase(reviewId: string, phase: string): void {
     const startMatch = /phase_(\d+)/.exec(phase);
     const start = startMatch !== null ? Number.parseInt(startMatch[1]!, 10) : 7;
-    for (let n = start; n <= 8; n += 1) {
-      const removed = deleteArtefactsByPrefix(reviewId, `p${n}-`);
-      this.resetPhaseCheckpoint(reviewId, `phase_${n}`);
-      if (removed.length > 0) {
-        this.log(`review ${reviewId}: invalidated ${removed.length} phase_${n} artefacts for gate retry`);
+    const cycleFindingIds = new Set<string>();
+    const collectIds = (value: unknown): void => {
+      const ids = (value as { mergedIds?: unknown }).mergedIds;
+      if (Array.isArray(ids)) {
+        for (const id of ids) {
+          if (typeof id === 'string') {
+            cycleFindingIds.add(id);
+          }
+        }
       }
+    };
+    for (let n = start; n <= 8; n += 1) {
+      for (const entry of readArtefactsByPrefix(reviewId, `merge-p${n}-`)) {
+        collectIds(entry.value);
+      }
+      const markerRows = this.client.sqlite
+        .prepare('SELECT merged_ids_json FROM merge_markers WHERE review_id = ? AND marker LIKE ?')
+        .all(reviewId, `p${n}-%`) as Array<{ merged_ids_json: string }>;
+      for (const row of markerRows) {
+        collectIds({ mergedIds: JSON.parse(row.merged_ids_json) });
+      }
+      const removed = deleteArtefactsByPrefix(reviewId, `p${n}-`);
+      deleteArtefactsByPrefix(reviewId, `merge-p${n}-`);
+      const markers = this.client.sqlite
+        .prepare('DELETE FROM merge_markers WHERE review_id = ? AND marker LIKE ?')
+        .run(reviewId, `p${n}-%`);
+      this.resetPhaseCheckpoint(reviewId, `phase_${n}`);
+      if (removed.length > 0 || markers.changes > 0) {
+        this.log(
+          `review ${reviewId}: invalidated ${removed.length} phase_${n} artefacts and ${markers.changes} merge markers for gate retry`,
+        );
+      }
+    }
+    if (cycleFindingIds.size > 0) {
+      const ids = [...cycleFindingIds];
+      const placeholders = ids.map(() => '?').join(',');
+      const purge = this.client.sqlite.transaction(() => {
+        this.client.sqlite.pragma('defer_foreign_keys = ON');
+        this.client.sqlite.exec('CREATE TEMP TABLE IF NOT EXISTS _mara_purge (marker INTEGER)');
+        this.client.sqlite
+          .prepare(`DELETE FROM findings WHERE review_id = ? AND id IN (${placeholders})`)
+          .run(reviewId, ...ids);
+        this.client.sqlite.exec('DROP TABLE IF EXISTS _mara_purge');
+      });
+      purge();
+      this.log(`review ${reviewId}: purged ${ids.length} invalidated-cycle ledger rows for gate retry`);
     }
     this.client.sqlite
       .prepare("UPDATE reviews SET error_class = NULL, updated_at = ? WHERE id = ?")
