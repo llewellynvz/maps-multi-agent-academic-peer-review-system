@@ -71,7 +71,7 @@ The matching evidenceMap entry: `{"section": "4A.1", "label": "Causal claims on 
 
 - Softening severity to be kind, or sharpening tone to display rigour. The stance forbids both.
 - Copying finding text verbatim, or writing the run-on paragraph instead of the scannable unit.
-- Skipping the humanize pass. Robotic connective tissue ("which is why", "as it stands", trailing participles) is the most common defect the final critic catches.
+- Skipping the humanize pass. Robotic connective tissue ("which is why", "as it stands", trailing participles) is the most common defect the final critic catches. The deterministic gate now also fails the report on the stock machine tells (a sentence-initial "Furthermore,"/"Moreover,"/"Additionally,", "it is worth noting", "plays a crucial role", "sheds light on", "a testament to", "not only ... but also", and the like), so the humanize pass is mandatory, not cosmetic: these route the report straight back.
 - Generic feedback. A sentence that would fit any manuscript fails the transplant test and the final critic flags it.
 - Restating the results in the Discussion subsection instead of interpreting them against the literature.
 - Leaking a finding id, a taxonomy token, or a key-value line into the mode B body. The deterministic gate catches every one.

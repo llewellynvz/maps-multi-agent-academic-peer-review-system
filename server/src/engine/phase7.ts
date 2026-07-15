@@ -366,9 +366,11 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
                 ? `grounding validator: the shipped report body contains raw finding ids; the prose stays id-free and all grounding moves into evidenceMap entries. Specifically: ${maskedObjection}`
                 : grounding.kind === 'machine-token'
                   ? `grounding validator: the shipped report body contains internal machine tokens; rewrite exactly these spots as natural reviewer prose and change nothing else: ${maskedObjection}`
-                  : grounding.kind === 'evidence-map-mismatch'
-                    ? `grounding validator: the evidence map does not line up with the ledger and the body: ${maskedObjection}`
-                    : `grounding validator: ${maskedObjection}`;
+                  : grounding.kind === 'ai-trope'
+                    ? `grounding validator: the shipped report body contains machine-writing tells; run the humanize pass and rewrite exactly these phrases in your own expert voice, changing nothing else: ${maskedObjection}`
+                    : grounding.kind === 'evidence-map-mismatch'
+                      ? `grounding validator: the evidence map does not line up with the ledger and the body: ${maskedObjection}`
+                      : `grounding validator: ${maskedObjection}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {

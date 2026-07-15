@@ -1,6 +1,6 @@
 {
   "name": "review-final-critic",
-  "promptVersion": "1.2.1",
+  "promptVersion": "1.2.2",
   "phase": [7],
   "role": "frontier",
   "knowledge": [

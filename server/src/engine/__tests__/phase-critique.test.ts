@@ -238,10 +238,24 @@ describe('per-phase adversarial critic', () => {
     expect(events[0]?.headline).toContain('re-dispatched the statistical lens');
   });
 
-  it('respects the two-per-run re-dispatch cap', async () => {
+  it('re-dispatches on the third phase, covering context, specialists, and integrity each once', async () => {
     seed('balanced');
     seedRedispatchedEvent(1, 'phase_1');
     seedRedispatchedEvent(2, 'phase_2');
+    const h = mockDeps({
+      critics: [critique({ verdict: 'redispatch', defects: [defect({ redispatchTarget: 'STAT' })] })],
+    });
+    await runPhaseCritique(h.deps, reviewId, 'phase_3', [{ label: 'Findings', content: 'summary' }]);
+    expect(h.specialistCalls).toBe(1);
+    const last = phaseCritiqueEvents().at(-1);
+    expect(last?.redispatched).toBe(true);
+  });
+
+  it('respects the three-per-run re-dispatch cap', async () => {
+    seed('balanced');
+    seedRedispatchedEvent(1, 'phase_1');
+    seedRedispatchedEvent(2, 'phase_2');
+    seedRedispatchedEvent(3, 'phase_4');
     const h = mockDeps({
       critics: [critique({ verdict: 'redispatch', defects: [defect({ redispatchTarget: 'STAT' })] })],
     });

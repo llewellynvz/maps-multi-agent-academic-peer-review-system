@@ -27,7 +27,7 @@ export interface PhaseCritiqueInput {
 
 export type CritiquePhase = 'phase_1' | 'phase_2' | 'phase_3' | 'phase_4' | 'phase_5' | 'phase_6';
 
-const MAX_REDISPATCHES_PER_RUN = 2;
+const MAX_REDISPATCHES_PER_RUN = 3;
 
 interface IntegrityClusterRoute {
   name: string;

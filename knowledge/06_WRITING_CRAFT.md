@@ -90,7 +90,7 @@ The shipped report is written by a reviewer, not printed by a system. Its prose 
 - **Finding ids** (REV-STAT-0001) in the shipped report body. Grounding travels in the structured evidence map returned alongside the body, never inline in the prose. The internal report and the private notes keep ids: those are audit documents.
 - **Pipeline vocabulary**: ledger, lens, dispatch, swarm, artefact, phase, gate, orchestrator, dossier ("the field dossier"). The reader is an author or an editor, and none of these words mean anything to them. Name the literature itself ("recent workplace mindfulness meta-analyses"), never the internal package it arrived in.
 
-A deterministic scan enforces this at the release gate. One machine token in shipped prose is a routed-back defect, not a style note.
+A deterministic scan enforces this at the release gate. One machine token in shipped prose is a routed-back defect, not a style note. The same gate carries a second, high-precision floor over the AI-writing tells above: the stock transitions and stock phrases that read as machine-written even when the grammar is clean (a sentence-initial "Furthermore,", "it is worth noting", "plays a crucial role", "sheds light on", "a testament to", "not only ... but also"). A hit there routes the report back the same way. The floor is deliberately narrow, so the ambiguous words that can be legitimate in expert prose (robust, comprehensive, novel) are left to the humanize pass and the final critic, not the regex.
 
 ## The transplant test (generic content fails)
 

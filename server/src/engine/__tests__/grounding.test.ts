@@ -3,6 +3,7 @@ import {
   loadBannedVerdictTerms,
   redactEditorOnlyIds,
   redactSupersededIds,
+  scanAiTropes,
   scanMachineTokens,
   validateGrounding,
 } from '../grounding';
@@ -320,6 +321,39 @@ describe('id-free prose and evidence map validation', () => {
       anchor: 'Abstract',
       findingIds: ['REV-MAP-0001'],
     });
+    expect(validateGrounding(input).ok).toBe(true);
+  });
+
+  it('fails the shipped body on AI-writing tells the humanize pass should remove', () => {
+    const input = idFreeBase();
+    input.authorFacingBody +=
+      ' Furthermore, the design plays a crucial role here, and it is worth noting the gap.';
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kind).toBe('ai-trope');
+  });
+
+  it('catches AI tells in the rubric justifications too', () => {
+    const input = {
+      ...idFreeBase(),
+      authorFacingAncillary: 'The measure sheds light on the construct, a testament to careful design.',
+    };
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kind).toBe('ai-trope');
+  });
+
+  it('does not flag legitimate expert review prose that engages the literature', () => {
+    const input = idFreeBase();
+    input.authorFacingBody =
+      '**Causal claims on a cross-sectional design.** The design cannot support the mediation claim. ' +
+      'Bakker and Demerouti (2017) show that a robust standard error does not license a causal reading, ' +
+      'and your comprehensive coverage of the JD-R literature makes the novel contribution harder to locate. ' +
+      'The core problem is the temporal ordering, which the additional wave of data would resolve. ' +
+      'I recommend rejection with an invitation to resubmit, held with high confidence.';
+    input.evidenceMap[0]!.anchor = 'Section 5.2';
+    const tropes = scanAiTropes(input.authorFacingBody);
+    expect(tropes).toEqual([]);
     expect(validateGrounding(input).ok).toBe(true);
   });
 

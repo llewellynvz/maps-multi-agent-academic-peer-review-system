@@ -48,6 +48,7 @@ export type GroundingFailureKind =
   | 'banned-verdict-term'
   | 'id-in-prose'
   | 'machine-token'
+  | 'ai-trope'
   | 'evidence-map-mismatch'
   | null;
 
@@ -107,6 +108,23 @@ const MACHINE_ENUM_TOKENS = [
 const KEY_VALUE_LINE = /^(?:[\s>+-]|\*\s|\d{1,2}[.)]\s)*(decision|recommendation|confidence|verdict|severity|fixability)\s*[:=]\s*\S/gim;
 const PIPE_KEY_VALUE = /\|\s*(decision|recommendation|confidence|verdict|severity|fixability)\s*[:=]/gi;
 const NUMERIC_CONFIDENCE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;
+
+const AI_TROPE_PATTERNS: RegExp[] = [
+  /(?:^|[.!?]\s+|\n[\s>*-]*)(furthermore|moreover|additionally|notably|importantly|crucially)\s*,/gi,
+  /\bit(?:'s| is)\s+worth\s+noting\b/gi,
+  /\bit\s+(?:is|should\s+be)\s+(?:important|worth|noted|noting)\s+(?:to\s+)?(?:note|remember|mention|be\s+noted)\b/gi,
+  /\bplays?\s+an?\s+(?:crucial|pivotal|key|vital|significant|central|important)\s+role\b/gi,
+  /\b(?:underscor|highlight|emphasiz|emphasis)\w*\s+the\s+(?:need|significance|importance|value|fact)\b/gi,
+  /\bsheds?\s+light\s+on\b/gi,
+  /\ba\s+testament\s+to\b/gi,
+  /\bdelv\w+\s+(?:into|deeper)\b/gi,
+  /\bnavigat\w+\s+the\s+(?:complex|landscape|challeng)\w*/gi,
+  /\bat\s+its\s+core\b/gi,
+  /\bin\s+(?:today's|the\s+realm\s+of|the\s+landscape\s+of)\b/gi,
+  /\b(?:cutting[\s-]edge|groundbreaking|game[\s-]chang\w+|paradigm\s+shift)\b/gi,
+  /\bseamless(?:ly)?\b/gi,
+  /\bnot\s+only\b[^.!?]{0,80}\bbut\s+also\b/gi,
+];
 
 const HEADING_LINE = /^#{1,6}\s+(.+)$/gm;
 const HEADING_NUMBERING = /^(?:\d+[A-Za-z]?(?:\.\d+)*[.)]?)\s+/;
@@ -194,6 +212,19 @@ export function scanMachineTokens(content: string): string[] {
   return hits;
 }
 
+export function scanAiTropes(content: string): string[] {
+  const hits = new Set<string>();
+  for (const pattern of AI_TROPE_PATTERNS) {
+    for (const match of content.match(pattern) ?? []) {
+      const cleaned = match.replace(/^[.!?\s>*-]+/, '').trim();
+      if (cleaned.length > 0) {
+        hits.add(cleaned.toLowerCase());
+      }
+    }
+  }
+  return [...hits];
+}
+
 export function validateGrounding(input: GroundingInput): GroundingResult {
   const failures: string[] = [];
   let kind: GroundingFailureKind = null;
@@ -241,6 +272,11 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
     if (tokens.length > 0) {
       kind = 'machine-token';
       failures.push(`the shipped report body contains internal machine tokens: ${[...new Set(tokens)].join('; ')}`);
+    }
+    const tropes = [...scanAiTropes(input.authorFacingBody), ...scanAiTropes(ancillary)];
+    if (tropes.length > 0) {
+      kind = 'ai-trope';
+      failures.push(`the shipped report body contains machine-writing tells the humanize pass must remove: ${[...new Set(tropes)].join('; ')}`);
     }
   }
 
