@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { dispatches, reviewEvents, reviews } from '../db/schema';
-import { getCurrentFindings } from '../ledger';
+import { getCurrentFindings, getCurrentFindingIds } from '../ledger';
 import { requireReview } from './reviews';
 import type { PersistedEvent } from './types';
 
@@ -104,10 +104,18 @@ export function replayEvents(db: MaraDatabase, reviewId: string, afterSeq: numbe
     .where(and(eq(reviewEvents.reviewId, reviewId), gt(reviewEvents.seq, afterSeq)))
     .all()
     .sort((a, b) => a.seq - b.seq);
+  const hasFindingRows = rows.some((row) => row.kind === 'finding_recorded');
+  const currentFindingIds = hasFindingRows ? getCurrentFindingIds(db, reviewId) : new Set<string>();
   const out: PersistedEvent[] = [];
   for (const row of rows) {
     if (!STREAMED_KINDS.has(row.kind)) {
       continue;
+    }
+    if (row.kind === 'finding_recorded') {
+      const findingId = (safeParse(row.payloadJson) as { findingId?: string }).findingId;
+      if (findingId !== undefined && !currentFindingIds.has(findingId)) {
+        continue;
+      }
     }
     const mapped = mapPersisted(row);
     if (mapped !== null) {

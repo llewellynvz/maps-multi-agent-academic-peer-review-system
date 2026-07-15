@@ -49,6 +49,7 @@ afterEach(() => {
 describe('SSE persisted replay (API-22/26)', () => {
   it('replays only the streamed kinds after Last-Event-ID, in order, with the right names', () => {
     insertReview('rev-1');
+    insertFinding('REV-STAT-0001', 'rev-1', 'author_facing', 'A concern.', 'major');
     insertEvent('rev-1', 1, 'phase_transition', { step: 'x' }, 'phase_1');
     insertEvent('rev-1', 2, 'control_ack', { commandId: 'c1' });
     insertEvent('rev-1', 3, 'gate_verdict', { verdict: 'pass', cycle: 1 }, 'phase_7');
@@ -133,6 +134,16 @@ describe('activity log stream confidentiality (H2c)', () => {
     expect(data.message).toContain('withheld');
     expect(data.message).not.toContain('unpublished intervention');
     expect(data.message).not.toContain('search=');
+  });
+
+  it('drops replayed finding events whose finding was purged by a gate retry', () => {
+    insertReview('rev-purge');
+    insertFinding('REV-STAT-0001', 'rev-purge', 'author_facing', 'A surviving concern.', 'moderate');
+    insertEvent('rev-purge', 1, 'finding_recorded', { findingId: 'REV-STAT-0001', severity: 'moderate', scope: 'author_facing', headline: 'kept' });
+    insertEvent('rev-purge', 2, 'finding_recorded', { findingId: 'REV-STAT-0002', severity: 'major', scope: 'author_facing', headline: 'purged' });
+    const events = replayEvents(client.db, 'rev-purge', 0).filter((e) => e.event === 'finding_headline');
+    const ids = events.map((e) => (e.data as { findingId: string }).findingId);
+    expect(ids).toEqual(['REV-STAT-0001']);
   });
 
   it('keeps finding claims and manuscript text out of every log surface', () => {
