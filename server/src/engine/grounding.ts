@@ -108,6 +108,23 @@ const KEY_VALUE_LINE = /^(?:[\s>+-]|\*\s|\d{1,2}[.)]\s)*(decision|recommendation
 const PIPE_KEY_VALUE = /\|\s*(decision|recommendation|confidence|verdict|severity|fixability)\s*[:=]/gi;
 const NUMERIC_CONFIDENCE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;
 
+const HEADING_LINE = /^#{1,6}\s+(.+)$/gm;
+const HEADING_NUMBERING = /^(?:\d+[A-Za-z]?(?:\.\d+)*[.)]?)\s+/;
+
+export function labelAppearsInBody(body: string, label: string): boolean {
+  const wanted = label.trim();
+  if (body.includes(`**${wanted}`)) {
+    return true;
+  }
+  for (const match of body.matchAll(HEADING_LINE)) {
+    const heading = (match[1] ?? '').replace(HEADING_NUMBERING, '').trim();
+    if (heading === wanted || heading.startsWith(wanted)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function scanMachineTokens(content: string): string[] {
   const hits: string[] = [];
   const lower = content.toLowerCase();
@@ -190,8 +207,10 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
       if (entry.anchor.trim().length === 0) {
         mapFailures.push(`evidence map entry "${entry.label}" has an empty manuscript anchor`);
       }
-      if (!input.authorFacingBody.includes(`**${entry.label}`)) {
-        mapFailures.push(`evidence map label "${entry.label}" does not appear as a bold label in the report body`);
+      if (!labelAppearsInBody(input.authorFacingBody, entry.label)) {
+        mapFailures.push(
+          `evidence map label "${entry.label}" does not appear as a bold label or section heading in the report body`,
+        );
       }
     }
     const cited = new Set(input.authorFacingCitedIds);

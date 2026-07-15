@@ -235,13 +235,35 @@ describe('id-free prose and evidence map validation', () => {
     expect(result.failures.join(' ')).toContain('union');
   });
 
-  it('fails when a map label is not a bold label in the body', () => {
+  it('fails when a map label is neither a bold label nor a heading in the body', () => {
     const input = idFreeBase();
     input.evidenceMap[0]!.label = 'A label the body never bolds.';
     const result = validateGrounding(input);
     expect(result.ok).toBe(false);
     expect(result.kind).toBe('evidence-map-mismatch');
-    expect(result.failures.join(' ')).toContain('bold label');
+    expect(result.failures.join(' ')).toContain('bold label or section heading');
+  });
+
+  it('accepts a map label carried by a numbered section heading', () => {
+    const input = idFreeBase();
+    input.authorFacingBody +=
+      '\n\n### 4A.1 Over-strong causal framing for a single waitlist trial (fatal if unresolved)\nThe trial cannot carry the causal weight placed on it.\n\n### Discussion calibration of claims and implications\nThe Discussion reads durability into a single post-test.';
+    input.evidenceMap.push(
+      {
+        section: '4A.1',
+        label: 'Over-strong causal framing for a single waitlist trial (fatal if unresolved)',
+        anchor: 'Abstract; Section 5',
+        findingIds: ['REV-STAT-0001'],
+      },
+      {
+        section: '4B Discussion',
+        label: 'Discussion calibration of claims and implications',
+        anchor: 'Section 5',
+        findingIds: ['REV-MAP-0001'],
+      },
+    );
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(true);
   });
 
   it('catches a finding id hidden in the rubric justifications', () => {
