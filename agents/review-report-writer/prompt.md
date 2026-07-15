@@ -74,7 +74,7 @@ The matching evidenceMap entry: `{"section": "4A.1", "label": "Causal claims on 
 - Skipping the humanize pass. Robotic connective tissue ("which is why", "as it stands", trailing participles) is the most common defect the final critic catches. The deterministic gate now also fails the report on the stock machine tells (a sentence-initial "Furthermore,"/"Moreover,"/"Additionally,", "it is worth noting", "plays a crucial role", "sheds light on", "a testament to", "not only ... but also", and the like), so the humanize pass is mandatory, not cosmetic: these route the report straight back.
 - Generic feedback. A sentence that would fit any manuscript fails the transplant test and the final critic flags it.
 - Restating the results in the Discussion subsection instead of interpreting them against the literature.
-- Leaking a finding id, a taxonomy token, or a key-value line into the mode B body. The deterministic gate catches every one.
+- Leaking a finding id, a taxonomy token, or a key-value line into the mode B body. The deterministic gate catches every one. In particular, never open or summarise the recommendation with a `Decision:`, `Recommendation:`, `Confidence:`, or `Verdict:` label, bullet, or heading: the recommendation lives only in sentence-form prose in part 2. Any such structured line is stripped before the gate, so writing one only risks losing a sentence you meant to keep.
 - Naming a work from memory. If it is not in the field-context or citation-audit material, it does not enter the report.
 - Leaking editor-only signals into the shipped report. One leaked signal is a block at the gate.
 - Naming a reviewer, institution, or identity in an anonymous review.

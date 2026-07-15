@@ -39,6 +39,7 @@ import {
 import {
   applyPaperTypeLensPolicy,
   paperTypeNote,
+  qualitativeRigourNote,
   selectActiveLenses,
   selectChallengeLenses,
   studyDesignAffirmsData,
@@ -48,7 +49,7 @@ import { readIntakeOptions } from './options';
 import { runAgent } from './dispatch-agent';
 import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
 import { upsertRubricScore } from './rubric';
-import type { EngineDeps } from './phases-shared';
+import { DispatchPauseError, type EngineDeps } from './phases-shared';
 
 export type { EngineDeps } from './phases-shared';
 
@@ -62,6 +63,49 @@ function phaseDone(db: MaraDatabase, reviewId: string, phase: string): boolean {
 
 function enterPhase(db: MaraDatabase, reviewId: string, phase: string): void {
   updateReview(db, reviewId, { status: 'running', currentPhase: phase });
+}
+
+export interface CoverageGap {
+  step: string;
+  unit: string;
+}
+
+// A cost-ceiling pause is re-thrown before any gap is recorded, so a resumed run persists none.
+export async function settleWithGaps<T>(
+  db: MaraDatabase,
+  reviewId: string,
+  phase: string,
+  step: string,
+  tasks: Array<{ label: string; run: () => Promise<T> }>,
+): Promise<{ results: T[]; gaps: CoverageGap[] }> {
+  const settled = await Promise.allSettled(tasks.map((task) => task.run()));
+  for (const outcome of settled) {
+    if (outcome.status === 'rejected' && outcome.reason instanceof DispatchPauseError) {
+      throw outcome.reason;
+    }
+  }
+  const results: T[] = [];
+  const gaps: CoverageGap[] = [];
+  for (const [index, outcome] of settled.entries()) {
+    if (outcome.status === 'fulfilled') {
+      results.push(outcome.value);
+      continue;
+    }
+    const unit = tasks[index]?.label ?? `unit ${index}`;
+    gaps.push({ step, unit });
+    insertEvent(db, {
+      reviewId,
+      kind: 'error',
+      phase,
+      payload: {
+        coverageGap: true,
+        step,
+        unit,
+        reason: `${unit} did not complete after retries and was skipped; ${step} continues with reduced coverage`,
+      },
+    });
+  }
+  return { results, gaps };
 }
 
 export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<void> {
@@ -534,35 +578,45 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
     selectActiveLenses(ctx.preset, analystB.activationMap),
     intake.paperType,
     affirmsData,
+    analystB.studyDesign,
   );
-  const typeNote = paperTypeNote(intake.paperType);
+  const typeNote = qualitativeRigourNote(analystB.studyDesign) ?? paperTypeNote(intake.paperType);
 
   const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (engage these works by name)');
 
   await withPhase('phase_3', async () => {
     enterPhase(db, reviewId, 'phase_3');
 
-    const firstPass = await Promise.all(
-      active.map((lens) =>
-        runAgent<SpecialistReviewerOutput>(deps, {
-          reviewId,
-          phase: 'phase_3',
-          agent: 'specialist-reviewer',
-          artefactName: `p3-${lens.prefix}-first`,
-          assembleInput: {
-            lens: lens.display,
-            parseQuality: ctx.parseQuality,
-            manuscriptExcerpt: digest,
-            artefacts: [
-              { label: 'Manuscript map', content: mapJson },
-              { label: 'Claim-evidence matrix', content: matrixJson },
-              ...(dossierArtefact !== null ? [dossierArtefact] : []),
-            ],
-            routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.${typeNote !== null ? ` ${typeNote}` : ''}`,
-          },
-        }).then((result) => ({ lens, result })),
-      ),
+    const { results: firstPass, gaps: firstPassGaps } = await settleWithGaps(
+      db,
+      reviewId,
+      'phase_3',
+      'specialist first pass',
+      active.map((lens) => ({
+        label: `${lens.display} (REV-${lens.prefix})`,
+        run: () =>
+          runAgent<SpecialistReviewerOutput>(deps, {
+            reviewId,
+            phase: 'phase_3',
+            agent: 'specialist-reviewer',
+            artefactName: `p3-${lens.prefix}-first`,
+            assembleInput: {
+              lens: lens.display,
+              parseQuality: ctx.parseQuality,
+              manuscriptExcerpt: digest,
+              artefacts: [
+                { label: 'Manuscript map', content: mapJson },
+                { label: 'Claim-evidence matrix', content: matrixJson },
+                ...(dossierArtefact !== null ? [dossierArtefact] : []),
+              ],
+              routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.${typeNote !== null ? ` ${typeNote}` : ''}`,
+            },
+          }).then((result) => ({ lens, result })),
+      })),
     );
+    if (active.length > 0 && firstPass.length === 0) {
+      throw new Error('every specialist lens failed in phase 3; a review needs at least one completed specialist pass');
+    }
 
     const severitiesByPrefix = new Map<string, string[]>();
     for (const { lens, result } of firstPass) {
@@ -591,32 +645,39 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
     const context2 = JSON.stringify(readArtefact(reviewId, 'p2-context'));
     const citations2 = JSON.stringify(readArtefact(reviewId, 'p2-citations'));
 
-    const challengeResults = await Promise.all(
-      challengeLenses.map((lens) => {
-        const mine = specialistFindings.filter((finding) => finding.id.startsWith(`REV-${lens.prefix}-`));
-        const others = specialistFindings.filter((finding) => !finding.id.startsWith(`REV-${lens.prefix}-`));
-        return runAgent<SpecialistReviewerOutput>(deps, {
-          reviewId,
-          phase: 'phase_3',
-          agent: 'specialist-reviewer',
-          artefactName: `p3-${lens.prefix}-challenge`,
-          assembleInput: {
-            lens: lens.display,
-            parseQuality: ctx.parseQuality,
-            manuscriptExcerpt: digest,
-            artefacts: [
-              { label: 'Manuscript map', content: mapJson },
-              { label: 'Claim-evidence matrix', content: matrixJson },
-              { label: 'Your first-pass findings (canonical ledger ids)', content: JSON.stringify(mine) },
-              { label: "Other lenses' findings (anonymised)", content: JSON.stringify(anonymiseFindings(others)) },
-              { label: 'Field context (Phase 2)', content: context2 },
-              { label: 'Citation audit (Phase 2)', content: citations2 },
-              ...(dossierArtefact !== null ? [dossierArtefact] : []),
-            ],
-            routingNote: `Challenge round for ${lens.display} (REV-${lens.prefix}). In "findings", return ONLY new or updated findings; an update sets supersedes to the existing canonical id shown in your first-pass findings, and you never re-list an unchanged finding. Update a position ONLY on named new evidence, never because another lens disagreed. Preserve evidence-based dissent held at confidence 0.75 or higher in challengeRound.dissentPreserved rather than converging.${typeNote !== null ? ` ${typeNote}` : ''}`,
-          },
-        }).then((result) => ({ lens, result }));
-      }),
+    const { results: challengeResults, gaps: challengeGaps } = await settleWithGaps(
+      db,
+      reviewId,
+      'phase_3',
+      'specialist challenge round',
+      challengeLenses.map((lens) => ({
+        label: `${lens.display} (REV-${lens.prefix})`,
+        run: () => {
+          const mine = specialistFindings.filter((finding) => finding.id.startsWith(`REV-${lens.prefix}-`));
+          const others = specialistFindings.filter((finding) => !finding.id.startsWith(`REV-${lens.prefix}-`));
+          return runAgent<SpecialistReviewerOutput>(deps, {
+            reviewId,
+            phase: 'phase_3',
+            agent: 'specialist-reviewer',
+            artefactName: `p3-${lens.prefix}-challenge`,
+            assembleInput: {
+              lens: lens.display,
+              parseQuality: ctx.parseQuality,
+              manuscriptExcerpt: digest,
+              artefacts: [
+                { label: 'Manuscript map', content: mapJson },
+                { label: 'Claim-evidence matrix', content: matrixJson },
+                { label: 'Your first-pass findings (canonical ledger ids)', content: JSON.stringify(mine) },
+                { label: "Other lenses' findings (anonymised)", content: JSON.stringify(anonymiseFindings(others)) },
+                { label: 'Field context (Phase 2)', content: context2 },
+                { label: 'Citation audit (Phase 2)', content: citations2 },
+                ...(dossierArtefact !== null ? [dossierArtefact] : []),
+              ],
+              routingNote: `Challenge round for ${lens.display} (REV-${lens.prefix}). In "findings", return ONLY new or updated findings; an update sets supersedes to the existing canonical id shown in your first-pass findings, and you never re-list an unchanged finding. Update a position ONLY on named new evidence, never because another lens disagreed. Preserve evidence-based dissent held at confidence 0.75 or higher in challengeRound.dissentPreserved rather than converging.${typeNote !== null ? ` ${typeNote}` : ''}`,
+            },
+          }).then((result) => ({ lens, result }));
+        },
+      })),
     );
 
     const dissentPreserved: Array<{ lens: string; id: string; whyItHolds: string }> = [];
@@ -638,6 +699,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
       }
     }
 
+    const phase3Gaps = [...firstPassGaps, ...challengeGaps];
     insertEvent(db, {
       reviewId,
       kind: 'phase_transition',
@@ -646,6 +708,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
         activeLenses: active.map((lens) => lens.prefix),
         challengeLenses: challengeLenses.map((lens) => lens.prefix),
         dissentPreserved: dissentPreserved.length,
+        coverageGaps: phase3Gaps,
       },
     });
     const phase3Findings = getCurrentFindings(db, reviewId).filter((finding) =>
@@ -676,6 +739,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
         activeLenses: active.map((lens) => lens.prefix),
         challengeLenses: challengeLenses.map((lens) => lens.prefix),
         dissentPreserved,
+        coverageGaps: phase3Gaps,
       },
     });
   });
@@ -724,29 +788,39 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
   await withPhase('phase_4', async () => {
     enterPhase(db, reviewId, 'phase_4');
 
-    const results = await Promise.all(
-      clusters.map((cluster) => {
-        const aiHandledElsewhere = cluster.name === 'similarity-and-ai-content' && intake.aiDetection;
-        return runAgent<IntegrityScreenerOutput>(deps, {
-          reviewId,
-          phase: 'phase_4',
-          agent: 'integrity-screener',
-          artefactName: `p4-${cluster.name}`,
-          assembleInput: {
-            parseQuality: ctx.parseQuality,
-            manuscriptExcerpt: digest,
-            artefacts: [
-              { label: 'Manuscript map', content: mapJson },
-              { label: 'Figure and table inventory', content: inventoryJson },
-              { label: 'Claim-evidence matrix', content: matrixJson },
-            ],
-            routingNote: `Integrity cluster "${cluster.name}", rubrics ${cluster.prefixes
-              .map((prefix) => `REV-${prefix}`)
-              .join(' and ')}. ${aiHandledElsewhere ? 'AI-content screening (REV-AIC) is handled by the dedicated AI-content analyst in this run; screen similarity signals only and do not emit REV-AIC findings. ' : ''}No external similarity report or AI-content detector output is provided; mark any check that needs one as not-run with the artifact named, never improvised. Findings are editorial signals, never verdicts; a serious signal is editor-only. Set each finding's lens to its rubric code and prefix its id REV-<rubric>.`,
-          },
-        }).then((result) => ({ cluster, result }));
-      }),
+    const { results, gaps: integrityGaps } = await settleWithGaps(
+      db,
+      reviewId,
+      'phase_4',
+      'integrity screening',
+      clusters.map((cluster) => ({
+        label: `integrity cluster "${cluster.name}"`,
+        run: () => {
+          const aiHandledElsewhere = cluster.name === 'similarity-and-ai-content' && intake.aiDetection;
+          return runAgent<IntegrityScreenerOutput>(deps, {
+            reviewId,
+            phase: 'phase_4',
+            agent: 'integrity-screener',
+            artefactName: `p4-${cluster.name}`,
+            assembleInput: {
+              parseQuality: ctx.parseQuality,
+              manuscriptExcerpt: digest,
+              artefacts: [
+                { label: 'Manuscript map', content: mapJson },
+                { label: 'Figure and table inventory', content: inventoryJson },
+                { label: 'Claim-evidence matrix', content: matrixJson },
+              ],
+              routingNote: `Integrity cluster "${cluster.name}", rubrics ${cluster.prefixes
+                .map((prefix) => `REV-${prefix}`)
+                .join(' and ')}. ${aiHandledElsewhere ? 'AI-content screening (REV-AIC) is handled by the dedicated AI-content analyst in this run; screen similarity signals only and do not emit REV-AIC findings. ' : ''}No external similarity report or AI-content detector output is provided; mark any check that needs one as not-run with the artifact named, never improvised. Findings are editorial signals, never verdicts; a serious signal is editor-only. Set each finding's lens to its rubric code and prefix its id REV-<rubric>.`,
+            },
+          }).then((result) => ({ cluster, result }));
+        },
+      })),
     );
+    if (clusters.length > 0 && results.length === 0) {
+      throw new Error('every integrity cluster failed in phase 4; integrity screening is required and the run halts for retry');
+    }
 
     const knownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
     for (const { cluster, result } of results) {
@@ -817,6 +891,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
       payload: {
         clusters: clusters.map((cluster) => cluster.name),
         aiContent: intake.aiDetection ? 'run' : 'skipped',
+        coverageGaps: integrityGaps,
       },
     });
     const phase4Critique: PhaseCritiqueInput[] = [
@@ -840,7 +915,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
       reviewId,
       phase: checkpointKey('phase_4'),
       status: 'completed',
-      snapshot: { clusters: clusters.map((cluster) => cluster.name), aiContent: intake.aiDetection },
+      snapshot: { clusters: clusters.map((cluster) => cluster.name), aiContent: intake.aiDetection, coverageGaps: integrityGaps },
     });
   });
 }

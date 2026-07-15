@@ -21,7 +21,7 @@ import {
 import { createGrobidClient } from './ingest';
 import { createDispatchRunner, createRegistry } from './providers';
 import { initTracing, startRun } from './tracing';
-import { getManuscript, getReviewOptions, mergeReviewOptions, pauseReview, updateReview } from './workflow/repo';
+import { getManuscript, getReviewOptions, maxEventSeq, mergeReviewOptions, pauseReview, recordEngineFailure } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
 import { readSetting } from './data/settings-store';
 import { announceFindings } from './worker/announce';
@@ -149,6 +149,7 @@ async function main(): Promise<void> {
         return mapIngest(summary);
       },
       runEngine: async (reviewId, shouldStop): Promise<EngineResult> => {
+        const engineStartSeq = maxEventSeq(db, reviewId);
         try {
           let outcome: EngineOutcome = 'completed';
           const announced = new Set<string>();
@@ -173,7 +174,7 @@ async function main(): Promise<void> {
           if (shouldStop() === 'shutdown') {
             return 'stopped';
           }
-          updateReview(db, reviewId, { status: 'failed', errorClass: 'engine_error' });
+          recordEngineFailure(db, reviewId, error instanceof Error ? error.name : 'Error', engineStartSeq);
           return 'failed';
         }
       },

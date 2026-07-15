@@ -1,8 +1,50 @@
 # Changelog
 
-All notable changes to MARA are recorded here. The format follows
+All notable changes to Collegia are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.0] - 2026-07-15
+
+### Changed
+- The system is presented as Collegia, a multi-agent academic peer-review
+  architecture. The README, hero image, badges, and product-facing prose carry
+  the new identity. Internal code identifiers and environment variable names are
+  unchanged.
+
+### Added
+- A deterministic pre-gate scrub that removes stray internal tokens and stock
+  machine-writing openers from the shipped letter, and records what it removed on
+  the gate record for the audit trail.
+- Qualitative and broadened non-empirical paper-type handling: conceptual,
+  perspective, and position papers are no longer judged against empirical-method
+  criteria, and qualitative studies are assessed on qualitative rigour rather than
+  statistical inference.
+- A read-only review trace tool that prints the full dispatch and event timeline
+  for any review from one command.
+- Self-describing terminal failures: every failed run records a human-readable
+  reason and the phase where it failed.
+- Graceful degradation for the parallel review steps: a non-critical specialist
+  lens or integrity cluster that exhausts its retries is skipped and recorded as
+  an explicit coverage gap rather than ending the run, with the gap surfaced in
+  the run trace, the phase checkpoint, and the editor-only notes. When every
+  specialist lens or every integrity cluster fails, the run halts cleanly for
+  retry instead of shipping without required coverage.
+- Dependency vulnerability scanning over the lockfile alongside the secret scan,
+  and an operations runbook covering monitoring, recovery, and backup.
+
+### Fixed
+- The release gate no longer treats a cosmetic surface defect as an unrecoverable
+  failure. Only substantive grounding, confidentiality, and verdict-term problems
+  halt a review; a complete, evidence-grounded review is never lost to a stray
+  token or a stock transition word.
+- A blocked or halted review now stops cleanly at the gate and does not run the
+  closing metrics agents.
+- Retrying a failed review records a fresh, consistent terminal state instead of
+  leaving the earlier failure as the last word.
+- After arbitration narrows a recommendation, the alignment rewrite that could not
+  be produced cleanly now falls back to the already-validated report rather than
+  discarding a complete, evidence-grounded review.
 
 ## [1.0.0] - 2026-07-15
 

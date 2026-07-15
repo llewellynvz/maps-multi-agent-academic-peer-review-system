@@ -1,12 +1,22 @@
 <div align="center">
 
-<img src="assets/mara-hero.png" alt="MARA: Multi-Agent Review Architecture, by Psynalytics" width="100%">
+<img src="assets/collegia-hero.png" alt="Collegia: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
 
 <br>
 
 **Autonomous, evidence-grounded peer review for psychological and wellbeing science.**
 
 A Psynalytics AI system. Proprietary and confidential.
+
+<p align="center">
+  <img src="https://img.shields.io/badge/licence-proprietary-006D7C?style=flat-square" alt="Licence: proprietary">
+  <img src="https://img.shields.io/badge/version-1.0.0-008DA1?style=flat-square" alt="Version 1.0.0">
+  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript strict">
+  <img src="https://img.shields.io/badge/Node-22.13%2B-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node 22.13 or newer">
+  <img src="https://img.shields.io/badge/tests-passing-A7D12B?style=flat-square" alt="Tests passing">
+  <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker ready">
+  <img src="https://img.shields.io/badge/status-private-032A30?style=flat-square" alt="Status: private">
+</p>
 
 </div>
 
@@ -16,11 +26,11 @@ A Psynalytics AI system. Proprietary and confidential.
 
 ## Overview
 
-MARA is a multi-agent system that reviews psychology and wellbeing-science manuscripts the way a rigorous, developmental third reviewer would. A single instruction runs a fully orchestrated pipeline that reads the manuscript, establishes its field context, audits its references, examines it through a fleet of specialist lenses, stress-tests the findings, and produces a developmental author letter, a confidential editor summary, and a full evidence-grounded review report.
+Collegia is a multi-agent academic peer-review architecture. It reviews psychology and wellbeing-science manuscripts the way a rigorous, developmental third reviewer would. A single instruction runs a fully orchestrated pipeline that reads the manuscript, establishes its field context, audits its references, examines it through a fleet of specialist lenses, stress-tests the findings, and produces a developmental author letter, a confidential editor summary, and a full evidence-grounded review report.
 
-The system rests on one discipline. Every claim in every deliverable traces to a specific finding in an append-only evidence ledger, anchored to a location in the manuscript. A recommendation that cannot be grounded does not ship. The reviewing voice stays developmental even when the verdict is severe, because a review is meant to show the path forward, not to close the door.
+The architecture rests on one discipline. Every claim in every deliverable traces to a specific finding in an append-only evidence ledger, anchored to a location in the manuscript. A recommendation that cannot be grounded does not ship. The reviewing voice stays developmental even when the verdict is severe, because a review is meant to show the path forward, not to close the door.
 
-MARA runs entirely on one machine. The manuscript text, the author identities, the reviewer's findings, and the model-provider keys never leave it.
+Collegia runs entirely on one machine. The manuscript text, the author identities, the reviewer's findings, and the model-provider keys never leave it.
 
 ## What it does
 
@@ -52,6 +62,44 @@ Phase 8   Deliverables        Render the branded Word documents and record the a
 ```
 
 The release gate at Phase 7 is deterministic. It rejects any deliverable whose prose carries a raw finding identifier, an internal machine token, a stock machine-writing tell, or a banned verdict term, and any evidence map that does not reconcile with the ledger and the manuscript. Failures route back for a bounded number of fix cycles, then to a logged arbitration. The reviewer's own preliminary assessment, when provided, is withheld from the review and stress-tested against the evidence only after the recommendation is set.
+
+### Agent workflow
+
+Sixteen agents run across the nine phases. Specialist lenses fan out in parallel and take an independent first pass before a challenge round. The orchestrator is the only writer that merges finding fragments into the ledger, and the Phase 7 release gate is a closed loop: the writer drafts, a deterministic validator and an independent critic test the draft, and unresolved objections fall to a logged arbitration rather than a silent failure.
+
+```mermaid
+flowchart TD
+    M([Manuscript])
+    P0[Phase 0 Sanitise<br/>manuscript-sanitizer]
+    P1[Phase 1 Structured analysis<br/>manuscript-analyst]
+    P2[Phase 2 Field context and citations<br/>field-context-scout and citation-auditor]
+    P3[Phase 3 Specialist review and challenge<br/>specialist-reviewer per active lens]
+    P4[Phase 4 Integrity screen<br/>integrity-screener and ai-content-analyst]
+    P5[Phase 5 Swarm stress-test<br/>swarm-simulator]
+    P6[Phase 6 Internal report<br/>review-report-writer]
+    P8[Phase 8 Deliverables<br/>quality-metrics, journal-scope, calibrator]
+    OUT([Author letter and editor summary])
+
+    subgraph G [Phase 7 Release gate]
+      direction LR
+      WR[review-report-writer] --> GV{Deterministic gate}
+      GV -- revise --> WR
+      GV -- pass --> FC{review-final-critic}
+      FC -- revise --> WR
+      FC -- pass --> REL([Release])
+      FC -- unresolved --> AR[Arbitration] --> REL
+    end
+
+    M --> P0 --> P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> G --> P8 --> OUT
+
+    L[(Append-only evidence ledger)]
+    ORC[[Orchestrator: the sole ledger merger]]
+    P1 -. fragments .-> ORC
+    P3 -. fragments .-> ORC
+    P4 -. fragments .-> ORC
+    ORC -. merges .-> L
+    PC[phase-critic after phases 1 to 6] -. re-dispatch .-> P3
+```
 
 ## Architecture
 
@@ -90,7 +138,7 @@ In `.env`, set:
 - `MARA_MASTER_KEY` to a 32-byte key. Generate one with `openssl rand -hex 32`.
 - Either the four `AZURE_*` values for Azure OpenAI, or a single provider key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OLLAMA_BASE_URL`.
 
-**2. Start MARA.**
+**2. Start Collegia.**
 
 ```bash
 docker compose up -d
@@ -100,9 +148,9 @@ The first start builds the image, runs the database migrations, and starts the w
 
 **3. Open the application.**
 
-Open `http://localhost:3100`. Upload a PDF or DOCX manuscript, answer the short set-up questions, and MARA runs the full review. Download the report and the editor summary from the results screen.
+Open `http://localhost:3100`. Upload a PDF or DOCX manuscript, answer the short set-up questions, and Collegia runs the full review. Download the report and the editor summary from the results screen.
 
-Stop MARA with `docker compose down`. Your data stays in `./data`.
+Stop Collegia with `docker compose down`. Your data stays in `./data`.
 
 ## Configuration
 
@@ -126,11 +174,11 @@ The default image parses PDFs with a built-in fallback, so it works with no extr
 docker compose --profile grobid up -d
 ```
 
-GROBID needs roughly 4 GB of RAM on top of MARA. On a machine with 8 GB or less, prefer the default fallback parser.
+GROBID needs roughly 4 GB of RAM on top of Collegia. On a machine with 8 GB or less, prefer the default fallback parser.
 
 ### Tracing (optional)
 
-If you run Langfuse on the host, set `LANGFUSE_HOST` (default `http://host.docker.internal:3000`), `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. When these are absent, MARA runs on its local statistics panel alone and tracing is skipped. A missing Langfuse is never an error.
+If you run Langfuse on the host, set `LANGFUSE_HOST` (default `http://host.docker.internal:3000`), `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. When these are absent, Collegia runs on its local statistics panel alone and tracing is skipped. A missing Langfuse is never an error.
 
 ## Development
 
@@ -152,18 +200,23 @@ Confidentiality is a design constraint, not a setting.
 - **Editor-only content stays editor-only.** Integrity signals, confidential synthesis, and the preliminary-assessment stress test never reach the author-facing letter or the read-only evidence endpoint.
 - **Provider keys are protected.** Session keys are held in memory. Persisted keys are sealed with AES-256-GCM under a master key that is never committed.
 - **The ledger is append-only.** Corrections supersede by new rows. History is preserved for audit.
+- **The container runs unprivileged.** It starts as root only long enough to take ownership of its data volume, then drops to a non-root user with no ability to regain privileges, and exposes a single application port.
 
-Secret scanning runs over the full history with a documented allowlist for synthetic test fixtures. No credential is committed.
+Secret scanning runs over the full history with a documented allowlist for synthetic test fixtures, and a dependency vulnerability scan runs over the lockfile. No credential is committed and no high or critical advisory is outstanding.
+
+### Operational resilience
+
+The pipeline is built so that no review is lost to a single failure. A non-critical step that exhausts its retries is skipped and recorded as an explicit coverage gap rather than ending the run, and that gap is stated in the editor-only notes so the limitation is visible. A required step that cannot complete halts cleanly with a recorded reason and a retry path, never a frozen run. Every failure, degradation, and gate decision is written to a structured, queryable event trail that carries no manuscript or author text, so any run can be traced and recovered from a single command.
 
 ## The reviewing voice
 
-MARA sits beside the author. Severity stays honest, and the wording stays developmental. A destructive letter fails the release gate no matter how correct its findings, and generic feedback that would fit any manuscript is treated as a defect. Integrity concerns are always framed as editorial signals for a handling editor to verify, never as determinations of misconduct.
+Collegia sits beside the author. Severity stays honest, and the wording stays developmental. A destructive letter fails the release gate no matter how correct its findings, and generic feedback that would fit any manuscript is treated as a defect. Integrity concerns are always framed as editorial signals for a handling editor to verify, never as determinations of misconduct.
 
 ## Author
 
 Prof. Llewellyn van Zyl, PhD, is the Founder and Chief AI Solutions Architect at Psynalytics, and works within Optentia at North-West University. His work sits at the intersection of data science, positive psychology, and the governance of artificial intelligence systems.
 
-MARA is developed and maintained by Psynalytics.
+Collegia is developed and maintained by Psynalytics.
 
 ## Licence
 
@@ -173,4 +226,4 @@ No right or licence to use, run, copy, modify, distribute, or exploit this softw
 
 ## Disclaimer
 
-MARA produces developmental, pre-submission editorial feedback. It is not affiliated with any journal, it is not a certification of quality, and it is not a substitute for human peer review. Every output is advisory and must be verified by a qualified person before any reliance.
+Collegia produces developmental, pre-submission editorial feedback. It is not affiliated with any journal, it is not a certification of quality, and it is not a substitute for human peer review. Every output is advisory and must be verified by a qualified person before any reliance.

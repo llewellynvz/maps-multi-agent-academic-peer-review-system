@@ -74,6 +74,7 @@ export interface GroundingInput {
 export interface GroundingResult {
   ok: boolean;
   kind: GroundingFailureKind;
+  kinds: Exclude<GroundingFailureKind, null>[];
   failures: string[];
 }
 
@@ -109,8 +110,10 @@ const KEY_VALUE_LINE = /^(?:[\s>+-]|\*\s|\d{1,2}[.)]\s)*(decision|recommendation
 const PIPE_KEY_VALUE = /\|\s*(decision|recommendation|confidence|verdict|severity|fixability)\s*[:=]/gi;
 const NUMERIC_CONFIDENCE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;
 
+const CONNECTIVE_WORDS = 'furthermore|moreover|additionally|notably|importantly|crucially|overall';
+
 const AI_TROPE_PATTERNS: RegExp[] = [
-  /(?:^|[.!?]\s+|\n[\s>*-]*)(furthermore|moreover|additionally|notably|importantly|crucially|overall)\s*,/gi,
+  new RegExp(`(?:^|[.!?]\\s+|\\n[\\s>*-]*)(${CONNECTIVE_WORDS})\\s*,`, 'gi'),
   /(?:^|[.!?]\s+|\n[\s>*-]*)in\s+(?:conclusion|summary)\s*,/gi,
   /\bit(?:'s| is)\s+worth\s+noting\b/gi,
   /\bit\s+(?:is|should\s+be|must\s+be|can\s+be|has\s+to\s+be)\s+noted\s+that\b/gi,
@@ -227,8 +230,94 @@ export function scanAiTropes(content: string): string[] {
   return [...hits];
 }
 
+const MACHINE_TOKEN_LINE = /^((?:[\s>+-]|\*\s|\d{1,2}[.)]\s)*)(decision|recommendation|confidence|verdict|severity|fixability)(\s*[:=]\s*)(\S.*)$/i;
+// pre matches only mid-sentence positions (after terminal punctuation), never a line start, so a
+// problem label or heading that opens with a connective is never rewritten out of sync with its map.
+const CONNECTIVE_OPENER = new RegExp(`([.!?]\\s+)(${CONNECTIVE_WORDS})\\s*,\\s*(\\w)(\\S?)`, 'gi');
+
+// Internal enum tokens are replaced with plain reviewer language rather than deleted, so a stray token becomes readable prose instead of a lost sentence.
+const ENUM_HUMANISE: Array<[RegExp, string]> = [
+  [/\breject_and_resubmit\b/gi, 'rejection with an invitation to resubmit'],
+  [/\bmajor_revision\b/gi, 'major revision'],
+  [/\bminor_revision\b/gi, 'minor revision'],
+  [/\brevise_specialist\b/gi, 'further specialist review'],
+  [/\brelease_gate_block\b/gi, 'a release hold'],
+  [/\beditor_only\b/gi, 'editorial'],
+  [/\bauthor_facing\b/gi, 'author-facing'],
+];
+
+// Word-level stock phrasings are neutralised here; structural tropes ("not only ... but also") are left to the humanise pass and ship rather than halt.
+const TROPE_REPLACE: Array<[RegExp, string]> = [
+  [/\bcutting[\s-]edge\b/gi, 'advanced'],
+  [/\bgroundbreaking\b/gi, 'notable'],
+  [/\bparadigm\s+shift\b/gi, 'marked change'],
+  [/\bgame[\s-]chang\w+\b/gi, 'significant'],
+  [/\bdelv(?:e|ing)\s+into\b/gi, 'examine'],
+  [/\bsheds?\s+light\s+on\b/gi, 'clarifies'],
+  [/\ba\s+testament\s+to\b/gi, 'evidence of'],
+];
+
+const NUMERIC_CONFIDENCE_INLINE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;
+const PIPE_KEY_VALUE_INLINE = /\s*\|\s*(?:decision|recommendation|confidence|verdict|severity|fixability)\s*[:=]\s*[^|\n]*/gi;
+
+function safeCapitalise(first: string, second: string): string | null {
+  // Capitalise only when the next character is a lowercase letter, so a proper noun (iOS), a symbol
+  // (p-value, "p values"), a digit, or punctuation after a stripped opener is never corrupted.
+  if (!/[a-z]/.test(second)) {
+    return null;
+  }
+  return first.toUpperCase() + second;
+}
+
+export function sanitiseAuthorFacingBody(body: string): { body: string; removed: string[] } {
+  const removed: string[] = [];
+  const kept: string[] = [];
+  for (const line of body.split('\n')) {
+    const match = MACHINE_TOKEN_LINE.exec(line);
+    if (match === null) {
+      kept.push(line);
+      continue;
+    }
+    const [, prefix, label, sep, rest] = match;
+    const value = rest!.trim();
+    const words = value.split(/\s+/).filter(Boolean);
+    if (words.length >= 3) {
+      removed.push(`${label}${sep!.trim()}`);
+      const capped = safeCapitalise(value.charAt(0), value.charAt(1));
+      kept.push(`${prefix}${capped ?? value.slice(0, 2)}${value.slice(2)}`);
+      continue;
+    }
+    removed.push(`${label}${sep!.trim()}`);
+  }
+  let cleaned = kept.join('\n');
+  for (const [pattern, replacement] of [...ENUM_HUMANISE, ...TROPE_REPLACE]) {
+    cleaned = cleaned.replace(pattern, (hit) => {
+      removed.push(hit.toLowerCase());
+      return replacement;
+    });
+  }
+  cleaned = cleaned.replace(PIPE_KEY_VALUE_INLINE, (hit) => {
+    removed.push(hit.trim());
+    return '';
+  });
+  cleaned = cleaned.replace(NUMERIC_CONFIDENCE_INLINE, (hit) => {
+    removed.push(hit.trim());
+    return 'confidence';
+  });
+  cleaned = cleaned.replace(CONNECTIVE_OPENER, (full, pre: string, conn: string, c1: string, c2: string) => {
+    const capped = safeCapitalise(c1, c2);
+    if (capped === null) {
+      return full;
+    }
+    removed.push(conn.toLowerCase());
+    return `${pre}${capped}`;
+  });
+  return { body: cleaned, removed };
+}
+
 export function validateGrounding(input: GroundingInput): GroundingResult {
   const failures: string[] = [];
+  const kinds: Exclude<GroundingFailureKind, null>[] = [];
   let kind: GroundingFailureKind = null;
 
   const proseIds = extractFindingIds(stripQuarantineMarkers(input.authorFacingBody));
@@ -244,6 +333,7 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
   const ungrounded = [...authorIds, ...privateIds].filter((id) => !input.ledgerIds.has(id));
   if (ungrounded.length > 0) {
     kind = 'ungrounded-id';
+    kinds.push('ungrounded-id');
     failures.push(
       `finding ids cited in the deliverables are not current in the ledger: ${[...new Set(ungrounded)].join(', ')}`,
     );
@@ -252,12 +342,14 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
   const leaked = [...authorIds].filter((id) => input.editorOnlyIds.has(id));
   if (leaked.length > 0) {
     kind = 'editor-only-leak';
+    kinds.push('editor-only-leak');
     failures.push(`author-facing text references editor-only finding ids: ${[...new Set(leaked)].join(', ')}`);
   }
 
   const bannedHits = loadBannedVerdictTerms().filter((term) => bannedTermPattern(term).test(input.authorFacingBody));
   if (bannedHits.length > 0) {
     kind = 'banned-verdict-term';
+    kinds.push('banned-verdict-term');
     failures.push(`author-facing text contains banned verdict terminology: ${bannedHits.join(', ')}`);
   }
 
@@ -266,6 +358,7 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
     const inlineIds = [...proseIds, ...extractFindingIds(stripQuarantineMarkers(ancillary))];
     if (inlineIds.length > 0) {
       kind = 'id-in-prose';
+      kinds.push('id-in-prose');
       failures.push(
         `the shipped report body and rubric justifications must carry no finding ids; found inline: ${[...new Set(inlineIds)].join(', ')}`,
       );
@@ -273,11 +366,13 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
     const tokens = [...scanMachineTokens(input.authorFacingBody), ...scanMachineTokens(ancillary)];
     if (tokens.length > 0) {
       kind = 'machine-token';
+      kinds.push('machine-token');
       failures.push(`the shipped report body contains internal machine tokens: ${[...new Set(tokens)].join('; ')}`);
     }
     const tropes = [...scanAiTropes(input.authorFacingBody), ...scanAiTropes(ancillary)];
     if (tropes.length > 0) {
       kind = 'ai-trope';
+      kinds.push('ai-trope');
       failures.push(`the shipped report body contains machine-writing tells the humanize pass must remove: ${[...new Set(tropes)].join('; ')}`);
     }
   }
@@ -314,9 +409,10 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
     }
     if (mapFailures.length > 0) {
       kind = 'evidence-map-mismatch';
+      kinds.push('evidence-map-mismatch');
       failures.push(...mapFailures);
     }
   }
 
-  return { ok: failures.length === 0, kind, failures };
+  return { ok: failures.length === 0, kind, kinds, failures };
 }

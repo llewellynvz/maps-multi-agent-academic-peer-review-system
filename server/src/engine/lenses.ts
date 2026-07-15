@@ -101,21 +101,159 @@ export function selectActiveLenses(preset: Preset, activationMap: ActivationEntr
   return LENSES.filter((lens) => selected.has(lens.prefix));
 }
 
-const NON_DATA_DESIGNS = new Set(['theory', 'commentary', 'protocol']);
+const NON_DATA_DESIGNS = new Set([
+  'theory',
+  'theoretical',
+  'conceptual',
+  'conceptual framework',
+  'commentary',
+  'perspective',
+  'position',
+  'position paper',
+  'essay',
+  'opinion',
+  'viewpoint',
+  'framework',
+  'protocol',
+  'editorial',
+  'letter',
+  'thought experiment',
+]);
+
+const NON_DATA_KEYWORDS = ['theory', 'theoretical', 'conceptual', 'commentary', 'perspective', 'position', 'essay', 'opinion', 'viewpoint', 'editorial', 'framework'];
+
+// A design that names any of these carries primary empirical data, which overrides a stray
+// non-data word ("opinion survey", "theory-driven trial") so its empirical lenses are not stripped.
+const DATA_MARKERS = [
+  'survey',
+  'trial',
+  'experiment',
+  'cohort',
+  'questionnaire',
+  'sample',
+  'longitudinal',
+  'cross sectional',
+  'observational',
+  'randomi',
+  'regression',
+  'structural equation',
+  'interview',
+  'ethnograph',
+  'dataset',
+  'participants',
+  'field study',
+  'diary study',
+  'panel study',
+  'case study',
+];
 
 export function studyDesignAffirmsData(studyDesign: string): boolean {
-  return !NON_DATA_DESIGNS.has(studyDesign.toLowerCase().trim());
+  const design = studyDesign.toLowerCase().trim().replace(/[_-]+/g, ' ');
+  if (design === '') {
+    return true;
+  }
+  if (DATA_MARKERS.some((marker) => design.includes(marker))) {
+    return true;
+  }
+  if (NON_DATA_DESIGNS.has(design)) {
+    return false;
+  }
+  const words = new Set(design.split(/\s+/));
+  return !NON_DATA_KEYWORDS.some((keyword) => words.has(keyword));
+}
+
+const QUALITATIVE_MARKERS = [
+  'qualitative',
+  'interview',
+  'ethnograph',
+  'phenomenolog',
+  'grounded theory',
+  'thematic analysis',
+  'narrative inquiry',
+  'focus group',
+  'discourse analysis',
+  'content analysis',
+  'interpretative phenomenological',
+];
+
+// Exclude designs that are quantitative or mixed so a "quantitative content analysis" or a
+// "mixed methods study with thematic analysis" is not stripped of its statistical lenses.
+const QUANTITATIVE_MARKERS = ['quantitative', 'mixed method', 'mixed-method', 'regression', 'structural equation', 'randomi', 'survey experiment', 'econometric', 'psychometric'];
+
+// The subset of data markers that imply quantitative analysis, used to catch a mixed design that
+// names a qualitative method alongside quantitative data ("surveys and interviews") so its
+// statistical lenses are kept rather than stripped as if it were purely qualitative.
+const QUANTITATIVE_DATA_MARKERS = [
+  'survey',
+  'questionnaire',
+  'trial',
+  'experiment',
+  'cohort',
+  'longitudinal',
+  'cross sectional',
+  'regression',
+  'structural equation',
+  'randomi',
+  'psychometric',
+  'econometric',
+  'panel study',
+  'observational',
+];
+
+function normaliseDesign(studyDesign: string): string {
+  return studyDesign.toLowerCase().trim().replace(/[_-]+/g, ' ');
+}
+
+export function studyDesignHasQuantitativeData(studyDesign: string): boolean {
+  const design = normaliseDesign(studyDesign);
+  return QUANTITATIVE_DATA_MARKERS.some((marker) => design.includes(marker));
+}
+
+export function studyDesignIsMixed(studyDesign: string): boolean {
+  const design = normaliseDesign(studyDesign);
+  return design.includes('mixed method');
+}
+
+export function studyDesignIsQualitative(studyDesign: string): boolean {
+  const design = normaliseDesign(studyDesign);
+  if (design === '') {
+    return false;
+  }
+  if (QUANTITATIVE_MARKERS.some((marker) => design.includes(marker))) {
+    return false;
+  }
+  return QUALITATIVE_MARKERS.some((marker) => design.includes(marker));
+}
+
+export function qualitativeRigourNote(studyDesign: string): string | null {
+  return studyDesignIsQualitative(studyDesign)
+    ? 'This is a qualitative study; judge it on qualitative rigour (credibility and trustworthiness, saturation or information power, reflexivity and positionality, and analytic transparency) rather than statistical inference or psychometric properties.'
+    : null;
 }
 
 export function applyPaperTypeLensPolicy(
   active: LensDef[],
   paperType: PaperType | null,
   analystAffirmsData: boolean,
+  studyDesign = '',
 ): LensDef[] {
+  const prefixes = new Set(active.map((lens) => lens.prefix));
+  const qualitative = studyDesignIsQualitative(studyDesign);
+  if (studyDesignIsMixed(studyDesign) || (qualitative && studyDesignHasQuantitativeData(studyDesign))) {
+    prefixes.add('MIX');
+    prefixes.add('QUAL');
+    return LENSES.filter((lens) => prefixes.has(lens.prefix));
+  }
+  if (qualitative) {
+    for (const prefix of ['STAT', 'CAUS', 'MEAS']) {
+      prefixes.delete(prefix);
+    }
+    prefixes.add('QUAL');
+    return LENSES.filter((lens) => prefixes.has(lens.prefix));
+  }
   if (paperType === null || paperType === 'empirical') {
     return active;
   }
-  const prefixes = new Set(active.map((lens) => lens.prefix));
   if (paperType === 'theoretical' || paperType === 'perspective-or-opinion') {
     if (!analystAffirmsData) {
       for (const prefix of ['METH', 'STAT', 'MEAS', 'CAUS']) {

@@ -26,12 +26,13 @@ import { DispatchPauseError, type EngineDeps } from './phases-shared';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
-import { arbitrate, type ArbitrationRecord } from './arbitration';
+import { arbitrate, groundingKindsForceHalt, type ArbitrationRecord } from './arbitration';
 import {
   bodyHeadings,
   labelAppearsInBody,
   redactEditorOnlyIds,
   redactSupersededIds,
+  sanitiseAuthorFacingBody,
   tokenOverlap,
   validateGrounding,
   type GroundingFailureKind,
@@ -287,7 +288,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     let arbitration: ArbitrationRecord | null = null;
     let blocked = false;
     let blockReason = '';
-    let lastGroundingFailureKind: GroundingFailureKind = null;
+    let lastGroundingFailureKinds: Exclude<GroundingFailureKind, null>[] = [];
+    const scrubbedTokens: string[] = [];
     let lastObjection = '';
     let priorDefect = '';
     let lastShipped: ShippedReportEnvelope | null = null;
@@ -328,7 +330,18 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         },
       });
 
-      const shipped = withDerivedCitedIds(shippedRaw);
+      const derived = withDerivedCitedIds(shippedRaw);
+      const bodyScrub = sanitiseAuthorFacingBody(derived.bodyMarkdown);
+      scrubbedTokens.push(...bodyScrub.removed);
+      const shipped: ShippedReportEnvelope = {
+        ...derived,
+        bodyMarkdown: bodyScrub.body,
+        rubricTable: derived.rubricTable.map((row) => {
+          const justificationScrub = sanitiseAuthorFacingBody(row.justification);
+          scrubbedTokens.push(...justificationScrub.removed);
+          return { ...row, justification: justificationScrub.body };
+        }),
+      };
 
       const privateNotes = assemblePrivateNotes({
         recommendation: currentMeta.recommendation,
@@ -354,7 +367,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       });
 
       if (!grounding.ok) {
-        lastGroundingFailureKind = grounding.kind;
+        lastGroundingFailureKinds = grounding.kinds;
         lastObjection = grounding.failures.join('; ');
         const maskedObjection = redactSupersededIds(redactEditorOnlyIds(lastObjection, editorOnlyIds), ledgerIdsNow);
         priorDefect =
@@ -387,7 +400,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         continue;
       }
 
-      lastGroundingFailureKind = null;
+      lastGroundingFailureKinds = [];
       const runAudit = `Fix cycles used so far: ${fixCycles}. This is gate cycle ${cycle}.`;
       const critic = await runAgent<ReviewFinalCriticOutput>(deps, {
         reviewId,
@@ -485,7 +498,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       const ledgerIdsNow = new Set(currentAll.map((finding) => finding.id));
       arbitration = arbitrate({
         objection: lastObjection,
-        lastGroundingFailureKind,
+        groundingFailureKinds: lastGroundingFailureKinds,
         confidentialityOrVerdictObjection: false,
         recommendation: currentMeta.recommendation,
         decisionHingeIds: currentMeta.decisionHinges.map((hinge) => hinge.findingId),
@@ -538,6 +551,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         alignAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
       );
       const alignAuthorFacing = alignAll.filter((finding) => finding.scope !== 'editor_only');
+      let alignmentFallbackDetail: string | null = null;
       try {
         const alignedRaw = await runAgent<ShippedReportEnvelope>(deps, {
           reviewId,
@@ -569,7 +583,18 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             routingNote: `Deterministic arbitration set the recommendation to "${RECOMMENDATION_LABEL[narrowed].toLowerCase()}" with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register: write the category only in plain words exactly as quoted above, never as an underscore token, key-value line, or finding id. Only the recommendation framing changes: keep every section heading and bold problem label byte-identical to the prior report, and return the evidenceMap unchanged (the engine preserves the validated map regardless). In the structured envelope's recommendation field, use the machine value your schema requires; the plain words are for the prose only.`,
           },
         });
-        const aligned = withDerivedCitedIds({ ...alignedRaw, evidenceMap: lastShipped.evidenceMap });
+        const alignedDerived = withDerivedCitedIds({ ...alignedRaw, evidenceMap: lastShipped.evidenceMap });
+        const alignedBodyScrub = sanitiseAuthorFacingBody(alignedDerived.bodyMarkdown);
+        scrubbedTokens.push(...alignedBodyScrub.removed);
+        const aligned: ShippedReportEnvelope = {
+          ...alignedDerived,
+          bodyMarkdown: alignedBodyScrub.body,
+          rubricTable: alignedDerived.rubricTable.map((row) => {
+            const justificationScrub = sanitiseAuthorFacingBody(row.justification);
+            scrubbedTokens.push(...justificationScrub.removed);
+            return { ...row, justification: justificationScrub.body };
+          }),
+        };
         const alignedNotes = assemblePrivateNotes({
           recommendation: narrowed,
           recommendationConfidence: currentMeta.recommendationConfidence,
@@ -588,26 +613,44 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           evidenceMap: aligned.evidenceMap,
           authorFacingAncillary: aligned.rubricTable.map((row) => row.justification).join('\n'),
         });
-        if (alignedGrounding.ok) {
+        // A cosmetic-only residue ships rather than re-destroying an arbitrated review; only a substantive failure falls back.
+        if (alignedGrounding.ok || !groundingKindsForceHalt(alignedGrounding.kinds)) {
           lastShipped = aligned;
           lastPrivateNotes = alignedNotes.markdown;
         } else {
-          released = false;
-          blocked = true;
-          blockReason = `Arbitration narrowed the recommendation to ${narrowed} but the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
+          alignmentFallbackDetail = `the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
         }
       } catch (error) {
         if (error instanceof DispatchPauseError) {
           throw error;
         }
-        released = false;
-        blocked = true;
-        blockReason = `Arbitration narrowed the recommendation to ${narrowed} but no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
+        alignmentFallbackDetail = `no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      if (alignmentFallbackDetail !== null) {
+        // The narrowed-recommendation rewrite could not be produced cleanly, so the already-validated
+        // pre-alignment report ships at its own recommendation rather than losing a complete review.
+        finalRecommendation = currentMeta.recommendation;
+        writeArtefact(reviewId, 'p7-alignment-fallback', {
+          narrowedRecommendation: narrowed,
+          shippedRecommendation: finalRecommendation,
+          detail: alignmentFallbackDetail,
+        });
+        insertEvent(db, {
+          reviewId,
+          kind: 'arbitration',
+          phase: 'phase_7',
+          payload: {
+            outcome: 'alignment-fallback',
+            narrowedRecommendation: narrowed,
+            shippedRecommendation: finalRecommendation,
+            reason: 'the narrowed-recommendation rewrite failed validation; the prior validated report shipped instead',
+          },
+        });
       }
       emitGateVerdict(db, reviewId, {
         cycle: fixCycles,
         source: 'arbitration-alignment',
-        verdict: blocked ? 'block' : 'aligned',
+        verdict: alignmentFallbackDetail !== null ? 'aligned-fallback' : 'aligned',
         narrowedRecommendation: narrowed,
       });
     }
@@ -685,6 +728,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       recommendationConfidence: finalConfidence,
       rubricAverage: currentMeta.average,
       ...(arbitration !== null ? { arbitration } : {}),
+      ...(scrubbedTokens.length > 0 ? { scrubbedTokens: [...new Set(scrubbedTokens)] } : {}),
     };
     writeArtefact(reviewId, 'p7-gate-record', gateRecord);
 

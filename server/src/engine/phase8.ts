@@ -66,6 +66,52 @@ function ledgerSnapshotMarkdown(reviewId: string, findings: ReturnType<typeof ge
   return `${lines.join('\n')}\n`;
 }
 
+function coverageGapsMarkdown(deps: EngineDeps, reviewId: string): string | null {
+  const gaps: Array<{ step: string; unit: string }> = [];
+  for (const phase of ['phase_3', 'phase_4']) {
+    const snapshot = (getCheckpoint(deps.db, reviewId, checkpointKey(phase))?.snapshot ?? {}) as Record<string, unknown>;
+    const recorded = Array.isArray(snapshot.coverageGaps) ? snapshot.coverageGaps : [];
+    for (const entry of recorded) {
+      if (entry !== null && typeof entry === 'object' && 'unit' in entry && 'step' in entry) {
+        gaps.push({ step: String((entry as { step: unknown }).step), unit: String((entry as { unit: unknown }).unit) });
+      }
+    }
+  }
+  if (gaps.length === 0) {
+    return null;
+  }
+  const lines = [
+    '## Coverage limitations',
+    '',
+    'These review steps could not be completed this run and were recorded as coverage gaps. Weigh the review with them in mind:',
+    '',
+    ...gaps.map((gap) => `- ${gap.unit} (${gap.step}) did not complete and was skipped.`),
+  ];
+  return lines.join('\n');
+}
+
+function alignmentFallbackMarkdown(reviewId: string): string | null {
+  if (!artefactExists(reviewId, 'p7-alignment-fallback')) {
+    return null;
+  }
+  const fallback = readArtefact<{ narrowedRecommendation?: unknown; shippedRecommendation?: unknown }>(
+    reviewId,
+    'p7-alignment-fallback',
+  );
+  const narrowed = fallback.narrowedRecommendation;
+  const shipped = fallback.shippedRecommendation;
+  if (typeof narrowed !== 'string' || typeof shipped !== 'string') {
+    return null;
+  }
+  const narrowedLabel = (RECOMMENDATION_LABEL[narrowed as Recommendation] ?? narrowed).toLowerCase();
+  const shippedLabel = (RECOMMENDATION_LABEL[shipped as Recommendation] ?? shipped).toLowerCase();
+  return [
+    '## Arbitration note',
+    '',
+    `Arbitration judged the evidence to warrant ${narrowedLabel}, but the aligned rewrite of the report could not be produced cleanly this run, so the review ships at ${shippedLabel}. Weigh the recommendation with that in mind.`,
+  ].join('\n');
+}
+
 function runAuditText(gateRecord: Record<string, unknown>): string {
   const fixCycles = typeof gateRecord.fixCycles === 'number' ? gateRecord.fixCycles : 0;
   const verdict = typeof gateRecord.verdict === 'string' ? gateRecord.verdict : 'pass';
@@ -108,6 +154,16 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
   const phase7 = getCheckpoint(db, reviewId, checkpointKey('phase_7'));
   const snapshot = (phase7?.snapshot ?? {}) as Record<string, unknown>;
   const released = snapshot.released === true;
+
+  if (!released) {
+    upsertCheckpoint(db, {
+      reviewId,
+      phase: checkpointKey('phase_8'),
+      status: 'completed',
+      snapshot: { released: false, skipped: 'blocked_or_halted' },
+    });
+    return;
+  }
 
   const ctx = loadEngineContext(db, reviewId);
   const options = getReviewOptions(db, reviewId);
@@ -155,7 +211,12 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         confidential: false,
       });
 
-      const privateNotesBody = appendRunAudit(privateNotes.markdown, runAuditText(gateRecord));
+      const editorAddenda = [coverageGapsMarkdown(deps, reviewId), alignmentFallbackMarkdown(reviewId)].filter(
+        (section): section is string => section !== null,
+      );
+      const notesWithGaps =
+        editorAddenda.length > 0 ? `${privateNotes.markdown}\n\n${editorAddenda.join('\n\n')}` : privateNotes.markdown;
+      const privateNotesBody = appendRunAudit(notesWithGaps, runAuditText(gateRecord));
       const notesDocx = await renderDeliverableDocx({
         title: 'Reviewer\'s private notes',
         kicker: 'Editor-only',

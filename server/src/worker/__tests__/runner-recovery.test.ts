@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
-import { updateReview } from '../../workflow/repo';
+import { insertEvent, recordEngineFailure, updateReview } from '../../workflow/repo';
 import { WorkerRunner, type WorkerProcessors } from '../runner';
 import type { StopSignal } from '../supervisor';
 
@@ -92,6 +92,57 @@ function seedForeignLease(workerId: string, heartbeatAt: string): void {
     .prepare('INSERT INTO settings (key, value_json, updated_at) VALUES (?, ?, ?)')
     .run('worker_lease', JSON.stringify({ workerId, heartbeatAt }), new Date().toISOString());
 }
+
+describe('self-describing failures and retry terminals (S0b, S0d)', () => {
+  it('records a self-describing run_terminal with the error type and the failing phase', () => {
+    const id = 'rev-selfdescribe';
+    insertReview(id, new Date().toISOString());
+    updateReview(client.db, id, { currentPhase: 'phase_3' });
+    recordEngineFailure(client.db, id, 'TypeError');
+    const term = client.sqlite
+      .prepare("SELECT phase, payload_json FROM review_events WHERE review_id = ? AND kind = 'run_terminal' ORDER BY seq DESC LIMIT 1")
+      .get(id) as { phase: string; payload_json: string };
+    expect(term.phase).toBe('phase_3');
+    const payload = JSON.parse(term.payload_json) as { errorClass: string; reason: string; phase: string };
+    expect(payload.errorClass).toBe('engine_error');
+    expect(payload.reason).toContain('TypeError');
+    expect(payload.reason).toContain('phase_3');
+    expect(payload.phase).toBe('phase_3');
+    expect(reviewStatus(id)).toBe('failed');
+  });
+
+  it('never lets a raw exception message reach the streamed terminal (confidentiality)', () => {
+    const id = 'rev-leakguard';
+    insertReview(id, new Date().toISOString());
+    updateReview(client.db, id, { currentPhase: 'phase_2' });
+    recordEngineFailure(client.db, id, 'schema validation failed: received "the abstract text of the manuscript"');
+    const term = client.sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'run_terminal' ORDER BY seq DESC LIMIT 1")
+      .get(id) as { payload_json: string };
+    expect(term.payload_json).not.toContain('abstract text of the manuscript');
+    expect((JSON.parse(term.payload_json) as { reason: string }).reason).toContain('Error');
+  });
+
+  it('does not duplicate the terminal within one run but appends a fresh one after a retry', () => {
+    const id = 'rev-retry-terminal';
+    insertReview(id, new Date().toISOString());
+    updateReview(client.db, id, { currentPhase: 'phase_7' });
+    recordEngineFailure(client.db, id, 'FirstError');
+    recordEngineFailure(client.db, id, 'DuplicateWithinTheSameRun');
+    let terms = client.sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'run_terminal' ORDER BY seq")
+      .all(id) as { payload_json: string }[];
+    expect(terms.length).toBe(1);
+
+    insertEvent(client.db, { reviewId: id, kind: 'gate_verdict', phase: 'phase_7', payload: { cycle: 0 } });
+    recordEngineFailure(client.db, id, 'SecondErrorAfterRetry');
+    terms = client.sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'run_terminal' ORDER BY seq")
+      .all(id) as { payload_json: string }[];
+    expect(terms.length).toBe(2);
+    expect((JSON.parse(terms[1]!.payload_json) as { reason: string }).reason).toContain('SecondErrorAfterRetry');
+  });
+});
 
 describe('WorkerRunner lease heartbeat throttling (F10)', () => {
   it('refreshes the held lease only after it ages past a third of the stale window', async () => {

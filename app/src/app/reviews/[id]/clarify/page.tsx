@@ -8,7 +8,7 @@ import { Icon, Meter, Pill, Spinner } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 import { Section } from '@/components/Section';
 import { ChoiceChips } from '@/components/ChoiceChips';
-import { CheckCard } from '@/components/CheckCard';
+import { CheckChips } from '@/components/CheckChips';
 import { DetectedSummary } from '@/components/DetectedSummary';
 
 const PRESET_TIME: Record<string, string> = {
@@ -180,33 +180,48 @@ export default function ClarifyPage(): ReactNode {
 
       {layout.showVerification ? (
         <Section number={verificationNum} eyebrow="Verification options" title="Extra checks before we start">
-          <div className="stack-12">
-            {layout.referenceAudit !== null ? (
-              <CheckCard
-                checked={resolveAnswer(layout.referenceAudit, answers) === 'forensic'}
-                onChange={(checked) => setAnswers((prev) => ({ ...prev, [layout.referenceAudit!.id]: checked ? 'forensic' : 'standard' }))}
-                title="Forensic reference audit"
-                description="Every reference is located and checked, with nothing dropped by the standard cap."
-                costNote="Slower"
-              />
-            ) : null}
-            {layout.claimCheck !== null ? (
-              <CheckCard
-                checked={resolveAnswer(layout.claimCheck, answers) === 'yes'}
-                onChange={(checked) => setAnswers((prev) => ({ ...prev, [layout.claimCheck!.id]: checked ? 'yes' : 'no' }))}
-                title="Claims-vs-citation check"
-                description="We fetch the abstracts of the load-bearing sources and check the manuscript's claims against them."
-              />
-            ) : null}
-            {layout.aiDetection !== null ? (
-              <CheckCard
-                checked={resolveAnswer(layout.aiDetection, answers) === 'yes'}
-                onChange={(checked) => setAnswers((prev) => ({ ...prev, [layout.aiDetection!.id]: checked ? 'yes' : 'no' }))}
-                title="AI-content screening"
-                description="In-context signals with clear false-positive caveats. This stays editor-only and is never phrased as an accusation."
-              />
-            ) : null}
-          </div>
+          <CheckChips
+            options={[
+              ...(layout.referenceAudit !== null
+                ? [
+                    {
+                      key: 'referenceAudit',
+                      label: 'Forensic reference audit',
+                      costNote: 'Slower',
+                      description: 'Every reference is located and checked, with nothing dropped by the standard cap.',
+                      checked: resolveAnswer(layout.referenceAudit, answers) === 'forensic',
+                      onChange: (checked: boolean) =>
+                        setAnswers((prev) => ({ ...prev, [layout.referenceAudit!.id]: checked ? 'forensic' : 'standard' })),
+                    },
+                  ]
+                : []),
+              ...(layout.claimCheck !== null
+                ? [
+                    {
+                      key: 'claimCheck',
+                      label: 'Claims-vs-citation check',
+                      description: "We fetch the abstracts of the load-bearing sources and check the manuscript's claims against them.",
+                      checked: resolveAnswer(layout.claimCheck, answers) === 'yes',
+                      onChange: (checked: boolean) =>
+                        setAnswers((prev) => ({ ...prev, [layout.claimCheck!.id]: checked ? 'yes' : 'no' })),
+                    },
+                  ]
+                : []),
+              ...(layout.aiDetection !== null
+                ? [
+                    {
+                      key: 'aiDetection',
+                      label: 'AI-content screening',
+                      description:
+                        'In-context signals with clear false-positive caveats. This stays editor-only and is never phrased as an accusation.',
+                      checked: resolveAnswer(layout.aiDetection, answers) === 'yes',
+                      onChange: (checked: boolean) =>
+                        setAnswers((prev) => ({ ...prev, [layout.aiDetection!.id]: checked ? 'yes' : 'no' })),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </Section>
       ) : null}
 

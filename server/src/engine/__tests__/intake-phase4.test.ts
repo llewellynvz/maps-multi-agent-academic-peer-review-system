@@ -172,6 +172,60 @@ describe('phase 4 AI-content analyst wiring', () => {
   });
 });
 
+describe('phase 4 graceful degradation', () => {
+  it('records a coverage gap and still completes when one integrity cluster fails all retries', async () => {
+    seedReview({ aiDetection: 'no' });
+    const failing = 'reporting-and-reproducibility';
+    const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
+      if (input.agent === 'integrity-screener') {
+        const cluster = /cluster "([^"]+)"/.exec(String(input.parts.prompt))?.[1] ?? 'unknown';
+        if (cluster === failing) {
+          throw new Error('provider unavailable');
+        }
+        return successResult(integrity(cluster));
+      }
+      if (input.agent === 'phase-critic') {
+        return successResult({ verdict: 'clean', defects: [], strongestGap: 'No material gap.', selfCritique });
+      }
+      throw new Error(`unexpected agent ${input.agent}`);
+    };
+    await runPhase4({ db, runDispatch }, reviewId);
+
+    const cp = sqlite
+      .prepare("SELECT status, snapshot_json FROM phase_checkpoints WHERE review_id = ? AND phase = 'engine_phase_4'")
+      .get(reviewId) as { status: string; snapshot_json: string } | undefined;
+    expect(cp?.status).toBe('completed');
+    const snapshot = JSON.parse(cp!.snapshot_json) as { coverageGaps: Array<{ unit: string }> };
+    expect(snapshot.coverageGaps.some((gap) => gap.unit.includes(failing))).toBe(true);
+
+    const gap = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'error' AND payload_json LIKE '%coverageGap%'")
+      .get(reviewId) as { payload_json: string } | undefined;
+    expect(gap).toBeDefined();
+    const payload = JSON.parse(gap!.payload_json) as { unit: string; reason: string };
+    expect(payload.unit).toContain(failing);
+    expect(payload.reason).not.toContain('provider unavailable');
+  });
+
+  it('halts for retry when every integrity cluster fails, since integrity screening is required', async () => {
+    seedReview({ aiDetection: 'no' });
+    const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
+      if (input.agent === 'integrity-screener') {
+        throw new Error('provider unavailable');
+      }
+      if (input.agent === 'phase-critic') {
+        return successResult({ verdict: 'clean', defects: [], strongestGap: 'No material gap.', selfCritique });
+      }
+      throw new Error(`unexpected agent ${input.agent}`);
+    };
+    await expect(runPhase4({ db, runDispatch }, reviewId)).rejects.toThrow(/integrity screening is required/);
+    const cp = sqlite
+      .prepare("SELECT status FROM phase_checkpoints WHERE review_id = ? AND phase = 'engine_phase_4'")
+      .get(reviewId) as { status: string } | undefined;
+    expect(cp?.status).not.toBe('completed');
+  });
+});
+
 describe('withheld-prior invariant', () => {
   it('never places the user prior into any phase 1-6 dispatch input (NAMED)', async () => {
     seedReview({ userPrior: PRIOR_SENTINEL, aiDetection: 'yes' });

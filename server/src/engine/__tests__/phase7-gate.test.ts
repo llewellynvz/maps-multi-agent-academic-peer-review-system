@@ -360,17 +360,68 @@ describe('phase 7 release gate routing', () => {
     expect(harness.writerInputs[1]).toContain('id-free');
   });
 
-  it('routes back machine tokens in the shipped prose, with the natural-prose instruction', async () => {
+  it('humanises an inline enum token so the review ships instead of routing back', async () => {
     const withTokens = {
       ...shippedObject(),
-      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\nDecision: major_revision | Confidence: 0.78`,
+      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\nThe category should fall to major_revision if unresolved.`,
     };
     const harness = mockDeps([critic('pass')], withTokens);
     await runPhase7(harness.deps, reviewId);
+    expect(harness.criticCalls).toBe(1);
+    expect(checkpointRow().snapshot.released).toBe(true);
+    const shipped = readArtefact<{ bodyMarkdown: string }>(reviewId, 'p7-shipped-final');
+    expect(shipped.bodyMarkdown).toContain('major revision');
+    expect(shipped.bodyMarkdown).not.toContain('major_revision');
+  });
+
+  it('auto-scrubs a structured decision line so the review ships instead of routing back', async () => {
+    const withDecisionLine = {
+      ...shippedObject(),
+      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\n- Decision: major_revision`,
+    };
+    const harness = mockDeps([critic('pass')], withDecisionLine);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.criticCalls).toBe(1);
+    expect(checkpointRow().snapshot.released).toBe(true);
+  });
+
+  it('ships via arbitration on an unresolvable cosmetic trope instead of destroying the review', async () => {
+    const trope = '\n\nThe contribution is not only strong but also genuinely valuable here.';
+    const base = shippedObject();
+    const tropeMajor = { ...base, bodyMarkdown: `${base.bodyMarkdown}${trope}` };
+    const tropeNarrowed = { ...base, recommendation: 'reject_and_resubmit', bodyMarkdown: `${base.bodyMarkdown}${trope}` };
+    const harness = mockDeps([critic('pass')], undefined, undefined, [tropeMajor, tropeMajor, tropeNarrowed]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
+    expect(cp.gate).toBe('arbitrated');
     expect(harness.criticCalls).toBe(0);
-    expect(checkpointRow().snapshot.released).toBe(false);
-    expect(harness.writerInputs[1]).toContain('natural reviewer prose');
-    expect(harness.writerInputs[1]).toContain('major_revision');
+    const review = sqlite.prepare('SELECT recommendation FROM reviews WHERE id = ?').get(reviewId) as { recommendation: string };
+    expect(review.recommendation).toBe('reject_and_resubmit');
+  });
+
+  it('falls back to the pre-alignment report when the narrowed rewrite introduces a substantive defect, never losing the review', async () => {
+    const trope = '\n\nThe contribution is not only strong but also genuinely valuable here.';
+    const base = shippedObject();
+    const tropeMajor = { ...base, bodyMarkdown: `${base.bodyMarkdown}${trope}` };
+    const alignedBadId = {
+      ...base,
+      recommendation: 'reject_and_resubmit',
+      bodyMarkdown: `${base.bodyMarkdown}\n\nSee REV-STAT-0001 in the record.`,
+    };
+    const harness = mockDeps([critic('pass')], undefined, undefined, [tropeMajor, tropeMajor, alignedBadId]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
+    const review = sqlite.prepare('SELECT status, recommendation FROM reviews WHERE id = ?').get(reviewId) as { status: string; recommendation: string };
+    expect(review.status).not.toBe('failed');
+    expect(review.recommendation).toBe('major_revision');
+    const fallback = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'arbitration' AND payload_json LIKE '%alignment-fallback%'")
+      .get(reviewId) as { payload_json: string } | undefined;
+    expect(fallback).toBeDefined();
+    const shipped = readArtefact<{ bodyMarkdown: string }>(reviewId, 'p7-shipped-final');
+    expect(shipped.bodyMarkdown).not.toContain('REV-STAT-0001');
   });
 
   it('routes back an evidence map whose labels are missing from the body', async () => {
@@ -576,18 +627,20 @@ describe('phase 7 release gate routing', () => {
     expect(checkpointRow().snapshot.released).toBe(true);
   });
 
-  it('halts instead of releasing a report that cannot be aligned with the narrowed recommendation', async () => {
+  it('falls back to the pre-alignment report when the narrowed rewrite cannot be produced, never losing the review', async () => {
     const harness = mockDeps([critic('revise'), critic('revise')]);
     await runPhase7(harness.deps, reviewId);
     const cp = checkpointRow();
-    expect(cp.snapshot.released).toBe(false);
-    const review = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(reviewId) as { status: string };
-    expect(review.status).toBe('failed');
+    expect(cp.snapshot.released).toBe(true);
+    const review = sqlite.prepare('SELECT status, recommendation FROM reviews WHERE id = ?').get(reviewId) as { status: string; recommendation: string };
+    expect(review.status).not.toBe('failed');
+    expect(review.recommendation).toBe('major_revision');
     const alignEvents = sqlite
       .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'gate_verdict'")
       .all(reviewId)
       .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source: string; verdict: string });
-    expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'block')).toBe(true);
+    expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'aligned-fallback')).toBe(true);
+    expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'block')).toBe(false);
   });
 
   it('never shows superseded ids to the writer: stale ids in upstream artefacts are masked', async () => {

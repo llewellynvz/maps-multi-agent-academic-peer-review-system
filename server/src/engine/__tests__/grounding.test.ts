@@ -3,6 +3,7 @@ import {
   loadBannedVerdictTerms,
   redactEditorOnlyIds,
   redactSupersededIds,
+  sanitiseAuthorFacingBody,
   scanAiTropes,
   scanMachineTokens,
   validateGrounding,
@@ -370,5 +371,99 @@ describe('id-free prose and evidence map validation', () => {
   it('keeps legacy behaviour when idFreeProse and evidenceMap are absent', () => {
     const result = validateGrounding(base());
     expect(result.ok).toBe(true);
+  });
+
+  it('reports every distinct failure kind, not only the last one', () => {
+    const input = idFreeBase();
+    input.authorFacingBody =
+      '**Causal claims on a cross-sectional design.** See REV-STAT-0001. Furthermore, it plays a crucial role.';
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kinds).toContain('id-in-prose');
+    expect(result.kinds).toContain('ai-trope');
+  });
+});
+
+describe('deterministic author-facing scrub', () => {
+  it('removes a structured decision line so it never reaches the gate', () => {
+    const { body, removed } = sanitiseAuthorFacingBody(
+      'I recommend major revision, held with high confidence.\n- Decision: minor_revision\nThe design is sound.',
+    );
+    expect(scanMachineTokens(body)).toHaveLength(0);
+    expect(removed.join(' ')).toContain('Decision');
+    expect(body).toContain('The design is sound.');
+  });
+
+  it('drops a connective opener and capitalises the next word, keeping the sentence', () => {
+    const { body } = sanitiseAuthorFacingBody('The model is thin. Overall, the evidence is weak.');
+    expect(body).toBe('The model is thin. The evidence is weak.');
+    expect(scanAiTropes(body)).toHaveLength(0);
+  });
+
+  it('reproduces the 4346ead3 halt cause: decision line removed, banned term and mid-sentence connective neutralised', () => {
+    const raw = 'The design is weak. Overall, this is a paradigm shift for the field.\n- Decision: minor_revision';
+    const { body } = sanitiseAuthorFacingBody(raw);
+    expect(scanMachineTokens(body)).toHaveLength(0);
+    expect(body).not.toContain('paradigm shift');
+    expect(body).not.toMatch(/\boverall,/i);
+    expect(body).toContain('The design is weak.');
+  });
+
+  it('leaves clean prose and legitimate bold labels untouched', () => {
+    const clean = '**Causal claims on a cross-sectional design.** The design cannot carry the mediation claim.';
+    expect(sanitiseAuthorFacingBody(clean).body).toBe(clean);
+  });
+
+  it('never rewrites a bold problem label that opens with a connective, so the evidence map stays in sync', () => {
+    const label = 'Importantly, the mediation is unidentified.';
+    const body = `Dear Editor and Authors, I recommend major revision.\n\n**${label}** The instrument cannot separate the paths.`;
+    const scrubbed = sanitiseAuthorFacingBody(body);
+    expect(scrubbed.body).toContain(`**${label}**`);
+    const result = validateGrounding({
+      authorFacingBody: scrubbed.body,
+      authorFacingCitedIds: ['REV-STAT-0001'],
+      privateNotesBody: '',
+      privateNotesReferencedIds: [],
+      ledgerIds,
+      editorOnlyIds,
+      idFreeProse: true,
+      evidenceMap: [{ section: '4A.1', label, anchor: 'Section 5', findingIds: ['REV-STAT-0001'] }],
+    });
+    expect(result.kinds).not.toContain('evidence-map-mismatch');
+  });
+
+  it('does not corrupt a mixed-case or hyphenated token after a stripped connective', () => {
+    expect(sanitiseAuthorFacingBody('The build failed. Overall, iOS crashed on launch.').body).toContain('iOS');
+    expect(sanitiseAuthorFacingBody('The test ran. Notably, p-values exceeded 0.05.').body).toContain('p-values');
+  });
+
+  it('keeps real prose on a mislabelled recommendation line, dropping only the label prefix', () => {
+    const { body } = sanitiseAuthorFacingBody('Recommendation: collect a second wave before the causal claim can stand.');
+    expect(body).toBe('Collect a second wave before the causal claim can stand.');
+    expect(scanMachineTokens(body)).toHaveLength(0);
+  });
+
+  it('humanises internal enum tokens so they never ship to the author', () => {
+    const { body } = sanitiseAuthorFacingBody('The evidence points to major_revision, not editor_only handling.');
+    expect(body).not.toMatch(/major_revision|editor_only/);
+    expect(body).toContain('major revision');
+    expect(body).toContain('editorial');
+    expect(scanMachineTokens(body)).toHaveLength(0);
+  });
+
+  it('removes an inline pipe key-value and strips a numeric confidence', () => {
+    expect(sanitiseAuthorFacingBody('I recommend rejection | Confidence: high').body).not.toContain('| Confidence');
+    const { body } = sanitiseAuthorFacingBody('I hold this at a confidence of 0.82 for now.');
+    expect(scanMachineTokens(body)).toHaveLength(0);
+    expect(body).toContain('confidence');
+  });
+
+  it('neutralises a banned marketing term rather than shipping it', () => {
+    expect(sanitiseAuthorFacingBody('This is a cutting-edge, groundbreaking contribution.').body).not.toMatch(/cutting-edge|groundbreaking/i);
+  });
+
+  it('does not corrupt a statistical symbol after a stripped connective', () => {
+    const { body } = sanitiseAuthorFacingBody('The result held. Notably, p values were low.');
+    expect(body).toContain('p values');
   });
 });
