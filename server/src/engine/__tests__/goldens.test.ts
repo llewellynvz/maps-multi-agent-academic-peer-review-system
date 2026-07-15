@@ -385,6 +385,7 @@ describe('AGENT-30 golden fixtures', () => {
       'quality-metrics-engine:default',
       'journal-scope-scorer:default',
       'review-calibrator:default',
+      'prior-stress-test:default',
     ];
     for (const pair of engineConsumed) {
       expect(boundModes.has(pair)).toBe(true);
@@ -401,6 +402,9 @@ describe('AGENT-30 golden fixtures', () => {
       'citation-auditor:default',
       'specialist-reviewer:default',
       'integrity-screener:default',
+      'ai-content-analyst:default',
+      'citation-auditor:claims',
+      'phase-critic:default',
       'swarm:A',
       'review-report-writer:A',
     ];
