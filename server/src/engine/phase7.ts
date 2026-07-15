@@ -39,7 +39,7 @@ import {
 import { matchLens, paperTypeNote } from './lenses';
 import { mergeFindingsOnce } from './merge';
 import { readIntakeOptions } from './options';
-import { assemblePrivateNotes } from './private-notes';
+import { assemblePrivateNotes, RECOMMENDATION_LABEL } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
 const MAX_FIX_CYCLES = 2;
@@ -550,7 +550,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               },
               { label: 'Arbitration rationale', content: arbitration.rationale },
             ],
-            routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register (no taxonomy tokens, no key-value lines, no finding ids in the body). Only the recommendation framing changes: keep every section heading and bold problem label byte-identical to the prior report, and return the evidenceMap unchanged (the engine preserves the validated map regardless).`,
+            routingNote: `Deterministic arbitration set the recommendation to "${RECOMMENDATION_LABEL[narrowed].toLowerCase()}" with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register: write the category only in plain words exactly as quoted above, never as an underscore token, key-value line, or finding id. Only the recommendation framing changes: keep every section heading and bold problem label byte-identical to the prior report, and return the evidenceMap unchanged (the engine preserves the validated map regardless). In the structured envelope's recommendation field, use the machine value your schema requires; the plain words are for the prose only.`,
           },
         });
         const aligned = withDerivedCitedIds({ ...alignedRaw, evidenceMap: lastShipped.evidenceMap });

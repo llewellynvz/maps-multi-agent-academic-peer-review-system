@@ -505,6 +505,12 @@ describe('phase 7 release gate routing', () => {
     );
     expect(final.evidenceMap.flatMap((entry) => entry.findingIds)).not.toContain('REV-CTX-9313');
     expect([...final.citedFindingIds].sort()).toEqual([...AUTHOR_IDS].sort());
+    const alignmentInput = JSON.parse(harness.writerInputs[harness.writerInputs.length - 1] ?? '{}') as {
+      parts?: { prompt?: string };
+    };
+    const userPrompt = alignmentInput.parts?.prompt ?? '';
+    expect(userPrompt).toContain('reject and resubmit');
+    expect(userPrompt.includes('reject_and_resubmit')).toBe(false);
   });
 
   it('aligns the released report with the arbitration-narrowed recommendation', async () => {

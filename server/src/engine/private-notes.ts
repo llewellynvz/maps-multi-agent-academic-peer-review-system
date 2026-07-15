@@ -1,7 +1,7 @@
 import type { CurrentFinding } from '../ledger';
 import type { Recommendation } from '@mara/shared';
 
-const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
+export const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   accept: 'Accept',
   minor_revision: 'Minor revision',
   major_revision: 'Major revision',
