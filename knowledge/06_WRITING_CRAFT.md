@@ -88,7 +88,7 @@ The shipped report is written by a reviewer, not printed by a system. Its prose 
 - **Taxonomy tokens and underscore compounds** ("reject_and_resubmit", "minor_revision"). Write the decision as a sentence: "I recommend rejection with an invitation to resubmit."
 - **Key-value lines** ("Decision: major_revision | Confidence: 0.78"). The recommendation and its confidence are prose. Confidence is carried in calibrated words, never a bare number: "I hold this recommendation with high confidence", or "the evidence sits close to the boundary with major revision, and I say so with moderate confidence."
 - **Finding ids** (REV-STAT-0001) in the shipped report body. Grounding travels in the structured evidence map returned alongside the body, never inline in the prose. The internal report and the private notes keep ids: those are audit documents.
-- **Pipeline vocabulary**: ledger, lens, dispatch, swarm, artefact, phase, gate, orchestrator. The reader is an author or an editor, and none of these words mean anything to them.
+- **Pipeline vocabulary**: ledger, lens, dispatch, swarm, artefact, phase, gate, orchestrator, dossier ("the field dossier"). The reader is an author or an editor, and none of these words mean anything to them. Name the literature itself ("recent workplace mindfulness meta-analyses"), never the internal package it arrived in.
 
 A deterministic scan enforces this at the release gate. One machine token in shipped prose is a routed-back defect, not a style note.
 
