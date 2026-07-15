@@ -41,6 +41,16 @@ function checkpointKey(phase: string): string {
   return `engine_${phase}`;
 }
 
+function confidenceBandPhrase(confidence: number): string {
+  if (confidence >= 0.9) {
+    return 'high confidence';
+  }
+  if (confidence >= 0.7) {
+    return 'reasonable confidence';
+  }
+  return 'stated reservations';
+}
+
 function journalName(options: Record<string, unknown>): string | null {
   const answers = (options.answers ?? {}) as Record<string, unknown>;
   return typeof answers.journal === 'string' ? answers.journal : null;
@@ -120,18 +130,24 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         ? gateRecord.recommendationConfidence
         : shipped.recommendationConfidence;
       const nowDate = new Date().toISOString().slice(0, 10);
+      const reviewRow = db.select({ title: reviews.title }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
+      const reviewTitle =
+        typeof reviewRow?.title === 'string' && reviewRow.title.trim().length > 0
+          ? reviewRow.title.trim()
+          : 'Peer review report';
+      const manuscriptTitle = ctx.sectionMap.title ?? 'not extracted';
 
       const reportMeta: DeliverableMetadataRow[] = [
-        { label: 'Review', value: reviewId, mono: true },
+        { label: 'Manuscript', value: manuscriptTitle.length > 110 ? `${manuscriptTitle.slice(0, 107)}...` : manuscriptTitle, mono: false },
         { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation], mono: false },
-        { label: 'Confidence', value: confidence.toFixed(2), mono: true },
+        { label: 'Confidence', value: confidenceBandPhrase(confidence), mono: false },
         { label: 'Rubric average', value: (typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : meta.average).toFixed(1), mono: true },
         { label: 'Date', value: nowDate, mono: true },
       ];
       const reportDocx = await renderDeliverableDocx({
-        title: 'Peer review report',
+        title: reviewTitle,
         kicker: 'Peer review',
-        subtitle: `${RECOMMENDATION_LABEL[recommendation]} at confidence ${confidence.toFixed(2)}.`,
+        subtitle: `${RECOMMENDATION_LABEL[recommendation]}, held with ${confidenceBandPhrase(confidence)}.`,
         metadata: reportMeta,
         bodyMarkdown: shipped.bodyMarkdown,
         confidential: false,

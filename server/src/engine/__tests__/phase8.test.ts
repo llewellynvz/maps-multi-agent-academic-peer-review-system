@@ -212,12 +212,14 @@ describe('phase 8 production and close-out', () => {
     expect(existsSync(manuscriptBlobPath(reviewId, 'memory/lessons.json'))).toBe(true);
   });
 
-  it('excludes editor-only ids from the author-facing docx', async () => {
+  it('excludes editor-only ids and internal identifiers from the author-facing docx', async () => {
     await runPhase7(deps(), reviewId);
     await runPhase8(deps(), reviewId);
     const zip = await JSZip.loadAsync(readFileSync(manuscriptBlobPath(reviewId, 'output/author-letter.docx')));
     const xml = await zip.file('word/document.xml')!.async('string');
     expect(xml).not.toContain('REV-SIM-0001');
+    expect(xml).not.toContain(reviewId);
+    expect(xml).not.toContain('at confidence 0.8');
   });
 
   it('completes the review and records the phase 8 checkpoint with the composite', async () => {
