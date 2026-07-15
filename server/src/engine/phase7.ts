@@ -534,7 +534,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           validate: (value) => {
             const envelope = value as ShippedReportEnvelope;
             if (envelope.recommendation !== narrowed) {
-              throw new Error(`the arbitrated recommendation is ${narrowed}; the envelope and the report body must state it`);
+              throw new Error(
+                `the arbitrated category is "${RECOMMENDATION_LABEL[narrowed].toLowerCase()}"; set the envelope recommendation field to the matching schema value and argue that category in the body in plain words`,
+              );
             }
           },
           assembleInput: {
