@@ -113,7 +113,7 @@ export function replayEvents(db: MaraDatabase, reviewId: string, afterSeq: numbe
     }
     if (row.kind === 'finding_recorded') {
       const findingId = (safeParse(row.payloadJson) as { findingId?: string }).findingId;
-      if (findingId !== undefined && !currentFindingIds.has(findingId)) {
+      if (findingId === undefined || !currentFindingIds.has(findingId)) {
         continue;
       }
     }
