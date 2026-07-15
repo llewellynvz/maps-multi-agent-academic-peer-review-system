@@ -24,13 +24,27 @@ export function findingHeadline(finding: {
   severity: string;
   scope: string;
 }): FindingHeadline {
+  const authorFacing = finding.scope === 'author_facing' || finding.scope === 'both';
+  if (!authorFacing) {
+    return {
+      findingId: finding.id,
+      severity: finding.severity,
+      scope: finding.scope,
+      lensPrefix: '',
+      lensDisplay: 'Confidential',
+      headline: 'Confidential signal recorded',
+    };
+  }
   const lensPrefix = lensPrefixOf(finding.id);
   const lensDisplay = PREFIX_DISPLAY[lensPrefix] ?? 'Review';
-  const authorFacing = finding.scope === 'author_facing' || finding.scope === 'both';
-  const headline = authorFacing
-    ? `${lensDisplay} recorded a ${finding.severity} issue`
-    : 'Confidential signal recorded';
-  return { findingId: finding.id, severity: finding.severity, scope: finding.scope, lensPrefix, lensDisplay, headline };
+  return {
+    findingId: finding.id,
+    severity: finding.severity,
+    scope: finding.scope,
+    lensPrefix,
+    lensDisplay,
+    headline: `${lensDisplay} recorded a ${finding.severity} issue`,
+  };
 }
 
 export function announceFindings(db: MaraDatabase, reviewId: string, announced: Set<string>): void {

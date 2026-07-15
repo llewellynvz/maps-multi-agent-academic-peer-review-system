@@ -17,6 +17,7 @@ import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { type LensDef, matchLens, normalisePreset } from './lenses';
 import { mergeFindingsOnce } from './merge';
+import { readIntakeOptions } from './options';
 import { DispatchPauseError, type EngineDeps } from './phases-shared';
 
 export interface PhaseCritiqueInput {
@@ -165,6 +166,9 @@ async function redispatchIntegrity(
   fixInstruction: string,
 ): Promise<void> {
   const ctx = loadEngineContext(deps.db, reviewId);
+  const intake = readIntakeOptions(getReviewOptions(deps.db, reviewId));
+  const route: IntegrityClusterRoute =
+    intake.aiDetection && cluster.name === 'similarity-and-ai-content' ? { ...cluster, prefixes: ['SIM'] } : cluster;
   const analystA = readArtefact<ManuscriptStructure>(reviewId, 'p1-analyst-a');
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const result = await runAgent<IntegrityScreenerOutput>(deps, {
@@ -181,7 +185,7 @@ async function redispatchIntegrity(
         { label: 'Claim-evidence matrix', content: JSON.stringify(analystB.claimEvidenceMatrix) },
         { label: 'Phase-critic instruction', content: fixInstruction },
       ],
-      routingNote: `Adversarial phase-critic re-dispatch, integrity cluster "${cluster.name}", rubrics ${cluster.prefixes
+      routingNote: `Adversarial phase-critic re-dispatch, integrity cluster "${route.name}", rubrics ${route.prefixes
         .map((prefix) => `REV-${prefix}`)
         .join(' and ')}. ${fixInstruction} Findings are editorial signals, never verdicts; a serious signal is editor-only. Set each finding's lens to its rubric code and prefix its id REV-<rubric>.`,
     },
@@ -189,7 +193,7 @@ async function redispatchIntegrity(
   const knownIds = new Set(getCurrentFindings(deps.db, reviewId).map((finding) => finding.id));
   const groups = new Map<string, Finding[]>();
   for (const finding of result.findings) {
-    const prefix = routeIntegrityPrefix(finding.lens, cluster.prefixes);
+    const prefix = routeIntegrityPrefix(finding.lens, route.prefixes);
     const enforced: Finding =
       (finding.severity === 'major' || finding.severity === 'fatal') && finding.scope !== 'editor-only'
         ? { ...finding, scope: 'editor-only' }

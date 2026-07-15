@@ -20,7 +20,7 @@ import {
   updateReview,
   upsertCheckpoint,
 } from '../workflow/repo';
-import { readArtefact, writeArtefact } from './artefacts';
+import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext } from './context';
 import { persistDeliverable } from './deliverables';
 import { runAgent } from './dispatch-agent';
@@ -113,7 +113,9 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
   const options = getReviewOptions(db, reviewId);
   const fullReport = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
   const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
-  const meta = readArtefact<ReviewMetaReviewerOutput>(reviewId, 'p7-meta-final');
+  const meta = artefactExists(reviewId, 'p7-meta-final')
+    ? readArtefact<ReviewMetaReviewerOutput>(reviewId, 'p7-meta-final')
+    : null;
 
   await withPhase('phase_8', async () => {
     updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_8' });
@@ -141,7 +143,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         { label: 'Manuscript', value: manuscriptTitle.length > 110 ? `${manuscriptTitle.slice(0, 107)}...` : manuscriptTitle, mono: false },
         { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation], mono: false },
         { label: 'Confidence', value: confidenceBandPhrase(confidence), mono: false },
-        { label: 'Rubric average', value: (typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : meta.average).toFixed(1), mono: true },
+        { label: 'Rubric average', value: (typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : (meta?.average ?? 0)).toFixed(1), mono: true },
         { label: 'Date', value: nowDate, mono: true },
       ];
       const reportDocx = await renderDeliverableDocx({
@@ -301,13 +303,13 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
 
     const lessons = {
       reviewId,
-      recommendation: released ? meta.recommendation : null,
-      rubricAverage: meta.average,
+      recommendation: released ? (meta?.recommendation ?? null) : null,
+      rubricAverage: meta?.average ?? null,
       composite: metrics.composite,
       decisionStability: swarm.decisionStability,
       scopeFit: scope.score,
       calibrationMode: calibration.mode,
-      bottlenecks: meta.bottlenecks,
+      bottlenecks: meta?.bottlenecks ?? [],
       note: 'Cross-review lessons: no lessons table in the schema; persisted as an artefact for later import.',
       recordedAt: new Date().toISOString(),
     };
@@ -318,7 +320,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
       'mara.composite': metrics.composite,
       'mara.scope_fit': scope.score,
       'mara.calibration_mode': calibration.mode,
-      'mara.recommendation': released ? meta.recommendation : 'not-released',
+      'mara.recommendation': released ? (meta?.recommendation ?? 'not-released') : 'not-released',
     });
 
     if (released) {
