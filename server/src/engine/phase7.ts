@@ -107,6 +107,10 @@ function ledgerForReport(findings: CurrentFinding[]): Array<Record<string, unkno
   }));
 }
 
+function withDerivedCitedIds(shipped: ShippedReportEnvelope): ShippedReportEnvelope {
+  return { ...shipped, citedFindingIds: [...new Set(shipped.evidenceMap.flatMap((entry) => entry.findingIds))] };
+}
+
 function recommendationPackage(meta: ReviewMetaReviewerOutput): Record<string, unknown> {
   return {
     recommendation: meta.recommendation,
@@ -245,7 +249,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
 
       const redact = (content: string): string =>
         redactSupersededIds(redactEditorOnlyIds(content, editorOnlyIds), ledgerIdsNow);
-      const shipped = await runAgent<ShippedReportEnvelope>(deps, {
+      const shippedRaw = await runAgent<ShippedReportEnvelope>(deps, {
         reviewId,
         phase: 'phase_7',
         agent: 'review-report-writer',
@@ -269,6 +273,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
+
+      const shipped = withDerivedCitedIds(shippedRaw);
 
       const privateNotes = assemblePrivateNotes({
         recommendation: currentMeta.recommendation,
@@ -476,7 +482,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       );
       const alignAuthorFacing = alignAll.filter((finding) => finding.scope !== 'editor_only');
       try {
-        const aligned = await runAgent<ShippedReportEnvelope>(deps, {
+        const alignedRaw = await runAgent<ShippedReportEnvelope>(deps, {
           reviewId,
           phase: 'phase_7',
           agent: 'review-report-writer',
@@ -504,6 +510,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register (no taxonomy tokens, no key-value lines, no finding ids in the body). Findings, evidence, the evidenceMap, and citedFindingIds stay exactly as they are; only the recommendation framing changes.`,
           },
         });
+        const aligned = withDerivedCitedIds(alignedRaw);
         const alignedNotes = assemblePrivateNotes({
           recommendation: narrowed,
           recommendationConfidence: currentMeta.recommendationConfidence,

@@ -382,6 +382,15 @@ describe('phase 7 release gate routing', () => {
     expect(harness.writerInputs[1]).toContain('evidence map');
   });
 
+  it('derives citedFindingIds from the evidence map when the writer omits an id', async () => {
+    const sloppyUnion = { ...shippedObject(), citedFindingIds: ['REV-STAT-0001'] };
+    const harness = mockDeps([critic('pass')], sloppyUnion);
+    await runPhase7(harness.deps, reviewId);
+    expect(checkpointRow().snapshot.released).toBe(true);
+    const final = readArtefact<{ citedFindingIds: string[] }>(reviewId, 'p7-shipped-final');
+    expect([...final.citedFindingIds].sort()).toEqual([...AUTHOR_IDS].sort());
+  });
+
   it('embeds the meta editorial synthesis in the private notes with superseded ids masked', async () => {
     const harness = mockDeps([critic('pass')]);
     await runPhase7(harness.deps, reviewId);
