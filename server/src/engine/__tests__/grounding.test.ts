@@ -280,6 +280,19 @@ describe('id-free prose and evidence map validation', () => {
     expect(result.kind).toBe('machine-token');
   });
 
+  it('matches labels across unicode hyphen and quote variants', () => {
+    const input = idFreeBase();
+    input.authorFacingBody += '\n\n### 4A.4 Statistical model under‑reported and over‑interpreted (major)\nDetail follows.';
+    input.evidenceMap.push({
+      section: '4A.4',
+      label: 'Statistical model under-reported and over-interpreted (major)',
+      anchor: 'Section 3',
+      findingIds: ['REV-MAP-0001'],
+    });
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(true);
+  });
+
   it('keeps legacy behaviour when idFreeProse and evidenceMap are absent', () => {
     const result = validateGrounding(base());
     expect(result.ok).toBe(true);

@@ -111,17 +111,25 @@ const NUMERIC_CONFIDENCE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\
 const HEADING_LINE = /^#{1,6}\s+(.+)$/gm;
 const HEADING_NUMBERING = /^(?:\d+[A-Za-z]?(?:\.\d+)*[.)]?)\s+/;
 
+export function canonicalPunctuation(value: string): string {
+  return value
+    .replace(/[‐-―−]/g, '-')
+    .replace(/[‘’]/g, String.fromCharCode(39))
+    .replace(/[“”]/g, String.fromCharCode(34))
+    .replace(/ /g, ' ');
+}
+
 export function bodyHeadings(body: string): string[] {
   const headings: string[] = [];
-  for (const match of body.matchAll(HEADING_LINE)) {
+  for (const match of canonicalPunctuation(body).matchAll(HEADING_LINE)) {
     headings.push((match[1] ?? '').replace(HEADING_NUMBERING, '').trim());
   }
   return headings;
 }
 
 export function labelAppearsInBody(body: string, label: string): boolean {
-  const wanted = label.trim();
-  if (body.includes(`**${wanted}`)) {
+  const wanted = canonicalPunctuation(label).trim();
+  if (canonicalPunctuation(body).includes(`**${wanted}`)) {
     return true;
   }
   return bodyHeadings(body).some((heading) => heading === wanted || heading.startsWith(wanted));
