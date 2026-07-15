@@ -50,7 +50,9 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
         data: {
           ts: row.ts,
           kind: 'web_query',
-          message: `Citation lookup via ${row.egressTarget ?? 'unknown source'}${blocked ? ' blocked by the egress guard' : ''}: ${truncate(row.egressQuery ?? '', 100)}`,
+          message: blocked
+            ? `Citation lookup via ${row.egressTarget ?? 'unknown source'} blocked by the egress guard; the query text is withheld because it overlapped protected manuscript text`
+            : `Citation lookup via ${row.egressTarget ?? 'unknown source'}: ${truncate(row.egressQuery ?? '', 100)}`,
         },
       };
     }

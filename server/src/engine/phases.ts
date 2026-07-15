@@ -14,7 +14,14 @@ import type {
 } from '@mara/shared';
 import { randomBytes } from 'node:crypto';
 import type { MaraDatabase } from '../db/client';
-import { type FetchLike, OPENALEX_HOST, reconstructAbstract, searchTopics, type TopicSearchResult } from '../citations';
+import {
+  createRateLimiter,
+  type FetchLike,
+  OPENALEX_HOST,
+  reconstructAbstract,
+  searchTopics,
+  type TopicSearchResult,
+} from '../citations';
 import { getCurrentFindings } from '../ledger';
 import { buildProtectedCorpus } from '../security';
 import { withPhase } from '../tracing';
@@ -294,7 +301,7 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
             kind: 'web_query',
             phase: 'phase_2',
             egressTarget: entry.target,
-            egressQuery: entry.query,
+            egressQuery: entry.blocked ? '[query withheld: it overlapped protected manuscript text]' : entry.query,
             payload: { blocked: entry.blocked, reason: entry.reason, signature: entry.signature },
           }),
       });
@@ -316,15 +323,18 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
           });
         }
       }
+      const retrievalLimiter = createRateLimiter();
       if (executedQueries.length > 0 && deps.egress !== undefined) {
         topicResults = await searchTopics(executedQueries, deps.egress.fetch, {
           maxQueries: topicCap ?? executedQueries.length,
           perQueryPerSource: 5,
+          rateLimiter: retrievalLimiter,
         });
       }
       if (intake.claimCheck && deps.egress !== undefined) {
         const verified = clientVerdicts.filter((verdict) => verdict.status === 'verified' && verdict.matchedDoi !== null);
         for (const verdict of verified.slice(0, claimsCap(ctx.preset))) {
+          await retrievalLimiter.acquire(OPENALEX_HOST);
           const abstract = await fetchAbstractByDoi(deps.egress.fetch, verdict.matchedDoi as string);
           claimAbstracts.push({ referenceIndex: verdict.referenceIndex, title: verdict.title, abstract });
         }

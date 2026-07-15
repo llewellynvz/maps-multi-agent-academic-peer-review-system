@@ -1,4 +1,5 @@
 import { CROSSREF_HOST, OPENALEX_HOST } from './allowlist';
+import { createRateLimiter, type RateLimiter } from './rate-limiter';
 import type { FetchLike } from './types';
 
 export interface TopicSearchItem {
@@ -17,11 +18,13 @@ export interface TopicSearchResult {
   query: string;
   source: 'openalex' | 'crossref';
   items: TopicSearchItem[];
+  status: string;
 }
 
 export interface TopicSearchOptions {
   maxQueries: number;
   perQueryPerSource?: number;
+  rateLimiter?: RateLimiter;
 }
 
 const DEFAULT_PER_QUERY_PER_SOURCE = 5;
@@ -43,15 +46,15 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-async function readJson(fetchImpl: FetchLike, url: string): Promise<unknown> {
+async function readJson(fetchImpl: FetchLike, url: string): Promise<{ body?: unknown; status: string }> {
   const response = await fetchImpl(url);
   if (!response.ok) {
-    return undefined;
+    return { status: `http error ${response.status}` };
   }
   try {
-    return await response.json();
+    return { body: await response.json(), status: 'ok' };
   } catch {
-    return undefined;
+    return { status: 'invalid json' };
   }
 }
 
@@ -168,7 +171,12 @@ function collect(
   return out;
 }
 
-async function searchOpenAlex(query: string, fetchImpl: FetchLike, keep: number): Promise<TopicSearchItem[]> {
+interface SourceOutcome {
+  items: TopicSearchItem[];
+  status: string;
+}
+
+async function searchOpenAlex(query: string, fetchImpl: FetchLike, keep: number): Promise<SourceOutcome> {
   try {
     const url = new URL(`https://${OPENALEX_HOST}/works`);
     url.searchParams.set('search', query);
@@ -177,23 +185,23 @@ async function searchOpenAlex(query: string, fetchImpl: FetchLike, keep: number)
       'select',
       'id,title,display_name,publication_year,doi,abstract_inverted_index,cited_by_count,authorships',
     );
-    const results = asArray(asRecord(await readJson(fetchImpl, url.toString()))?.results);
-    return collect(results, openAlexItem, keep);
+    const { body, status } = await readJson(fetchImpl, url.toString());
+    return { items: collect(asArray(asRecord(body)?.results), openAlexItem, keep), status };
   } catch {
-    return [];
+    return { items: [], status: 'network error' };
   }
 }
 
-async function searchCrossref(query: string, fetchImpl: FetchLike, keep: number): Promise<TopicSearchItem[]> {
+async function searchCrossref(query: string, fetchImpl: FetchLike, keep: number): Promise<SourceOutcome> {
   try {
     const url = new URL(`https://${CROSSREF_HOST}/works`);
     url.searchParams.set('query.bibliographic', query);
     url.searchParams.set('rows', '5');
     url.searchParams.set('select', 'DOI,title,published,issued,author,container-title');
-    const items = asArray(asRecord(asRecord(await readJson(fetchImpl, url.toString()))?.message)?.items);
-    return collect(items, crossrefItem, keep);
+    const { body, status } = await readJson(fetchImpl, url.toString());
+    return { items: collect(asArray(asRecord(asRecord(body)?.message)?.items), crossrefItem, keep), status };
   } catch {
-    return [];
+    return { items: [], status: 'network error' };
   }
 }
 
@@ -203,15 +211,20 @@ export async function searchTopics(
   opts: TopicSearchOptions,
 ): Promise<TopicSearchResult[]> {
   const keep = opts.perQueryPerSource ?? DEFAULT_PER_QUERY_PER_SOURCE;
+  const limiter = opts.rateLimiter ?? createRateLimiter();
+  const throttled: FetchLike = async (url) => {
+    await limiter.acquire(new URL(url).host);
+    return fetchImpl(url);
+  };
   const limited = queries.slice(0, opts.maxQueries);
   const results: TopicSearchResult[] = [];
   for (const query of limited) {
     const [openalex, crossref] = await Promise.all([
-      searchOpenAlex(query, fetchImpl, keep),
-      searchCrossref(query, fetchImpl, keep),
+      searchOpenAlex(query, throttled, keep),
+      searchCrossref(query, throttled, keep),
     ]);
-    results.push({ query, source: 'openalex', items: openalex });
-    results.push({ query, source: 'crossref', items: crossref });
+    results.push({ query, source: 'openalex', items: openalex.items, status: openalex.status });
+    results.push({ query, source: 'crossref', items: crossref.items, status: crossref.status });
   }
   return results;
 }

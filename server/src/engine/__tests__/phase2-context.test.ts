@@ -256,6 +256,17 @@ describe('phase 2 field dossier', () => {
     expect(webQueries.some((entry) => entry.payload.blocked === true && entry.payload.reason === 'ngram')).toBe(true);
     expect(webQueries.some((entry) => entry.payload.blocked === false)).toBe(true);
 
+    const blockedRows = sqlite
+      .prepare(
+        "SELECT egress_query FROM review_events WHERE review_id = ? AND kind = 'web_query' AND json_extract(payload_json, '$.blocked') = 1",
+      )
+      .all(reviewId) as Array<{ egress_query: string }>;
+    expect(blockedRows.length).toBeGreaterThan(0);
+    for (const row of blockedRows) {
+      expect(row.egress_query).toContain('withheld');
+      expect(row.egress_query).not.toContain('strengths intervention improved');
+    }
+
     const topic = readArtefact<{ results: Array<{ query: string; items: unknown[] }> }>(reviewId, 'p2-topic-results');
     const blocked = topic.results.filter((entry) =>
       entry.query.startsWith('the strengths intervention improved employee wellbeing'),

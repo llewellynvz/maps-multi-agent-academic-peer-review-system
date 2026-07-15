@@ -136,6 +136,30 @@ describe('searchTopics', () => {
     expect(calls.length).toBeGreaterThan(0);
   });
 
+  it('surfaces a rate-limited host as an http error status instead of a silently empty result', async () => {
+    const tooMany: HttpResponse = { ok: false, status: 429, json: async () => ({}) };
+    const { fetchImpl } = routedFetch(tooMany, crossrefBody([CROSSREF_ITEM]));
+    const results = await searchTopics(['brief interventions'], fetchImpl, { maxQueries: 5 });
+    const openAlex = results.find((entry) => entry.source === 'openalex');
+    const crossref = results.find((entry) => entry.source === 'crossref');
+    expect(openAlex?.items).toEqual([]);
+    expect(openAlex?.status).toBe('http error 429');
+    expect(crossref?.status).toBe('ok');
+  });
+
+  it('spaces same-host requests through the rate limiter', async () => {
+    const acquired: string[] = [];
+    const limiter = {
+      acquire: async (host: string) => {
+        acquired.push(host);
+      },
+    };
+    const { fetchImpl } = routedFetch(openAlexBody([]), crossrefBody([]));
+    await searchTopics(['one', 'two'], fetchImpl, { maxQueries: 5, rateLimiter: limiter });
+    expect(acquired.filter((host) => host === OPENALEX_HOST)).toHaveLength(2);
+    expect(acquired.filter((host) => host === CROSSREF_HOST)).toHaveLength(2);
+  });
+
   it('enforces the maxQueries cap and runs only the supplied fetch', async () => {
     const { fetchImpl, calls } = routedFetch(openAlexBody([]), crossrefBody([]));
     const results = await searchTopics(['one', 'two', 'three'], fetchImpl, { maxQueries: 1 });

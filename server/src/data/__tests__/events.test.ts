@@ -119,6 +119,22 @@ describe('activity log stream confidentiality (H2c)', () => {
     expect(data.ts.length).toBeGreaterThan(0);
   });
 
+  it('withholds the query text of a blocked egress row from the stream, even when the persisted row carries it', () => {
+    insertReview('rev-log3');
+    const manuscriptSpan = 'the unpublished intervention lowered burnout by forty percent among nurses';
+    client.sqlite
+      .prepare(
+        "INSERT INTO review_events (id, review_id, seq, ts, kind, phase, payload_json, egress_target, egress_query) VALUES (?, 'rev-log3', 1, ?, 'web_query', 'phase_2', '{\"blocked\":true,\"reason\":\"ngram\"}', 'openalex', ?)",
+      )
+      .run(randomUUID(), new Date().toISOString(), `/works?search=${manuscriptSpan}`);
+    const mapped = replayEvents(client.db, 'rev-log3', 0)[0];
+    const data = mapped?.data as { message: string };
+    expect(data.message).toContain('blocked by the egress guard');
+    expect(data.message).toContain('withheld');
+    expect(data.message).not.toContain('unpublished intervention');
+    expect(data.message).not.toContain('search=');
+  });
+
   it('keeps finding claims and manuscript text out of every log surface', () => {
     insertReview('rev-log2');
     insertFinding('REV-STAT-0001', 'rev-log2', 'author_facing', 'the unpublished thesis result is fabricated', 'major');
@@ -152,6 +168,9 @@ describe('editor-only masking (API-25, UI-33)', () => {
     const editorEvent = events.find((e) => (e.data as { findingId: string }).findingId === 'REV-SIM-0001');
     expect((editorEvent?.data as { scope: string }).scope).toBe('editor_only');
     expect((editorEvent?.data as { headline: string }).headline).toBe('Confidential signal recorded');
+    expect((editorEvent?.data as { lensDisplay: string }).lensDisplay).toBe('Confidential');
+    expect((editorEvent?.data as { lensPrefix: string }).lensPrefix).toBe('');
+    expect((editorEvent?.data as { severity: string }).severity).toBe('major');
 
     const ephemeral = JSON.stringify(deriveEphemeral(client.db, 'rev-3'));
     expect(ephemeral).not.toContain('unpublished thesis');
