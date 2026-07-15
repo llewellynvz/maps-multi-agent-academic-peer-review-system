@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { api, type Question, type QuestionsResponse } from '@/lib/api';
 import { Icon, Meter, Pill, Spinner } from '@/components/ui';
+import { PageHeader } from '@/components/PageHeader';
 
 const PRESET_DELTA: Record<string, { cost: string; time: string }> = {
   fast: { cost: 'cost -60%', time: 'time -55%' },
@@ -102,9 +103,11 @@ export default function ClarifyPage(): ReactNode {
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <p className="eyebrow">Clarifying questions</p>
-      <h1 className="h1">Confirm what we detected</h1>
-      <p className="sub" style={{ marginBottom: 24 }}>Everything here is optional. Skip with defaults to proceed using the detected values.</p>
+      <PageHeader
+        eyebrow="Clarifying questions"
+        title="Confirm what we detected"
+        sub="Everything here is optional. Skip with defaults to proceed using the detected values."
+      />
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 className="h3">What we read</h2>

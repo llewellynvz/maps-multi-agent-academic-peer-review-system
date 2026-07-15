@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { api, type Detected } from '@/lib/api';
 import { Icon, Meter, Pill } from '@/components/ui';
+import { PageHeader } from '@/components/PageHeader';
 
 type Phase = 'idle' | 'uploading' | 'parsing' | 'ready' | 'error';
 
@@ -79,9 +80,12 @@ export default function NewReviewPage(): ReactNode {
 
   return (
     <div>
-      <p className="eyebrow">New review</p>
-      <h1 className="h1">Bring a manuscript in</h1>
-      <div className="grid-2" style={{ marginTop: 24, gridTemplateColumns: '3fr 2fr' }}>
+      <PageHeader
+        eyebrow="New review"
+        title="Bring a manuscript in"
+        sub="Upload a PDF or DOCX. We read the structure, then ask a few quick questions before the review starts."
+      />
+      <div className="grid-2" style={{ gridTemplateColumns: '3fr 2fr' }}>
         <div>
           <div
             className={`dropzone ${dragOver ? 'dragover' : ''} ${phase === 'error' ? 'reject' : ''}`}

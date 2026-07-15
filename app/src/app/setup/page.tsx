@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { api } from '@/lib/api';
 import { Icon, Pill, Spinner, Stepper } from '@/components/ui';
+import { PageHeader } from '@/components/PageHeader';
 
 const STEPS = ['Provider and key', 'Tier preset', 'Defaults', 'Telemetry', 'Review'];
 
@@ -51,9 +52,12 @@ export default function SetupPage(): ReactNode {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <p className="eyebrow">First run</p>
-      <h1 className="h1">Set up MARA</h1>
-      <div className="card" style={{ marginTop: 24 }}>
+      <PageHeader
+        eyebrow="First run"
+        title="Set up MARA"
+        sub="Connect a provider, choose a speed and cost tier, and set your defaults. This takes about a minute."
+      />
+      <div className="card">
         <Stepper steps={STEPS} current={step} />
 
         {step === 0 ? (

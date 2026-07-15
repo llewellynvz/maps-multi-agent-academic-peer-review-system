@@ -364,6 +364,8 @@ main.page { flex: 1; padding: 40px 0 80px; }
 
 .h-display { font-family: var(--font-sans); font-size: var(--fs-display); font-weight: 700; line-height: 1.08; letter-spacing: 0.002em; color: var(--fg-1); margin: 8px 0; }
 
+.clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
 .section + .section { border-top: 1px solid var(--border-1); padding-top: var(--space-7); margin-top: var(--space-7); }
 .section-eyebrow { font-family: var(--font-mono); font-size: var(--fs-micro); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--psy-lime); margin: 0 0 8px; }
 .section-title { font-size: var(--fs-h2); font-weight: 700; color: var(--fg-1); letter-spacing: 0.003em; margin: 0 0 8px; }

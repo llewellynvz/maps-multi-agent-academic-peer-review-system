@@ -28,7 +28,7 @@ function LoginForm(): ReactNode {
     <div style={{ maxWidth: 420, margin: '40px auto' }}>
       <div className="card">
         <p className="eyebrow">Instance passphrase</p>
-        <h1 className="h2">Unlock this instance</h1>
+        <h1 className="h1">Unlock this instance</h1>
         <p className="sub" style={{ marginBottom: 20 }}>This instance is protected by a passphrase. Enter it to continue.</p>
         <form onSubmit={submit}>
           <div className="field">

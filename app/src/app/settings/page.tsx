@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { api, type ProviderKeyView, type PublicSettings, type ReviewSummary } from '@/lib/api';
 import { Icon, Pill, Spinner } from '@/components/ui';
+import { PageHeader } from '@/components/PageHeader';
 import { SideDrawer } from '@/components/SideDrawer';
 
 export default function SettingsPage(): ReactNode {
@@ -68,8 +69,11 @@ export default function SettingsPage(): ReactNode {
 
   return (
     <div>
-      <p className="eyebrow">Settings</p>
-      <h1 className="h1" style={{ marginBottom: 24 }}>Manage your instance</h1>
+      <PageHeader
+        eyebrow="Settings"
+        title="Manage your instance"
+        sub="Providers, the instance passphrase, telemetry, and the reviews stored on disk."
+      />
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 className="h3">Providers and keys</h2>

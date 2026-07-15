@@ -45,7 +45,7 @@ export function SideDrawer({
     <div>
       <div className="drawer-scrim" onClick={onClose} aria-hidden="true" />
       <div className="drawer" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={panelRef}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div className="spread" style={{ marginBottom: 20 }}>
           <h2 className="h2" style={{ margin: 0 }}>
             {title}
           </h2>

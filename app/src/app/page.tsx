@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { api, type InstanceStats, type ReviewSummary } from '@/lib/api';
-import { formatDate, formatDuration, formatUsd, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
+import { api, type ReviewSummary } from '@/lib/api';
+import { formatDate, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
 import { Icon, Pill, Spinner, StatTile } from '@/components/ui';
+import { PageHeader } from '@/components/PageHeader';
+import { Section } from '@/components/Section';
+import { EmptyState } from '@/components/EmptyState';
 
 function isRunning(status: string): boolean {
   return status === 'running' || status === 'sanitizing' || status === 'awaiting_input' || status === 'queued';
@@ -20,37 +23,75 @@ function reviewHref(review: ReviewSummary): string {
   return `/reviews/${review.id}/run`;
 }
 
-function ReviewCard({ review }: { review: ReviewSummary }): ReactNode {
+const CARD_STYLE = { display: 'flex', flexDirection: 'column' as const, gap: 14 };
+
+function CardTop({ review }: { review: ReviewSummary }): ReactNode {
   const tone = statusTone(review.status);
   const running = isRunning(review.status);
+  const label = running && review.currentPhase !== null ? phaseLabel(review.currentPhase) : tone.label;
   return (
-    <Link href={reviewHref(review)} className="card card-hover" style={{ display: 'block' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-        <h2 className="h3" style={{ margin: 0 }}>
-          {review.title ?? 'Untitled manuscript'}
-        </h2>
+    <div className="spread">
+      <span className="row" style={{ gap: 8 }}>
+        <Pill tone={tone.tone} label={label} />
         {running ? <span className="timeline-dot node-active" aria-hidden="true" /> : null}
-      </div>
-      <p className="mono" style={{ color: 'var(--fg-4)', fontSize: 13, margin: '6px 0 16px' }}>{formatDate(review.createdAt)}</p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Pill tone={tone.tone} label={running && review.currentPhase !== null ? phaseLabel(review.currentPhase) : tone.label} />
-        {review.recommendation !== null ? (
-          <Pill tone="neutral" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} />
-        ) : null}
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span className="mono stat-num" style={{ fontSize: 22 }}>
-            {review.rubricAverage !== null ? review.rubricAverage.toFixed(1) : '--'}
-          </span>
-          <span className="muted" style={{ fontSize: 13 }}>/ 5</span>
+      </span>
+      <span className="mono" style={{ color: 'var(--fg-4)', fontSize: 13 }}>{formatDate(review.createdAt)}</span>
+    </div>
+  );
+}
+
+function CardBody({ review }: { review: ReviewSummary }): ReactNode {
+  return (
+    <>
+      <h2 className="h3 clamp-2" style={{ margin: 0 }}>{review.title ?? 'Untitled manuscript'}</h2>
+      {review.findingsCount > 0 ? (
+        <span className="chip-hint">
+          {review.findingsCount} finding{review.findingsCount === 1 ? '' : 's'} recorded
         </span>
-      </div>
+      ) : null}
+    </>
+  );
+}
+
+function ReviewCard({ review }: { review: ReviewSummary }): ReactNode {
+  if (review.status === 'failed') {
+    return (
+      <article className="card" style={CARD_STYLE}>
+        <CardTop review={review} />
+        <CardBody review={review} />
+        <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
+          <Link href={`/reviews/${review.id}/run`} className="btn btn-secondary">Resume</Link>
+          <Link href={`/reviews/${review.id}/results`} className="btn btn-ghost">View partial results</Link>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <Link href={reviewHref(review)} className="card card-hover" style={CARD_STYLE}>
+      <CardTop review={review} />
+      <CardBody review={review} />
+      {review.status === 'completed' ? (
+        <div className="spread" style={{ marginTop: 'auto' }}>
+          {review.recommendation !== null ? (
+            <Pill tone="neutral" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} />
+          ) : (
+            <span />
+          )}
+          <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span className="mono stat-num" style={{ fontSize: 22 }}>
+              {review.rubricAverage !== null ? review.rubricAverage.toFixed(1) : '--'}
+            </span>
+            <span className="muted" style={{ fontSize: 13 }}>/ 5</span>
+          </span>
+        </div>
+      ) : null}
     </Link>
   );
 }
 
 export default function LibraryPage(): ReactNode {
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);
-  const [stats, setStats] = useState<InstanceStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -62,10 +103,6 @@ export default function LibraryPage(): ReactNode {
         if (active) {
           setReviews(result.reviews);
           setError(null);
-        }
-        const instanceStats = await api.getInstanceStats().catch(() => null);
-        if (active && instanceStats !== null) {
-          setStats(instanceStats);
         }
       } catch (err) {
         if (active) {
@@ -81,6 +118,23 @@ export default function LibraryPage(): ReactNode {
     };
   }, []);
 
+  const stats = useMemo(() => {
+    if (reviews === null) {
+      return null;
+    }
+    const completed = reviews.filter((review) => review.status === 'completed');
+    const rated = completed.filter((review) => review.rubricAverage !== null);
+    const average = rated.length > 0
+      ? rated.reduce((sum, review) => sum + (review.rubricAverage ?? 0), 0) / rated.length
+      : null;
+    return {
+      total: reviews.length,
+      completed: completed.length,
+      running: reviews.filter((review) => isRunning(review.status)).length,
+      average,
+    };
+  }, [reviews]);
+
   const sorted = useMemo(() => {
     if (reviews === null) {
       return null;
@@ -89,59 +143,71 @@ export default function LibraryPage(): ReactNode {
     return [...filtered].sort((a, b) => Number(isRunning(b.status)) - Number(isRunning(a.status)));
   }, [reviews, query]);
 
+  const hasReviews = reviews !== null && reviews.length > 0;
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div>
-          <p className="eyebrow">Library</p>
-          <h1 className="h1">Your reviews</h1>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div className="field" style={{ margin: 0 }}>
-            <label className="sr-only" htmlFor="search">Search reviews</label>
-            <input id="search" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: 180 }} />
-          </div>
-          <Link href="/reviews/new" className="btn btn-primary">
-            <Icon name="plus" /> New review
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Library"
+        title="Your reviews"
+        sub="Every manuscript you have put through MARA, with its status, findings, and outcome in one place."
+        actions={
+          <>
+            <div className="field" style={{ margin: 0 }}>
+              <label className="sr-only" htmlFor="search">Search reviews</label>
+              <input id="search" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: 200 }} />
+            </div>
+            <Link href="/reviews/new" className="btn btn-primary">
+              <Icon name="plus" /> New review
+            </Link>
+          </>
+        }
+      />
 
-      {stats !== null && stats.runCount > 0 ? (
-        <div className="card" style={{ marginBottom: 24 }} aria-label="Instance statistics">
-          <p className="eyebrow" style={{ marginBottom: 14 }}>Across all reviews</p>
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-            <StatTile label="Reviews" value={String(stats.runCount)} />
-            <StatTile label="Completion rate" value={`${Math.round(stats.completionRate * 100)}%`} />
-            <StatTile label="Cost per run" value={formatUsd(stats.costPerRun)} />
-            <StatTile label="Retry rate" value={`${Math.round(stats.retryRate * 100)}%`} />
-            <StatTile label="Avg time to complete" value={formatDuration(stats.timeToFirstReviewMs)} />
-          </div>
-        </div>
-      ) : null}
+      {error !== null ? <div style={{ marginBottom: 20 }}><Pill tone="fail" label={error} /></div> : null}
 
-      {error !== null ? <Pill tone="fail" label={error} /> : null}
-
-      {sorted === null && error === null ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--fg-3)' }}>
+      {reviews === null && error === null ? (
+        <div className="row" style={{ color: 'var(--fg-3)' }}>
           <Spinner /> Loading reviews
         </div>
       ) : null}
 
-      {sorted !== null && sorted.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 56 }}>
-          <h2 className="h2">No reviews yet</h2>
-          <p className="sub" style={{ margin: '8px auto 20px' }}>Bring a manuscript in to produce a developmental peer review.</p>
-          <Link href="/reviews/new" className="btn btn-primary">Start your first review</Link>
-        </div>
+      {reviews !== null && reviews.length === 0 ? (
+        <EmptyState
+          icon="upload"
+          title="Start your first review"
+          steps={[
+            'Upload a manuscript as a PDF or DOCX',
+            'Confirm the detected scope and focus',
+            'Receive a developmental peer review',
+          ]}
+          cta={<Link href="/reviews/new" className="btn btn-primary"><Icon name="plus" /> New review</Link>}
+        />
       ) : null}
 
-      {sorted !== null && sorted.length > 0 ? (
-        <div className="grid-3">
-          {sorted.map((review) => (
-            <ReviewCard key={review.id} review={review} />
-          ))}
-        </div>
+      {hasReviews && stats !== null ? (
+        <Section number={1} eyebrow="At a glance" title="Your review activity">
+          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+            <StatTile label="Total reviews" value={String(stats.total)} />
+            <StatTile label="Completed" value={String(stats.completed)} />
+            <StatTile label="Running" value={String(stats.running)} />
+            <StatTile label="Average rubric" value={stats.average !== null ? `${stats.average.toFixed(1)} / 5` : '--'} />
+          </div>
+        </Section>
+      ) : null}
+
+      {hasReviews && sorted !== null ? (
+        <Section number={2} eyebrow="Library" title="All reviews">
+          {sorted.length > 0 ? (
+            <div className="grid-3" style={{ marginTop: 'var(--space-4)' }}>
+              {sorted.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </div>
+          ) : (
+            <p className="sub muted" style={{ marginTop: 'var(--space-4)' }}>No reviews match your search.</p>
+          )}
+        </Section>
       ) : null}
     </div>
   );
