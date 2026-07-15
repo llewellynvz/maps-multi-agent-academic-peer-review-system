@@ -45,13 +45,19 @@ export default function RunPage(): ReactNode {
   const [gate, setGate] = useState<{ verdict: string; cycle: number } | null>(null);
   const [logEntries, setLogEntries] = useState<Record<string, { ts: string; message: string; phase: string }>>({});
   const [connected, setConnected] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const notified = useRef(false);
   const phaseRef = useRef('phase_0');
+  const terminalRef = useRef<'complete' | 'failed' | null>(null);
 
   useEffect(() => {
     phaseRef.current = currentPhase;
   }, [currentPhase]);
+
+  useEffect(() => {
+    terminalRef.current = terminal;
+  }, [terminal]);
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -61,18 +67,44 @@ export default function RunPage(): ReactNode {
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
 
+    const LOG_CAP = 400;
     const addLog = (key: string, ts: string | undefined, message: string, phase: string): void => {
-      setLogEntries((prev) =>
-        prev[key] !== undefined ? prev : { ...prev, [key]: { ts: ts ?? new Date().toISOString(), message, phase } },
-      );
+      setLogEntries((prev) => {
+        if (prev[key] !== undefined) {
+          return prev;
+        }
+        const next = { ...prev, [key]: { ts: ts ?? new Date().toISOString(), message, phase } };
+        const keys = Object.keys(next);
+        if (keys.length > LOG_CAP) {
+          const oldest = keys.sort((a, b) => ((next[a]?.ts ?? '') < (next[b]?.ts ?? '') ? -1 : 1)).slice(0, keys.length - LOG_CAP);
+          for (const stale of oldest) {
+            delete next[stale];
+          }
+        }
+        return next;
+      });
     };
 
     source.addEventListener('phase_status', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { phase: string | null; ts?: string };
       if (data.phase !== null) {
-        setCurrentPhase((prev) => (phaseIndex(data.phase) >= phaseIndex(prev) ? (data.phase as string) : prev));
-        addLog(`phase-${data.phase}`, data.ts, `Started ${phaseLabel(data.phase)}`, data.phase);
+        setPaused(false);
+        if (terminalRef.current === 'failed') {
+          terminalRef.current = null;
+          setTerminal(null);
+          setFailedPhase(null);
+          setGate(null);
+          setCurrentPhase(data.phase);
+        } else {
+          setCurrentPhase((prev) => (phaseIndex(data.phase) >= phaseIndex(prev) ? (data.phase as string) : prev));
+        }
+        addLog(`phase-${data.phase}-${data.ts ?? ''}`, data.ts, `Started ${phaseLabel(data.phase)}`, data.phase);
       }
+    });
+    source.addEventListener('run_paused', (event) => {
+      const data = JSON.parse((event as MessageEvent).data) as { ts?: string; phase?: string | null };
+      setPaused(true);
+      addLog(`paused-${data.ts ?? ''}`, data.ts, 'Run paused', data.phase ?? phaseRef.current);
     });
     source.addEventListener('lens_status', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { lens: string; status: string; findingsCount: number };
@@ -112,7 +144,7 @@ export default function RunPage(): ReactNode {
     });
     source.addEventListener('gate_verdict', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { verdict: string; cycle: number; source?: string; ts?: string; phase?: string };
-      setGate({ verdict: data.verdict, cycle: data.cycle });
+      setGate(data.verdict === 'pass' ? null : { verdict: data.verdict, cycle: data.cycle });
       addLog(
         `gate-${data.cycle}-${data.source ?? 'gate'}-${data.verdict}`,
         data.ts,
@@ -138,14 +170,15 @@ export default function RunPage(): ReactNode {
       }
     });
     source.addEventListener('run_complete', () => {
+      terminalRef.current = 'complete';
       setTerminal('complete');
       source.close();
     });
     source.addEventListener('run_failed', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { phase?: string };
+      terminalRef.current = 'failed';
       setTerminal('failed');
       setFailedPhase(data.phase ?? phaseRef.current);
-      source.close();
     });
 
     return () => source.close();
@@ -232,7 +265,18 @@ export default function RunPage(): ReactNode {
         actions={
           <>
             {!connected && terminal === null ? <Pill tone="warn" label="Reconnecting" /> : null}
-            {gate !== null ? <Pill tone="neutral" label={`Release gate requested revisions, cycle ${gate.cycle} of 2`} icon="clock" /> : null}
+            {paused && terminal === null ? <Pill tone="warn" label="Paused" icon="pause" /> : null}
+            {gate !== null && terminal === null ? (
+              <Pill
+                tone="neutral"
+                label={
+                  gate.verdict === 'revise' || gate.verdict === 'revise_specialist'
+                    ? `Release gate requested revisions, cycle ${gate.cycle} of 2`
+                    : `Release gate escalated to arbitration, cycle ${gate.cycle}`
+                }
+                icon="clock"
+              />
+            ) : null}
             {terminal === 'complete' ? <Pill tone="info" label="Complete" /> : null}
             {terminal === 'failed' ? <Pill tone="fail" label="Halted" /> : null}
           </>
@@ -334,8 +378,8 @@ export default function RunPage(): ReactNode {
           {terminal === null ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-ghost" onClick={() => void api.pause(id)}><Icon name="pause" /> Pause</button>
-                <button className="btn btn-ghost" onClick={() => void api.resume(id)}><Icon name="play" /> Resume</button>
+                <button className="btn btn-ghost" onClick={() => { setPaused(true); void api.pause(id); }}><Icon name="pause" /> Pause</button>
+                <button className="btn btn-ghost" onClick={() => { setPaused(false); void api.resume(id); }}><Icon name="play" /> Resume</button>
                 <button className="btn btn-ghost" onClick={() => void api.cancel(id)}>Cancel</button>
               </div>
             </div>

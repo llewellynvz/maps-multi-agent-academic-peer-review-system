@@ -130,7 +130,7 @@ export default function ClarifyPage(): ReactNode {
               <label>The name this review will carry</label>
               <input
                 value={resolveAnswer(layout.reviewTitle, answers)}
-                onChange={(event) => setAnswers((prev) => ({ ...prev, reviewTitle: event.target.value }))}
+                onChange={(event) => setAnswers((prev) => ({ ...prev, [layout.reviewTitle!.id]: event.target.value }))}
               />
             </div>
           ) : null}
@@ -144,7 +144,7 @@ export default function ClarifyPage(): ReactNode {
             <ChoiceChips
               options={(layout.paperType.options ?? []).map((option) => ({ value: option, label: humanizeOption(option) }))}
               value={resolveAnswer(layout.paperType, answers)}
-              onChange={(value) => setAnswers((prev) => ({ ...prev, paperType: value as string }))}
+              onChange={(value) => setAnswers((prev) => ({ ...prev, [layout.paperType!.id]: value as string }))}
             />
           </div>
         ) : null}
@@ -184,7 +184,7 @@ export default function ClarifyPage(): ReactNode {
             {layout.referenceAudit !== null ? (
               <CheckCard
                 checked={resolveAnswer(layout.referenceAudit, answers) === 'forensic'}
-                onChange={(checked) => setAnswers((prev) => ({ ...prev, referenceAudit: checked ? 'forensic' : 'standard' }))}
+                onChange={(checked) => setAnswers((prev) => ({ ...prev, [layout.referenceAudit!.id]: checked ? 'forensic' : 'standard' }))}
                 title="Forensic reference audit"
                 description="Every reference is located and checked, with nothing dropped by the standard cap."
                 costNote="Slower"
@@ -193,7 +193,7 @@ export default function ClarifyPage(): ReactNode {
             {layout.claimCheck !== null ? (
               <CheckCard
                 checked={resolveAnswer(layout.claimCheck, answers) === 'yes'}
-                onChange={(checked) => setAnswers((prev) => ({ ...prev, claimCheck: checked ? 'yes' : 'no' }))}
+                onChange={(checked) => setAnswers((prev) => ({ ...prev, [layout.claimCheck!.id]: checked ? 'yes' : 'no' }))}
                 title="Claims-vs-citation check"
                 description="We fetch the abstracts of the load-bearing sources and check the manuscript's claims against them."
               />
@@ -201,7 +201,7 @@ export default function ClarifyPage(): ReactNode {
             {layout.aiDetection !== null ? (
               <CheckCard
                 checked={resolveAnswer(layout.aiDetection, answers) === 'yes'}
-                onChange={(checked) => setAnswers((prev) => ({ ...prev, aiDetection: checked ? 'yes' : 'no' }))}
+                onChange={(checked) => setAnswers((prev) => ({ ...prev, [layout.aiDetection!.id]: checked ? 'yes' : 'no' }))}
                 title="AI-content screening"
                 description="In-context signals with clear false-positive caveats. This stays editor-only and is never phrased as an accusation."
               />
@@ -216,7 +216,7 @@ export default function ClarifyPage(): ReactNode {
             <ChoiceChips
               options={(layout.userPrior.options ?? []).map((option) => ({ value: option, label: humanizeOption(option) }))}
               value={resolveAnswer(layout.userPrior, answers)}
-              onChange={(value) => setAnswers((prev) => ({ ...prev, userPrior: value as string }))}
+              onChange={(value) => setAnswers((prev) => ({ ...prev, [layout.userPrior!.id]: value as string }))}
             />
             <p className="sub" style={{ margin: 0 }}>
               We keep this sealed until the review is done, then stress-test it against the evidence: the strongest case

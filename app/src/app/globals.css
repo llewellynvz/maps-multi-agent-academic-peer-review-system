@@ -386,7 +386,7 @@ main.page { flex: 1; padding: 40px 0 80px; }
 .stack-16 { display: flex; flex-direction: column; gap: var(--space-4); }
 .stack-24 { display: flex; flex-direction: column; gap: var(--space-5); }
 
-.chip-hint { font-size: 11px; color: var(--fg-4); }
+.chip-hint { font-size: 11px; color: var(--fg-3); }
 
 .check-card { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out); }
 .check-card:hover { border-color: var(--border-3); }
@@ -399,7 +399,7 @@ main.page { flex: 1; padding: 40px 0 80px; }
 .check-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .check-card-title { font-size: var(--fs-body); font-weight: 500; color: var(--fg-1); }
 .check-card-desc { font-size: var(--fs-small); line-height: 1.5; color: var(--fg-3); }
-.check-card-cost { font-size: var(--fs-micro); color: var(--fg-4); }
+.check-card-cost { font-size: var(--fs-micro); color: var(--fg-3); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
