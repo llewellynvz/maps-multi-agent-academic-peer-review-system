@@ -244,6 +244,24 @@ describe('id-free prose and evidence map validation', () => {
     expect(result.failures.join(' ')).toContain('bold label or section heading');
   });
 
+  it('rejects a map label that is only a prefix of a longer bold run', () => {
+    const input = idFreeBase();
+    input.evidenceMap[0]!.label = 'Sampling';
+    input.authorFacingBody += '\n\n**Sampling frame differs from the target population.** Detail follows.';
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kind).toBe('evidence-map-mismatch');
+  });
+
+  it('rejects a map label that only loosely resembles a semantically different heading', () => {
+    const input = idFreeBase();
+    input.evidenceMap[0]!.label = 'Measurement reliability of the outcome scale';
+    input.authorFacingBody += '\n\n### 4A.4 Measurement invariance of the outcome scale\nDetail follows.';
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kind).toBe('evidence-map-mismatch');
+  });
+
   it('accepts a map label carried by a numbered section heading', () => {
     const input = idFreeBase();
     input.authorFacingBody +=

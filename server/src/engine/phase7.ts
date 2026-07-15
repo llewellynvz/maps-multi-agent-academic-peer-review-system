@@ -129,23 +129,34 @@ function repairEvidenceLabels(shipped: ShippedReportEnvelope): ShippedReportEnve
     if (sectionKey.length < 3) {
       return entry;
     }
-    const index = lower.findIndex(
-      (heading) =>
-        heading === sectionKey || heading.startsWith(sectionKey) || (sectionKey.startsWith(heading) && heading.length >= 8),
-    );
+    const index = lower.findIndex((heading) => {
+      if (heading === sectionKey) {
+        return true;
+      }
+      const shorter = Math.min(heading.length, sectionKey.length);
+      const longer = Math.max(heading.length, sectionKey.length);
+      if (shorter / longer < 0.7) {
+        return false;
+      }
+      return heading.startsWith(sectionKey) || (sectionKey.startsWith(heading) && heading.length >= 8);
+    });
     if (index >= 0) {
       return { ...entry, label: headings[index] as string };
     }
     let best = -1;
     let bestRatio = 0;
+    let candidates = 0;
     for (let i = 0; i < headings.length; i += 1) {
       const overlap = tokenOverlap(entry.label, headings[i] as string);
-      if (overlap.ratio >= 0.6 && overlap.shared >= 3 && overlap.ratio > bestRatio) {
-        best = i;
-        bestRatio = overlap.ratio;
+      if (overlap.ratio >= 0.75 && overlap.shared >= 4) {
+        candidates += 1;
+        if (overlap.ratio > bestRatio) {
+          best = i;
+          bestRatio = overlap.ratio;
+        }
       }
     }
-    return best >= 0 ? { ...entry, label: headings[best] as string } : entry;
+    return candidates === 1 && best >= 0 ? { ...entry, label: headings[best] as string } : entry;
   });
 }
 
@@ -345,18 +356,19 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       if (!grounding.ok) {
         lastGroundingFailureKind = grounding.kind;
         lastObjection = grounding.failures.join('; ');
+        const maskedObjection = redactSupersededIds(redactEditorOnlyIds(lastObjection, editorOnlyIds), ledgerIdsNow);
         priorDefect =
           grounding.kind === 'editor-only-leak'
             ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
             : grounding.kind === 'ungrounded-id'
               ? 'grounding validator: your text cited finding ids that are superseded or unknown; cite only ids present verbatim in the author-facing ledger artefact and never ids marked [SUPERSEDED]'
               : grounding.kind === 'id-in-prose'
-                ? `grounding validator: the shipped report body contains raw finding ids; the prose stays id-free and all grounding moves into evidenceMap entries. Specifically: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`
+                ? `grounding validator: the shipped report body contains raw finding ids; the prose stays id-free and all grounding moves into evidenceMap entries. Specifically: ${maskedObjection}`
                 : grounding.kind === 'machine-token'
-                  ? `grounding validator: the shipped report body contains internal machine tokens; rewrite exactly these spots as natural reviewer prose and change nothing else: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`
+                  ? `grounding validator: the shipped report body contains internal machine tokens; rewrite exactly these spots as natural reviewer prose and change nothing else: ${maskedObjection}`
                   : grounding.kind === 'evidence-map-mismatch'
-                    ? `grounding validator: the evidence map does not line up with the ledger and the body: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`
-                    : `grounding validator: ${redactEditorOnlyIds(lastObjection, editorOnlyIds)}`;
+                    ? `grounding validator: the evidence map does not line up with the ledger and the body: ${maskedObjection}`
+                    : `grounding validator: ${maskedObjection}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {

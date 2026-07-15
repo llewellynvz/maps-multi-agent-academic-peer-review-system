@@ -132,16 +132,26 @@ function comparableLabel(value: string): string {
 }
 
 export function labelAppearsInBody(body: string, label: string): boolean {
-  const wanted = comparableLabel(label);
-  if (canonicalPunctuation(body).includes(`**${canonicalPunctuation(label).trim()}`)) {
+  const canonLabel = canonicalPunctuation(label).trim();
+  const escaped = canonLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (new RegExp(`\\*\\*${escaped}[.:]?\\*\\*`).test(canonicalPunctuation(body))) {
     return true;
   }
+  const wanted = comparableLabel(label);
   return bodyHeadings(body).some((heading) => {
     const comparable = comparableLabel(heading);
     if (comparable.length < 4) {
       return false;
     }
-    return comparable === wanted || comparable.startsWith(wanted) || wanted.startsWith(comparable);
+    if (comparable === wanted) {
+      return true;
+    }
+    const shorter = Math.min(comparable.length, wanted.length);
+    const longer = Math.max(comparable.length, wanted.length);
+    if (shorter / longer < 0.7) {
+      return false;
+    }
+    return comparable.startsWith(wanted) || wanted.startsWith(comparable);
   });
 }
 
