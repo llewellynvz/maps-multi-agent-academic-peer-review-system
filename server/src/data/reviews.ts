@@ -75,6 +75,10 @@ export function getReviewRow(db: MaraDatabase, id: string): typeof reviews.$infe
   return db.select().from(reviews).where(eq(reviews.id, id)).limit(1).all()[0];
 }
 
+export function updateReviewTitle(db: MaraDatabase, id: string, title: string): void {
+  db.update(reviews).set({ title, updatedAt: nowIso() }).where(eq(reviews.id, id)).run();
+}
+
 export function requireReview(db: MaraDatabase, id: string): Review {
   const row = getReviewRow(db, id);
   if (row === undefined) {

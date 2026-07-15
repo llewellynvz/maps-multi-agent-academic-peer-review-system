@@ -12,12 +12,34 @@ const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
 const SIGNAL_FRAMING =
   'These are editorial signals for the handling editor, not determinations of misconduct. Each should be checked against the original files, journal policy, and any author explanation where appropriate.';
 
+const PRIOR_LABEL: Record<string, string> = {
+  accept: 'Accept',
+  'minor-revision': 'Minor revision',
+  'major-revision': 'Major revision',
+  'reject-and-resubmit': 'Reject and resubmit',
+  reject: 'Reject',
+};
+
+const ALIGNMENT_SENTENCE: Record<string, string> = {
+  supported: 'The evidence supports this preliminary assessment.',
+  partially_supported: 'The evidence partially supports this preliminary assessment, diverging on severity or category.',
+  contradicted: 'The evidence contradicts this preliminary assessment.',
+};
+
+export interface PriorStressNotesInput {
+  prior: string;
+  caseFor: string;
+  caseAgainst: string;
+  alignment: 'supported' | 'partially_supported' | 'contradicted';
+}
+
 export interface PrivateNotesInput {
   recommendation: Recommendation;
   recommendationConfidence: number;
   currentFindings: CurrentFinding[];
   strongestMinorityReport: string;
   editorSummaryMarkdown?: string;
+  priorStressTest?: PriorStressNotesInput;
 }
 
 export interface AssembledPrivateNotes {
@@ -37,6 +59,17 @@ export function assemblePrivateNotes(input: PrivateNotesInput): AssembledPrivate
     `${RECOMMENDATION_LABEL[input.recommendation]} at confidence ${input.recommendationConfidence.toFixed(2)}.`,
   );
   lines.push('');
+  if (input.priorStressTest !== undefined) {
+    const prior = input.priorStressTest;
+    lines.push('## Preliminary assessment, stress-tested');
+    lines.push(
+      `The reviewer's preliminary assessment was ${PRIOR_LABEL[prior.prior] ?? prior.prior}. It was withheld from the review and tested against the evidence only after the recommendation was set.`,
+    );
+    lines.push(`Case for: ${prior.caseFor.trim()}`);
+    lines.push(`Case against: ${prior.caseAgainst.trim()}`);
+    lines.push(ALIGNMENT_SENTENCE[prior.alignment] ?? `Alignment: ${prior.alignment}.`);
+    lines.push('');
+  }
   if (input.editorSummaryMarkdown !== undefined && input.editorSummaryMarkdown.trim().length > 0) {
     lines.push('## Editorial synthesis');
     lines.push(input.editorSummaryMarkdown.trim());

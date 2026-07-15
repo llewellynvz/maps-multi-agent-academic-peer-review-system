@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type {
+  AiContentAnalystOutput,
   CitationAuditorOutput,
+  CitationClaimsOutput,
   ClaimDesignAnalysis,
   FieldContextScoutOutput,
   FullReportEnvelope,
@@ -12,6 +14,7 @@ import type {
   ManuscriptSanitizerOutput,
   ManuscriptStructure,
   PhaseCriticOutput,
+  PriorStressTestOutput,
   QualityMetricsEngineOutput,
   ReviewCalibratorOutput,
   ReviewFinalCriticOutput,
@@ -147,6 +150,48 @@ const bindings: GoldenBinding[] = [
       expect(value.findings.some((finding) => finding.severity === 'major' && finding.scope === 'editor-only')).toBe(
         true,
       );
+    },
+  },
+  {
+    label: 'ai-content analyst caveats every signal and keeps a serious signal editor-only',
+    agent: 'ai-content-analyst',
+    file: 'ai-content-analyst.json',
+    assert: (output) => {
+      const value = output as AiContentAnalystOutput;
+      expect(value.signals.every((signal) => signal.falsePositiveCaveat.length > 0)).toBe(true);
+      expect(value.signals.some((signal) => signal.kind === 'reference-integrity' && signal.strength === 'serious')).toBe(
+        true,
+      );
+      expect(value.disclosureCheck.length).toBeGreaterThan(0);
+      expect(value.findings.some((finding) => finding.id.startsWith('REV-AIC-') && finding.scope === 'editor-only')).toBe(
+        true,
+      );
+    },
+  },
+  {
+    label: 'citation-auditor claims mode judges support and supersedes a contradicted verdict',
+    agent: 'citation-auditor',
+    mode: 'claims',
+    file: 'citation-auditor-claims.json',
+    assert: (output) => {
+      const value = output as CitationClaimsOutput;
+      expect(value.assessments.some((entry) => entry.support === 'does_not_support')).toBe(true);
+      expect(value.assessments.some((entry) => entry.support === 'abstract_unavailable')).toBe(true);
+      expect(value.findings.some((finding) => finding.id.startsWith('REV-REF-') && finding.supersedes !== null)).toBe(
+        true,
+      );
+    },
+  },
+  {
+    label: 'prior stress test grounds hinges in the ledger and lands an alignment',
+    agent: 'prior-stress-test',
+    file: 'prior-stress-test.json',
+    assert: (output) => {
+      const value = output as PriorStressTestOutput;
+      expect(value.caseFor.length).toBeGreaterThan(0);
+      expect(value.caseAgainst.length).toBeGreaterThan(0);
+      expect(['supported', 'partially_supported', 'contradicted']).toContain(value.alignment);
+      expect(value.hingeFindingIds.length).toBeGreaterThanOrEqual(1);
     },
   },
   {

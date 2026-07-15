@@ -2,7 +2,7 @@ import type { MaraDatabase } from '../db/client';
 import { ApiError } from './errors';
 import { insertRunCommand } from './commands';
 import { loadRawQuestions } from './questions';
-import { requireReview } from './reviews';
+import { requireReview, updateReviewTitle } from './reviews';
 
 export interface SubmittedAnswer {
   questionId: string;
@@ -42,6 +42,10 @@ export function submitAnswers(db: MaraDatabase, reviewId: string, input: SubmitA
     const question = byId.get(submitted.questionId);
     const key = question?.field ?? submitted.questionId;
     answers[key] = flatten(submitted.value);
+  }
+
+  if (typeof answers.reviewTitle === 'string' && answers.reviewTitle.trim().length > 0) {
+    updateReviewTitle(db, reviewId, answers.reviewTitle.trim());
   }
 
   let preset: string | undefined;

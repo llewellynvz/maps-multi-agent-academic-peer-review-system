@@ -1,6 +1,8 @@
 import type {
+  AiContentAnalystOutput,
   ClaimDesignAnalysis,
   CitationAuditorOutput,
+  CitationClaimsOutput,
   FieldContextScoutOutput,
   Finding,
   FullReportEnvelope,
@@ -12,11 +14,11 @@ import type {
 } from '@mara/shared';
 import { randomBytes } from 'node:crypto';
 import type { MaraDatabase } from '../db/client';
-import { searchTopics, type TopicSearchResult } from '../citations';
+import { type FetchLike, OPENALEX_HOST, reconstructAbstract, searchTopics, type TopicSearchResult } from '../citations';
 import { getCurrentFindings } from '../ledger';
 import { buildProtectedCorpus } from '../security';
 import { withPhase } from '../tracing';
-import { getCheckpoint, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
+import { getCheckpoint, getReviewOptions, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { computeComposite } from './composite';
 import { mergeFindingsOnce } from './merge';
@@ -24,9 +26,18 @@ import {
   loadEngineContext,
   manuscriptDigest,
   referenceMetadataList,
+  type ReferenceSkip,
   referencesForVerification,
 } from './context';
-import { selectActiveLenses, selectChallengeLenses, swarmProfile } from './lenses';
+import {
+  applyPaperTypeLensPolicy,
+  paperTypeNote,
+  selectActiveLenses,
+  selectChallengeLenses,
+  studyDesignAffirmsData,
+  swarmProfile,
+} from './lenses';
+import { readIntakeOptions } from './options';
 import { runAgent } from './dispatch-agent';
 import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
 import { upsertRubricScore } from './rubric';
@@ -169,6 +180,32 @@ function topicSearchCap(preset: string): number | null {
   return null;
 }
 
+function claimsCap(preset: string): number {
+  return preset === 'thorough' ? 20 : 12;
+}
+
+async function fetchAbstractByDoi(fetchImpl: FetchLike, doi: string): Promise<string | null> {
+  try {
+    const clean = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    const url = new URL(`https://${OPENALEX_HOST}/works/doi:${clean}`);
+    url.searchParams.set('select', 'abstract_inverted_index');
+    const response = await fetchImpl(url.toString());
+    if (!response.ok) {
+      return null;
+    }
+    const json = (await response.json()) as Record<string, unknown> | null;
+    return reconstructAbstract(json?.abstract_inverted_index) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+interface FetchedAbstract {
+  referenceIndex: number;
+  title: string;
+  abstract: string | null;
+}
+
 const OFFLINE_SCOUT_NOTE =
   'No web retrieval tool is available in this build. Work from the manuscript and the provided context only. Where a comparator or benchmark would normally need retrieval, record it as not performable with the reason rather than inventing a source. Prefix findings REV-CTX.';
 
@@ -208,6 +245,7 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const matrixJson = JSON.stringify(analystB.claimEvidenceMatrix);
   const topicCap = topicSearchCap(ctx.preset);
+  const intake = readIntakeOptions(getReviewOptions(db, reviewId));
 
   await withPhase('phase_2', async () => {
     enterPhase(db, reviewId, 'phase_2');
@@ -240,8 +278,11 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
 
     const clientVerdicts: ClientVerdict[] = [];
     let topicResults: TopicSearchResult[] = [];
+    let referenceSkips: ReferenceSkip[] = [];
+    const claimAbstracts: FetchedAbstract[] = [];
     const retrievalActive =
-      deps.egress !== undefined && (deps.citationClient !== undefined || executedQueries.length > 0);
+      deps.egress !== undefined &&
+      (deps.citationClient !== undefined || executedQueries.length > 0 || intake.claimCheck);
     if (retrievalActive && deps.egress !== undefined) {
       deps.egress.begin({
         reviewId,
@@ -260,7 +301,8 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
     }
     try {
       if (deps.citationClient !== undefined) {
-        const references = referencesForVerification(ctx.sectionMap);
+        const { references, skipped } = referencesForVerification(ctx.sectionMap, intake.referenceAudit);
+        referenceSkips = skipped;
         for (const reference of references) {
           const { index, ...metadata } = reference;
           const verdict = await deps.citationClient.verifyReference(metadata);
@@ -279,6 +321,13 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
           maxQueries: topicCap ?? executedQueries.length,
           perQueryPerSource: 5,
         });
+      }
+      if (intake.claimCheck && deps.egress !== undefined) {
+        const verified = clientVerdicts.filter((verdict) => verdict.status === 'verified' && verdict.matchedDoi !== null);
+        for (const verdict of verified.slice(0, claimsCap(ctx.preset))) {
+          const abstract = await fetchAbstractByDoi(deps.egress.fetch, verdict.matchedDoi as string);
+          claimAbstracts.push({ referenceIndex: verdict.referenceIndex, title: verdict.title, abstract });
+        }
       }
     } finally {
       if (retrievalActive) {
@@ -355,18 +404,80 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
       fragments: sanitiseSupersedes(citation.findings, knownIds),
       marker: 'p2-citations',
     });
-    writeArtefact(reviewId, 'p2-citations', { ...citation, verifications: reconciled, clientVerdicts });
+    writeArtefact(reviewId, 'p2-citations', {
+      ...citation,
+      verifications: reconciled,
+      clientVerdicts,
+      referencesSkipped: referenceSkips,
+    });
+
+    let claims: CitationClaimsOutput | null = null;
+    if (intake.claimCheck) {
+      const abstractByIndex = new Map(claimAbstracts.map((entry) => [entry.referenceIndex, entry]));
+      const claimWorklist = reconciled
+        .filter((verification) => abstractByIndex.has(verification.referenceIndex as number))
+        .map((verification) => {
+          const fetched = abstractByIndex.get(verification.referenceIndex as number);
+          return {
+            referenceTitle: fetched?.title ?? '',
+            claim: typeof verification.citation === 'string' ? verification.citation : '',
+            abstract: fetched?.abstract ?? 'No abstract was retrievable for this reference.',
+          };
+        });
+      const refFindings = getCurrentFindings(db, reviewId).filter((finding) => finding.id.startsWith('REV-REF-'));
+      claims = await runAgent<CitationClaimsOutput>(deps, {
+        reviewId,
+        phase: 'phase_2',
+        agent: 'citation-auditor',
+        mode: 'claims',
+        artefactName: 'p2-citations-claims',
+        assembleInput: {
+          mode: 'claims',
+          parseQuality: ctx.parseQuality,
+          artefacts: [
+            {
+              label: 'Load-bearing references with retrieved abstracts and the claim each is cited for',
+              content: JSON.stringify(claimWorklist, null, 2),
+            },
+            { label: 'Claim-evidence matrix', content: matrixJson },
+            {
+              label: 'First-pass reference findings (canonical ledger ids; supersede a contradicted one by id)',
+              content: JSON.stringify(refFindings, null, 2),
+            },
+          ],
+          routingNote:
+            "Mode claims. Judge each reference-and-claim pair using only the supplied abstract; abstract_unavailable is the honest verdict where no abstract is present, and you never guess support from the title or memory. Where a verdict contradicts a first-pass reference finding, emit a REV-REF finding whose supersedes is that finding's canonical id shown above. Prefix findings REV-REF.",
+        },
+      });
+      const claimsKnownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
+      mergeFindingsOnce(db, {
+        reviewId,
+        lensPrefix: 'REF',
+        phase: 'phase_2',
+        agent: 'citation-auditor',
+        fragments: sanitiseSupersedes(claims.findings, claimsKnownIds),
+        marker: 'p2-citations-claims',
+      });
+    }
 
     insertEvent(db, {
       reviewId,
       kind: 'phase_transition',
       phase: 'phase_2',
-      payload: { referencesChecked: clientVerdicts.length, comparators: scout.comparators.length },
+      payload: {
+        referencesChecked: clientVerdicts.length,
+        comparators: scout.comparators.length,
+        referencesSkipped: referenceSkips.length,
+        claimsChecked: claims !== null ? claims.assessments.length : 0,
+      },
     });
     const phase2Critique: PhaseCritiqueInput[] = [
       { label: 'Field context dossier', content: JSON.stringify(scout) },
       { label: 'Citation audit', content: JSON.stringify({ ...citation, verifications: reconciled }) },
     ];
+    if (claims !== null) {
+      phase2Critique.push({ label: 'Claim-versus-abstract support check', content: JSON.stringify(claims) });
+    }
     if (scoutPlan !== null) {
       phase2Critique.push({ label: 'Topic search results', content: JSON.stringify(topicResultsPayload) });
     }
@@ -407,7 +518,14 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const mapJson = JSON.stringify(analystA.manuscriptMap);
   const matrixJson = JSON.stringify(analystB.claimEvidenceMatrix);
-  const active = selectActiveLenses(ctx.preset, analystB.activationMap);
+  const intake = readIntakeOptions(getReviewOptions(db, reviewId));
+  const affirmsData = studyDesignAffirmsData(analystB.studyDesign);
+  const active = applyPaperTypeLensPolicy(
+    selectActiveLenses(ctx.preset, analystB.activationMap),
+    intake.paperType,
+    affirmsData,
+  );
+  const typeNote = paperTypeNote(intake.paperType);
 
   const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (engage these works by name)');
 
@@ -430,7 +548,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
               { label: 'Claim-evidence matrix', content: matrixJson },
               ...(dossierArtefact !== null ? [dossierArtefact] : []),
             ],
-            routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.`,
+            routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.${typeNote !== null ? ` ${typeNote}` : ''}`,
           },
         }).then((result) => ({ lens, result })),
       ),
@@ -485,7 +603,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
               { label: 'Citation audit (Phase 2)', content: citations2 },
               ...(dossierArtefact !== null ? [dossierArtefact] : []),
             ],
-            routingNote: `Challenge round for ${lens.display} (REV-${lens.prefix}). In "findings", return ONLY new or updated findings; an update sets supersedes to the existing canonical id shown in your first-pass findings, and you never re-list an unchanged finding. Update a position ONLY on named new evidence, never because another lens disagreed. Preserve evidence-based dissent held at confidence 0.75 or higher in challengeRound.dissentPreserved rather than converging.`,
+            routingNote: `Challenge round for ${lens.display} (REV-${lens.prefix}). In "findings", return ONLY new or updated findings; an update sets supersedes to the existing canonical id shown in your first-pass findings, and you never re-list an unchanged finding. Update a position ONLY on named new evidence, never because another lens disagreed. Preserve evidence-based dissent held at confidence 0.75 or higher in challengeRound.dissentPreserved rather than converging.${typeNote !== null ? ` ${typeNote}` : ''}`,
           },
         }).then((result) => ({ lens, result }));
       }),
@@ -586,13 +704,20 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
   const mapJson = JSON.stringify(analystA.manuscriptMap);
   const inventoryJson = JSON.stringify(analystA.figureTableInventory);
   const matrixJson = JSON.stringify(analystB.claimEvidenceMatrix);
+  const intake = readIntakeOptions(getReviewOptions(db, reviewId));
+  const clusters: IntegrityCluster[] = intake.aiDetection
+    ? INTEGRITY_CLUSTERS.map((cluster) =>
+        cluster.name === 'similarity-and-ai-content' ? { ...cluster, prefixes: ['SIM'] } : cluster,
+      )
+    : INTEGRITY_CLUSTERS;
 
   await withPhase('phase_4', async () => {
     enterPhase(db, reviewId, 'phase_4');
 
     const results = await Promise.all(
-      INTEGRITY_CLUSTERS.map((cluster) =>
-        runAgent<IntegrityScreenerOutput>(deps, {
+      clusters.map((cluster) => {
+        const aiHandledElsewhere = cluster.name === 'similarity-and-ai-content' && intake.aiDetection;
+        return runAgent<IntegrityScreenerOutput>(deps, {
           reviewId,
           phase: 'phase_4',
           agent: 'integrity-screener',
@@ -607,10 +732,10 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
             ],
             routingNote: `Integrity cluster "${cluster.name}", rubrics ${cluster.prefixes
               .map((prefix) => `REV-${prefix}`)
-              .join(' and ')}. No external similarity report or AI-content detector output is provided; mark any check that needs one as not-run with the artifact named, never improvised. Findings are editorial signals, never verdicts; a serious signal is editor-only. Set each finding's lens to its rubric code and prefix its id REV-<rubric>.`,
+              .join(' and ')}. ${aiHandledElsewhere ? 'AI-content screening (REV-AIC) is handled by the dedicated AI-content analyst in this run; screen similarity signals only and do not emit REV-AIC findings. ' : ''}No external similarity report or AI-content detector output is provided; mark any check that needs one as not-run with the artifact named, never improvised. Findings are editorial signals, never verdicts; a serious signal is editor-only. Set each finding's lens to its rubric code and prefix its id REV-<rubric>.`,
           },
-        }).then((result) => ({ cluster, result })),
-      ),
+        }).then((result) => ({ cluster, result }));
+      }),
     );
 
     const knownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
@@ -638,13 +763,53 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
       }
     }
 
+    let aiContent: AiContentAnalystOutput | null = null;
+    if (intake.aiDetection) {
+      const citationVerdicts = artefactExists(reviewId, 'p2-citations')
+        ? readArtefact<{ verifications?: unknown }>(reviewId, 'p2-citations').verifications ?? []
+        : [];
+      aiContent = await runAgent<AiContentAnalystOutput>(deps, {
+        reviewId,
+        phase: 'phase_4',
+        agent: 'ai-content-analyst',
+        artefactName: 'p4-ai-content',
+        assembleInput: {
+          parseQuality: ctx.parseQuality,
+          manuscriptExcerpt: digest,
+          artefacts: [
+            { label: 'Manuscript structure (analyst mode A)', content: JSON.stringify(analystA) },
+            { label: 'Reconciled citation verdicts', content: JSON.stringify(citationVerdicts) },
+          ],
+          routingNote:
+            'Weigh AI-content signals from the manuscript and the reconciled citation verdicts only; no detector exists or may be called. Every signal carries its own false-positive caveat and the analysis carries the standing ESL caveat. Fabricated or unlocatable references are the strongest single tell; stylometric and uniformity readings are the weakest and you say so. Signals are editorial signals, never verdicts; a serious signal is editor-only. Prefix findings REV-AIC.',
+        },
+      });
+      const aiKnownIds = new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id));
+      const enforced = aiContent.findings.map((finding): Finding =>
+        (finding.severity === 'major' || finding.severity === 'fatal') && finding.scope !== 'editor-only'
+          ? { ...finding, scope: 'editor-only' }
+          : finding,
+      );
+      mergeFindingsOnce(db, {
+        reviewId,
+        lensPrefix: 'AIC',
+        phase: 'phase_4',
+        agent: 'ai-content-analyst',
+        fragments: sanitiseSupersedes(enforced, aiKnownIds),
+        marker: 'p4-ai-content',
+      });
+    }
+
     insertEvent(db, {
       reviewId,
       kind: 'phase_transition',
       phase: 'phase_4',
-      payload: { clusters: INTEGRITY_CLUSTERS.map((cluster) => cluster.name) },
+      payload: {
+        clusters: clusters.map((cluster) => cluster.name),
+        aiContent: intake.aiDetection ? 'run' : 'skipped',
+      },
     });
-    await runPhaseCritique(deps, reviewId, 'phase_4', [
+    const phase4Critique: PhaseCritiqueInput[] = [
       {
         label: 'Integrity cluster outputs',
         content: JSON.stringify(
@@ -656,12 +821,16 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
           })),
         ),
       },
-    ]);
+    ];
+    if (aiContent !== null) {
+      phase4Critique.push({ label: 'AI-content analysis', content: JSON.stringify(aiContent) });
+    }
+    await runPhaseCritique(deps, reviewId, 'phase_4', phase4Critique);
     upsertCheckpoint(db, {
       reviewId,
       phase: checkpointKey('phase_4'),
       status: 'completed',
-      snapshot: { clusters: INTEGRITY_CLUSTERS.map((cluster) => cluster.name) },
+      snapshot: { clusters: clusters.map((cluster) => cluster.name), aiContent: intake.aiDetection },
     });
   });
 }
@@ -788,6 +957,7 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
   };
 
   const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (the only literature you may name)');
+  const typeNote = paperTypeNote(readIntakeOptions(getReviewOptions(db, reviewId)).paperType);
 
   await withPhase('phase_6', async () => {
     enterPhase(db, reviewId, 'phase_6');
@@ -810,7 +980,7 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
           ...(dossierArtefact !== null ? [dossierArtefact] : []),
         ],
         routingNote:
-          'Mode A full internal report. Every claim in bodyMarkdown and every provisional rubric row must cite Finding IDs that exist in the ledger above; list every id you cite in citedFindingIds. Order concerns by severity then fixability. Provide provisional 15-criterion scores each citing at least one Finding ID, the provisional average, and the three lowest criteria as bottlenecks.',
+          `Mode A full internal report. Every claim in bodyMarkdown and every provisional rubric row must cite Finding IDs that exist in the ledger above; list every id you cite in citedFindingIds. Order concerns by severity then fixability. Provide provisional 15-criterion scores each citing at least one Finding ID, the provisional average, and the three lowest criteria as bottlenecks.${typeNote !== null ? ` ${typeNote}` : ''}`,
       },
     });
 

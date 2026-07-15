@@ -1,0 +1,46 @@
+{
+  "signals": [
+    {
+      "kind": "reference-integrity",
+      "anchor": "References, entries 14 and 31",
+      "strength": "serious",
+      "falsePositiveCaveat": "A single failed lookup can reflect an indexing gap or grey literature rather than an invented source; the citation audit's verdicts are the ground here, not a guess."
+    },
+    {
+      "kind": "disclosure",
+      "anchor": "Author note; Methods para 1",
+      "strength": "low",
+      "falsePositiveCaveat": "A missing AI-use declaration is expected in many 2026 submissions and does not by itself indicate concealment."
+    },
+    {
+      "kind": "uniformity",
+      "anchor": "Sections 3 and 4",
+      "strength": "low",
+      "falsePositiveCaveat": "Even sentence length and register are equally consistent with a heavily edited draft and with a competent non-native-English writer; this reading is the weakest signal and carries no finding on its own."
+    }
+  ],
+  "disclosureCheck": "The manuscript makes no declaration of AI assistance; the target journal's 2026 norms expect a declaration where generative tools were used, so the absence is recorded as a signal for the editor, not as a finding of concealment.",
+  "notRun": ["stylometric baseline comparison (no authorship-provenance artefact was supplied and none may be generated in this build)"],
+  "findings": [
+    {
+      "id": "REV-AIC-0001",
+      "lens": "REV-AIC",
+      "phase": 4,
+      "claim": "Two load-bearing references could not be located in any index during the citation audit, a pattern that may warrant editorial review; this is not a determination of misconduct.",
+      "anchor": "References, entries 14 and 31",
+      "epistemic": "Inferred",
+      "confidence": 0.82,
+      "band": "Yellow",
+      "severity": "major",
+      "fixability": "unclear",
+      "scope": "editor-only",
+      "failureScenario": "If the flagged references are genuinely absent, the claims that rest on them are unsupported and the evidence base is weaker than it appears.",
+      "leanestFix": "Ask the authors to supply DOIs or stable records for the flagged references, and check the originals against journal policy.",
+      "supersedes": null
+    }
+  ],
+  "selfCritique": {
+    "strongestObjection": "The reference-integrity signal inherits any error in the citation audit; if the two references exist in a source not indexed by the tools checked, the strongest signal is a false positive.",
+    "confidenceRaisers": ["A firmer citation record from an additional index, or the authors' own copies of the flagged references."]
+  }
+}

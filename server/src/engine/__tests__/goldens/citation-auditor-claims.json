@@ -1,0 +1,44 @@
+{
+  "assessments": [
+    {
+      "referenceTitle": "Brief mindfulness interventions and student wellbeing",
+      "claim": "The intervention doubled wellbeing scores over twelve weeks.",
+      "support": "does_not_support",
+      "note": "The retrieved abstract reports a small positive association (roughly 0.2 SD), not a doubling; the manuscript overstates the source."
+    },
+    {
+      "referenceTitle": "Psychological capital and job performance",
+      "claim": "Psychological capital increases performance.",
+      "support": "partially_supports",
+      "note": "The abstract reports cross-sectional associations in mostly correlational work, which supports an association but not the causal increase as written."
+    },
+    {
+      "referenceTitle": "A meta-analysis of workplace strengths interventions",
+      "claim": "A meta-analysis confirms the pooled effect the manuscript relies on.",
+      "support": "abstract_unavailable",
+      "note": "No abstract was retrievable for this reference, so support cannot be judged and is not guessed."
+    }
+  ],
+  "findings": [
+    {
+      "id": "REV-REF-0003",
+      "lens": "REV-REF",
+      "phase": 2,
+      "claim": "The abstract of the cited mindfulness trial reports a small association, not the doubling the manuscript claims; the citing sentence overstates the source.",
+      "anchor": "Discussion, para 2",
+      "epistemic": "Known",
+      "confidence": 0.9,
+      "band": "Yellow",
+      "severity": "moderate",
+      "fixability": "easy",
+      "scope": "author-facing",
+      "failureScenario": "The overclaim inflates the evidence base for a central argument and misrepresents the cited work.",
+      "leanestFix": "Reword the claim to match the association the source actually reports, or cite a source that supports the stronger statement.",
+      "supersedes": "REV-REF-0002"
+    }
+  ],
+  "selfCritique": {
+    "strongestObjection": "The does_not_support verdict rests on an abstract alone; the full text could contain a longitudinal result the abstract omits.",
+    "confidenceRaisers": ["The full text of the cited mindfulness trial rather than only its abstract."]
+  }
+}

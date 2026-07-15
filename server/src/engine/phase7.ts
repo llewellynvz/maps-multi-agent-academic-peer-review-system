@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import type {
   FieldContextScoutOutput,
   FullReportEnvelope,
+  PriorStressTestOutput,
   Recommendation,
   ReviewFinalCriticOutput,
   ReviewMetaReviewerOutput,
@@ -27,8 +28,9 @@ import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
 import { redactEditorOnlyIds, redactSupersededIds, validateGrounding, type GroundingFailureKind } from './grounding';
-import { matchLens } from './lenses';
+import { matchLens, paperTypeNote } from './lenses';
 import { mergeFindingsOnce } from './merge';
+import { readIntakeOptions } from './options';
 import { assemblePrivateNotes } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
@@ -183,6 +185,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   const ctx = loadEngineContext(db, reviewId);
   const digest = manuscriptDigest(ctx.sectionMap);
   const options = getReviewOptions(db, reviewId);
+  const intake = readIntakeOptions(options);
+  const typeNote = paperTypeNote(intake.paperType);
   const report = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
   const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
   const dossierContent = fieldDossierContent(reviewId);
@@ -262,7 +266,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               : []),
           ],
           routingNote:
-            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
+            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
 
@@ -571,6 +575,37 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       recommendationConfidence: finalConfidence,
     });
 
+    if (intake.userPrior !== null) {
+      const priorFindings = getCurrentFindings(db, reviewId);
+      const priorLedgerIds = new Set(priorFindings.map((finding) => finding.id));
+      const priorEditorOnlyIds = new Set(
+        priorFindings.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
+      );
+      const priorStress = await runPriorStressTest(deps, reviewId, {
+        userPrior: intake.userPrior,
+        digest,
+        recommendationPackage: recommendationPackage(currentMeta),
+        findings: priorFindings.filter((finding) => finding.scope !== 'editor_only'),
+        ledgerIds: priorLedgerIds,
+        editorOnlyIds: priorEditorOnlyIds,
+      });
+      if (priorStress !== null) {
+        lastPrivateNotes = assemblePrivateNotes({
+          recommendation: finalRecommendation,
+          recommendationConfidence: finalConfidence,
+          currentFindings: priorFindings,
+          strongestMinorityReport: swarm.strongestMinorityReport,
+          editorSummaryMarkdown: redactSupersededIds(currentMeta.editorSummaryMarkdown, priorLedgerIds),
+          priorStressTest: {
+            prior: intake.userPrior,
+            caseFor: priorStress.caseFor,
+            caseAgainst: priorStress.caseAgainst,
+            alignment: priorStress.alignment,
+          },
+        }).markdown;
+      }
+    }
+
     if (lastShipped !== null) {
       writeArtefact(reviewId, 'p7-shipped-final', lastShipped);
       writeArtefact(reviewId, 'p7-private-notes-final', { markdown: lastPrivateNotes });
@@ -620,6 +655,78 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       },
     });
   });
+}
+
+const PRIOR_SEVERITY_WEIGHT: Record<string, number> = { none: 0, minor: 1, moderate: 2, major: 3, fatal: 4 };
+
+async function runPriorStressTest(
+  deps: EngineDeps,
+  reviewId: string,
+  input: {
+    userPrior: string;
+    digest: string;
+    recommendationPackage: Record<string, unknown>;
+    findings: CurrentFinding[];
+    ledgerIds: Set<string>;
+    editorOnlyIds: Set<string>;
+  },
+): Promise<PriorStressTestOutput | null> {
+  try {
+    const topFindings = [...input.findings]
+      .sort((a, b) => (PRIOR_SEVERITY_WEIGHT[b.severity] ?? 0) - (PRIOR_SEVERITY_WEIGHT[a.severity] ?? 0))
+      .slice(0, 20)
+      .map((finding) => ({
+        id: finding.id,
+        lens: finding.type,
+        claim: finding.claim,
+        anchor: finding.manuscriptAnchor,
+        severity: finding.severity,
+        scope: finding.scope,
+        confidence: finding.confidence,
+      }));
+    return await runAgent<PriorStressTestOutput>(deps, {
+      reviewId,
+      phase: 'phase_7',
+      agent: 'prior-stress-test',
+      artefactName: 'p7-prior-stress',
+      validate: (value) => {
+        const output = value as PriorStressTestOutput;
+        const ungrounded = output.hingeFindingIds.filter((id) => !input.ledgerIds.has(id));
+        if (ungrounded.length > 0) {
+          throw new Error(
+            `prior stress test cites hinge finding ids not present in the ledger: ${ungrounded.join(', ')}. Name only current ledger ids as hinges.`,
+          );
+        }
+      },
+      assembleInput: {
+        manuscriptExcerpt: input.digest,
+        artefacts: [
+          { label: "Reviewer's preliminary assessment (the prior under test)", content: input.userPrior },
+          {
+            label: 'Recommendation package (reached on the evidence)',
+            content: redactEditorOnlyIds(JSON.stringify(input.recommendationPackage, null, 2), input.editorOnlyIds),
+          },
+          {
+            label: 'Current evidence ledger (author-facing findings, canonical ids)',
+            content: JSON.stringify(topFindings, null, 2),
+          },
+        ],
+        routingNote:
+          "Hold the reviewer's preliminary assessment against the assembled evidence. Build the honest case for and against it, then set alignment to supported, partially_supported, or contradicted with positive evidence. Name the hinge finding ids from the ledger above; every id must exist there verbatim. Any id shown as [EDITOR-ONLY] is confidential and never appears in your prose or hinges.",
+      },
+    });
+  } catch (error) {
+    if (error instanceof DispatchPauseError) {
+      throw error;
+    }
+    insertEvent(deps.db, {
+      reviewId,
+      kind: 'error',
+      phase: 'phase_7',
+      payload: { message: 'Prior stress test skipped after an internal error.' },
+    });
+    return null;
+  }
 }
 
 async function reDispatchSpecialist(

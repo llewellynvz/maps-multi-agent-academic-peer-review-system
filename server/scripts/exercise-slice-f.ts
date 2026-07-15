@@ -338,7 +338,7 @@ function exerciseInPrepFilter(): void {
     parser: 'grobid',
     parseQuality: 'good',
   };
-  const eligible = referencesForVerification(sectionMap);
+  const eligible = referencesForVerification(sectionMap, 'standard').references;
   const inPrepExcluded = !eligible.some((r) => r.index === 1);
   const publishedKept = eligible.some((r) => r.index === 2);
   const noIdentifierExcluded = !eligible.some((r) => r.index === 3);

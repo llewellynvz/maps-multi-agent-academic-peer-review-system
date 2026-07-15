@@ -1,0 +1,7 @@
+{
+  "name": "ai-content-analyst",
+  "promptVersion": "1.0.0",
+  "phase": [4],
+  "role": "cheap",
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md"]
+}

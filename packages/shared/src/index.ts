@@ -20,6 +20,8 @@ export * from './agents/field-context-scout';
 export * from './agents/citation-auditor';
 export * from './agents/specialist-reviewer';
 export * from './agents/integrity-screener';
+export * from './agents/ai-content-analyst';
+export * from './agents/prior-stress-test';
 export * from './agents/swarm';
 export * from './agents/review-report-writer';
 export * from './agents/review-meta-reviewer';

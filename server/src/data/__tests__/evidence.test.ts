@@ -90,6 +90,28 @@ describe('getEvidenceData editor-only invariant', () => {
       recommendedAction: 'Report the omitted effect sizes.',
     });
   });
+
+  it('redacts an editor-only id from the prior stress test prose and filters it from the hinges', () => {
+    insertFinding('REV-STAT-0001', 'author_facing', 'The reported analysis lacks effect sizes.');
+    insertFinding('REV-METH-0002', 'editor_only', 'Confidential concern held for the editor.');
+    client.sqlite
+      .prepare('UPDATE reviews SET options_json = ? WHERE id = ?')
+      .run(JSON.stringify({ answers: { userPrior: 'major-revision' } }), REVIEW_ID);
+    writeArtefact(REVIEW_ID, 'p7-prior-stress', {
+      caseFor: 'The evidence supports the prior via REV-STAT-0001.',
+      caseAgainst: 'A confidential concern, REV-METH-0002, cuts against it.',
+      alignment: 'partially_supported',
+      hingeFindingIds: ['REV-STAT-0001', 'REV-METH-0002'],
+      selfCritique: { strongestObjection: 'x', confidenceRaisers: ['y'] },
+    });
+
+    const evidence = getEvidenceData(client.db, REVIEW_ID);
+
+    expect(evidence.priorStressTest).not.toBeNull();
+    expect(evidence.priorStressTest?.hingeFindingIds).toEqual(['REV-STAT-0001']);
+    expect(evidence.priorStressTest?.caseAgainst).toContain('[EDITOR-ONLY]');
+    expect(JSON.stringify(evidence)).not.toContain('REV-METH-0002');
+  });
 });
 
 describe('getEvidenceData legacy path', () => {

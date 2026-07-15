@@ -34,3 +34,27 @@ export const citationAuditorSchema = z.object({
 });
 
 export type CitationAuditorOutput = z.infer<typeof citationAuditorSchema>;
+
+export const claimSupportVerdictSchema = z.enum([
+  'supports',
+  'partially_supports',
+  'does_not_support',
+  'abstract_unavailable',
+]);
+
+export const citationClaimAssessmentSchema = z.object({
+  referenceTitle: z.string(),
+  claim: z.string(),
+  support: claimSupportVerdictSchema,
+  note: z.string(),
+});
+
+export const citationClaimsSchema = z.object({
+  assessments: z.array(citationClaimAssessmentSchema),
+  findings: z.array(findingSchema),
+  selfCritique: selfCritiqueSchema,
+});
+
+export type ClaimSupportVerdict = z.infer<typeof claimSupportVerdictSchema>;
+export type CitationClaimAssessment = z.infer<typeof citationClaimAssessmentSchema>;
+export type CitationClaimsOutput = z.infer<typeof citationClaimsSchema>;

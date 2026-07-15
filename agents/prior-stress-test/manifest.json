@@ -1,0 +1,7 @@
+{
+  "name": "prior-stress-test",
+  "promptVersion": "1.0.0",
+  "phase": [7],
+  "role": "cheap",
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "03_REVIEW_DECISION.md"]
+}

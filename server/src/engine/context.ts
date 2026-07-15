@@ -67,8 +67,21 @@ export function referenceMetadataList(sectionMap: SectionMap): string {
     .join('\n');
 }
 
-export function referencesForVerification(sectionMap: SectionMap): Array<Reference & { index: number }> {
-  const usable: Array<Reference & { index: number }> = [];
+export type ReferenceAuditMode = 'standard' | 'forensic';
+
+export interface ReferenceSkip {
+  reference: string;
+  reason: string;
+}
+
+export interface ReferenceSelection {
+  references: Array<Reference & { index: number }>;
+  skipped: ReferenceSkip[];
+}
+
+export function referencesForVerification(sectionMap: SectionMap, mode: ReferenceAuditMode): ReferenceSelection {
+  const references: Array<Reference & { index: number }> = [];
+  const skipped: ReferenceSkip[] = [];
   for (const reference of sectionMap.references) {
     if (reference.title === null || reference.title.trim().length < 6) {
       continue;
@@ -76,16 +89,17 @@ export function referencesForVerification(sectionMap: SectionMap): Array<Referen
     if (!isPublishedReference(reference)) {
       continue;
     }
-    usable.push({
+    if (mode === 'standard' && references.length >= REFERENCE_CAP) {
+      skipped.push({ reference: reference.title, reason: 'standard-cap' });
+      continue;
+    }
+    references.push({
       index: reference.index,
       title: reference.title,
       authors: reference.authors,
       year: reference.year ?? 0,
       ...(reference.doi !== null ? { doi: reference.doi } : {}),
     });
-    if (usable.length >= REFERENCE_CAP) {
-      break;
-    }
   }
-  return usable;
+  return { references, skipped };
 }

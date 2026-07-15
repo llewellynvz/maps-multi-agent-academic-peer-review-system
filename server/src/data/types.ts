@@ -59,6 +59,9 @@ export interface Detected {
   manuscriptType: string;
   language: string;
   wordCount: number;
+  sectionCount: number;
+  referenceCount: number;
+  hasAbstract: boolean;
   parseQuality: 'good' | 'degraded';
 }
 

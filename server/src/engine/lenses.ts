@@ -1,3 +1,5 @@
+import type { PaperType } from './options';
+
 export interface LensDef {
   key: string;
   prefix: string;
@@ -97,6 +99,61 @@ export function selectActiveLenses(preset: Preset, activationMap: ActivationEntr
     }
   }
   return LENSES.filter((lens) => selected.has(lens.prefix));
+}
+
+const NON_DATA_DESIGNS = new Set(['theory', 'commentary', 'protocol']);
+
+export function studyDesignAffirmsData(studyDesign: string): boolean {
+  return !NON_DATA_DESIGNS.has(studyDesign.toLowerCase().trim());
+}
+
+export function applyPaperTypeLensPolicy(
+  active: LensDef[],
+  paperType: PaperType | null,
+  analystAffirmsData: boolean,
+): LensDef[] {
+  if (paperType === null || paperType === 'empirical') {
+    return active;
+  }
+  const prefixes = new Set(active.map((lens) => lens.prefix));
+  if (paperType === 'theoretical' || paperType === 'perspective-or-opinion') {
+    if (!analystAffirmsData) {
+      for (const prefix of ['METH', 'STAT', 'MEAS', 'CAUS']) {
+        prefixes.delete(prefix);
+      }
+    }
+  } else if (paperType === 'review') {
+    for (const prefix of ['ARG', 'NOV', 'THEO', 'METH']) {
+      prefixes.add(prefix);
+    }
+  } else if (paperType === 'methodological') {
+    for (const prefix of ['METH', 'STAT', 'MEAS']) {
+      prefixes.add(prefix);
+    }
+  } else if (paperType === 'case-study') {
+    if (!analystAffirmsData) {
+      prefixes.delete('STAT');
+    }
+  }
+  return LENSES.filter((lens) => prefixes.has(lens.prefix));
+}
+
+const PAPER_TYPE_NOTE: Record<PaperType, string | null> = {
+  empirical: null,
+  theoretical:
+    'This is a theoretical contribution; judge the coherence and advancement of the argument and its scholarly grounding, and do not demand empirical validation the paper does not claim.',
+  'perspective-or-opinion':
+    'This is a perspective piece; judge argument quality and scholarly grounding, do not demand empirical validation.',
+  review:
+    'This is a review; judge the search methodology, coverage, synthesis, and argument, and hold it to review-reporting norms rather than to primary-study design standards.',
+  methodological:
+    'This is a methodological contribution; judge the validity, statistical properties, and measurement rigour of the proposed method rather than a substantive empirical finding.',
+  'case-study':
+    'This is a case study; judge the depth, richness, and transferability of the case rather than statistical generalisation.',
+};
+
+export function paperTypeNote(paperType: PaperType | null): string | null {
+  return paperType === null ? null : PAPER_TYPE_NOTE[paperType];
 }
 
 const SEVERITY_WEIGHT: Record<string, number> = {

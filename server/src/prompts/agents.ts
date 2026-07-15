@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 import {
+  aiContentAnalystSchema,
   citationAuditorSchema,
+  citationClaimsSchema,
   claimDesignAnalysisSchema,
   fieldContextScoutSchema,
   fullReportEnvelopeSchema,
@@ -9,6 +11,7 @@ import {
   manuscriptSanitizerSchema,
   manuscriptStructureSchema,
   phaseCriticSchema,
+  priorStressTestSchema,
   qualityMetricsEngineSchema,
   reviewCalibratorSchema,
   reviewFinalCriticSchema,
@@ -42,9 +45,11 @@ const SCHEMA_RESOLVERS: Record<string, SchemaResolver> = {
   'manuscript-sanitizer': single(manuscriptSanitizerSchema),
   'manuscript-analyst': byMode({ A: manuscriptStructureSchema, B: claimDesignAnalysisSchema }),
   'field-context-scout': byMode({ dossier: fieldContextScoutSchema, plan: scoutPlanSchema }),
-  'citation-auditor': single(citationAuditorSchema),
+  'citation-auditor': byMode({ default: citationAuditorSchema, claims: citationClaimsSchema }),
   'specialist-reviewer': single(specialistReviewerSchema),
   'integrity-screener': single(integrityScreenerSchema),
+  'ai-content-analyst': single(aiContentAnalystSchema),
+  'prior-stress-test': single(priorStressTestSchema),
   swarm: byMode({ A: swarmEvaluationSchema, B: swarmReportCritiqueSchema }),
   'review-report-writer': byMode({ A: fullReportEnvelopeSchema, B: shippedReportEnvelopeSchema }),
   'review-meta-reviewer': single(reviewMetaReviewerSchema),
@@ -62,6 +67,7 @@ export const PHASE_0_6_ROSTER: string[] = [
   'citation-auditor',
   'specialist-reviewer',
   'integrity-screener',
+  'ai-content-analyst',
   'swarm',
   'review-report-writer',
 ];
@@ -69,6 +75,7 @@ export const PHASE_0_6_ROSTER: string[] = [
 export const PHASE_7_8_ROSTER: string[] = [
   'review-meta-reviewer',
   'review-report-writer',
+  'prior-stress-test',
   'swarm',
   'review-final-critic',
   'quality-metrics-engine',

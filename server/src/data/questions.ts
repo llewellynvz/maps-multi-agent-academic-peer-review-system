@@ -16,7 +16,7 @@ interface RawQuestion {
 }
 
 interface LiteParseBlob {
-  deterministic: { wordCount: number; sectionCount: number; referenceCount: number };
+  deterministic: { wordCount: number; sectionCount: number; referenceCount: number; hasAbstract?: boolean };
   provisional: { field: string; studyDesign: string; manuscriptType: string; language: string; wordCountEstimate: number };
   questions: RawQuestion[];
 }
@@ -67,6 +67,9 @@ export function getQuestions(db: MaraDatabase, reviewId: string): QuestionsRespo
     manuscriptType: blob.provisional.manuscriptType,
     language: blob.provisional.language,
     wordCount: blob.deterministic.wordCount,
+    sectionCount: blob.deterministic.sectionCount,
+    referenceCount: blob.deterministic.referenceCount,
+    hasAbstract: blob.deterministic.hasAbstract ?? false,
     parseQuality: parseQualityFor(db, reviewId),
   };
   const questions = blob.questions.map((raw) => mapQuestion(raw, detected.field));

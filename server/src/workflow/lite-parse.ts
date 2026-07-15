@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { SectionMap } from '@mara/shared';
 import type { DetectDispatch } from '../sanitize';
+import { mapManuscriptTypeToPaperType, PAPER_TYPES } from '../engine/options';
 
 export const clarifyingQuestionSchema = z.object({
   id: z.string(),
@@ -128,6 +129,57 @@ export async function liteParse(options: LiteParseOptions): Promise<LiteParseRes
       defaultValue: null,
     });
   }
+
+  const detectedTitle = sectionMap.title !== null && sectionMap.title.length > 0 ? sectionMap.title : null;
+  questions.push(
+    {
+      id: 'review-title',
+      kind: 'metadata',
+      field: 'reviewTitle',
+      prompt: 'Name this review. It defaults to the detected manuscript title.',
+      defaultValue: detectedTitle,
+    },
+    {
+      id: 'paper-type',
+      kind: 'metadata',
+      field: 'paperType',
+      prompt: `Confirm the paper type (provisional classification: ${provisional.manuscriptType}).`,
+      options: PAPER_TYPES,
+      defaultValue: mapManuscriptTypeToPaperType(provisional.manuscriptType),
+    },
+    {
+      id: 'reference-audit',
+      kind: 'metadata',
+      field: 'referenceAudit',
+      prompt: 'Reference audit depth. Standard samples the reference list; forensic verifies every reference.',
+      options: ['standard', 'forensic'],
+      defaultValue: 'standard',
+    },
+    {
+      id: 'claim-check',
+      kind: 'metadata',
+      field: 'claimCheck',
+      prompt: 'Run the load-bearing claim-versus-abstract support check on verified references?',
+      options: ['no', 'yes'],
+      defaultValue: 'no',
+    },
+    {
+      id: 'ai-detection',
+      kind: 'metadata',
+      field: 'aiDetection',
+      prompt: 'Run the AI-content signal analysis over the manuscript?',
+      options: ['yes', 'no'],
+      defaultValue: 'yes',
+    },
+    {
+      id: 'user-prior',
+      kind: 'metadata',
+      field: 'userPrior',
+      prompt: 'Your own preliminary assessment, if any. It is withheld from the reviewers and stress-tested at the end.',
+      options: ['none', 'accept', 'minor-revision', 'major-revision', 'reject-and-resubmit', 'reject'],
+      defaultValue: 'none',
+    },
+  );
 
   return { deterministic, provisional: { ...provisional, labelled: 'provisional' }, questions };
 }
