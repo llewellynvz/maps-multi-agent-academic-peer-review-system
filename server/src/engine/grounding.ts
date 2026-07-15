@@ -110,8 +110,10 @@ const PIPE_KEY_VALUE = /\|\s*(decision|recommendation|confidence|verdict|severit
 const NUMERIC_CONFIDENCE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;
 
 const AI_TROPE_PATTERNS: RegExp[] = [
-  /(?:^|[.!?]\s+|\n[\s>*-]*)(furthermore|moreover|additionally|notably|importantly|crucially)\s*,/gi,
+  /(?:^|[.!?]\s+|\n[\s>*-]*)(furthermore|moreover|additionally|notably|importantly|crucially|overall)\s*,/gi,
+  /(?:^|[.!?]\s+|\n[\s>*-]*)in\s+(?:conclusion|summary)\s*,/gi,
   /\bit(?:'s| is)\s+worth\s+noting\b/gi,
+  /\bit\s+(?:is|should\s+be|must\s+be|can\s+be|has\s+to\s+be)\s+noted\s+that\b/gi,
   /\bit\s+(?:is|should\s+be)\s+(?:important|worth|noted|noting)\s+(?:to\s+)?(?:note|remember|mention|be\s+noted)\b/gi,
   /\bplays?\s+an?\s+(?:crucial|pivotal|key|vital|significant|central|important)\s+role\b/gi,
   /\b(?:underscor|highlight|emphasiz|emphasis)\w*\s+the\s+(?:need|significance|importance|value|fact)\b/gi,

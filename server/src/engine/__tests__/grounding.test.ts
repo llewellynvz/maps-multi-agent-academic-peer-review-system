@@ -343,6 +343,16 @@ describe('id-free prose and evidence map validation', () => {
     expect(result.kind).toBe('ai-trope');
   });
 
+  it('catches the summary-transition and noted-that tells without touching a genuine closing sign-off', () => {
+    const input = idFreeBase();
+    input.authorFacingBody +=
+      ' In conclusion, this is competent. It should be noted that the sample skews young.';
+    const result = validateGrounding(input);
+    expect(result.ok).toBe(false);
+    expect(result.kind).toBe('ai-trope');
+    expect(scanAiTropes('In closing, I encourage a second wave. The overall fit was poor. The authors note that attrition was high.')).toEqual([]);
+  });
+
   it('does not flag legitimate expert review prose that engages the literature', () => {
     const input = idFreeBase();
     input.authorFacingBody =
