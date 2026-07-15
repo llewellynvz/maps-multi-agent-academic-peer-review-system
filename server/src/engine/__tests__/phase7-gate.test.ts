@@ -382,6 +382,28 @@ describe('phase 7 release gate routing', () => {
     expect(harness.writerInputs[1]).toContain('evidence map');
   });
 
+  it('repairs a paraphrased evidence label from its section heading', async () => {
+    const paraphrased = {
+      ...shippedObject(),
+      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\n## 4B. By-section review\n### ACT in the workplace\nThe framing outstrips the design.`,
+      evidenceMap: [
+        ...shippedObject().evidenceMap,
+        {
+          section: '4B ACT in the workplace',
+          label: 'Specifying psychological flexibility sub-processes.',
+          anchor: 'Section 1.2',
+          findingIds: ['REV-STAT-0002'],
+        },
+      ],
+    };
+    const harness = mockDeps([critic('pass')], paraphrased);
+    await runPhase7(harness.deps, reviewId);
+    expect(checkpointRow().snapshot.released).toBe(true);
+    const final = readArtefact<{ evidenceMap: Array<{ section: string; label: string }> }>(reviewId, 'p7-shipped-final');
+    const repaired = final.evidenceMap.find((entry) => entry.section === '4B ACT in the workplace');
+    expect(repaired?.label).toBe('ACT in the workplace');
+  });
+
   it('derives citedFindingIds from the evidence map when the writer omits an id', async () => {
     const sloppyUnion = { ...shippedObject(), citedFindingIds: ['REV-STAT-0001'] };
     const harness = mockDeps([critic('pass')], sloppyUnion);

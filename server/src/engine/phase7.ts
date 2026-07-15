@@ -27,7 +27,14 @@ import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
-import { redactEditorOnlyIds, redactSupersededIds, validateGrounding, type GroundingFailureKind } from './grounding';
+import {
+  bodyHeadings,
+  labelAppearsInBody,
+  redactEditorOnlyIds,
+  redactSupersededIds,
+  validateGrounding,
+  type GroundingFailureKind,
+} from './grounding';
 import { matchLens, paperTypeNote } from './lenses';
 import { mergeFindingsOnce } from './merge';
 import { readIntakeOptions } from './options';
@@ -107,8 +114,31 @@ function ledgerForReport(findings: CurrentFinding[]): Array<Record<string, unkno
   }));
 }
 
+function repairEvidenceLabels(shipped: ShippedReportEnvelope): ShippedReportEnvelope['evidenceMap'] {
+  const headings = bodyHeadings(shipped.bodyMarkdown);
+  const lower = headings.map((heading) => heading.toLowerCase());
+  return shipped.evidenceMap.map((entry) => {
+    if (labelAppearsInBody(shipped.bodyMarkdown, entry.label)) {
+      return entry;
+    }
+    const sectionKey = entry.section
+      .replace(/^4[AB][.\d]*\s*/i, '')
+      .trim()
+      .toLowerCase();
+    if (sectionKey.length < 3) {
+      return entry;
+    }
+    const index = lower.findIndex(
+      (heading) =>
+        heading === sectionKey || heading.startsWith(sectionKey) || (sectionKey.startsWith(heading) && heading.length >= 8),
+    );
+    return index >= 0 ? { ...entry, label: headings[index] as string } : entry;
+  });
+}
+
 function withDerivedCitedIds(shipped: ShippedReportEnvelope): ShippedReportEnvelope {
-  return { ...shipped, citedFindingIds: [...new Set(shipped.evidenceMap.flatMap((entry) => entry.findingIds))] };
+  const evidenceMap = repairEvidenceLabels(shipped);
+  return { ...shipped, evidenceMap, citedFindingIds: [...new Set(evidenceMap.flatMap((entry) => entry.findingIds))] };
 }
 
 function recommendationPackage(meta: ReviewMetaReviewerOutput): Record<string, unknown> {

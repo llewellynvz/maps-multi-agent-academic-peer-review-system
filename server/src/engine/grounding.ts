@@ -111,18 +111,20 @@ const NUMERIC_CONFIDENCE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\
 const HEADING_LINE = /^#{1,6}\s+(.+)$/gm;
 const HEADING_NUMBERING = /^(?:\d+[A-Za-z]?(?:\.\d+)*[.)]?)\s+/;
 
+export function bodyHeadings(body: string): string[] {
+  const headings: string[] = [];
+  for (const match of body.matchAll(HEADING_LINE)) {
+    headings.push((match[1] ?? '').replace(HEADING_NUMBERING, '').trim());
+  }
+  return headings;
+}
+
 export function labelAppearsInBody(body: string, label: string): boolean {
   const wanted = label.trim();
   if (body.includes(`**${wanted}`)) {
     return true;
   }
-  for (const match of body.matchAll(HEADING_LINE)) {
-    const heading = (match[1] ?? '').replace(HEADING_NUMBERING, '').trim();
-    if (heading === wanted || heading.startsWith(wanted)) {
-      return true;
-    }
-  }
-  return false;
+  return bodyHeadings(body).some((heading) => heading === wanted || heading.startsWith(wanted));
 }
 
 export function scanMachineTokens(content: string): string[] {
