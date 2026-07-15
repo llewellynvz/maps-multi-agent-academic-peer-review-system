@@ -507,10 +507,10 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               },
               { label: 'Arbitration rationale', content: arbitration.rationale },
             ],
-            routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register (no taxonomy tokens, no key-value lines, no finding ids in the body). Findings, evidence, the evidenceMap, and citedFindingIds stay exactly as they are; only the recommendation framing changes.`,
+            routingNote: `Deterministic arbitration set the recommendation to ${narrowed} with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register (no taxonomy tokens, no key-value lines, no finding ids in the body). Only the recommendation framing changes: keep every section heading and bold problem label byte-identical to the prior report, and return the evidenceMap unchanged (the engine preserves the validated map regardless).`,
           },
         });
-        const aligned = withDerivedCitedIds(alignedRaw);
+        const aligned = withDerivedCitedIds({ ...alignedRaw, evidenceMap: lastShipped.evidenceMap });
         const alignedNotes = assemblePrivateNotes({
           recommendation: narrowed,
           recommendationConfidence: currentMeta.recommendationConfidence,

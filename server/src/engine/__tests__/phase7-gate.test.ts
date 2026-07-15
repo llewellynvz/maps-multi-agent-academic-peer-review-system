@@ -437,6 +437,31 @@ describe('phase 7 release gate routing', () => {
     expect(gateRecord.recommendationConfidence).toBeCloseTo(0.6);
   });
 
+  it('preserves the validated evidence map when the alignment writer fabricates an id', async () => {
+    const fabricated = {
+      ...shippedObject(),
+      recommendation: 'reject_and_resubmit',
+      evidenceMap: [
+        { section: '4A.1', label: 'The reported mean is impossible.', anchor: 'Table 2', findingIds: ['REV-CTX-9313'] },
+      ],
+      citedFindingIds: ['REV-CTX-9313'],
+    };
+    const harness = mockDeps(
+      [critic('revise'), critic('revise')],
+      undefined,
+      undefined,
+      [shippedObject(), shippedObject(), shippedObject(), fabricated],
+    );
+    await runPhase7(harness.deps, reviewId);
+    expect(checkpointRow().snapshot.released).toBe(true);
+    const final = readArtefact<{ citedFindingIds: string[]; evidenceMap: Array<{ findingIds: string[] }> }>(
+      reviewId,
+      'p7-shipped-final',
+    );
+    expect(final.evidenceMap.flatMap((entry) => entry.findingIds)).not.toContain('REV-CTX-9313');
+    expect([...final.citedFindingIds].sort()).toEqual([...AUTHOR_IDS].sort());
+  });
+
   it('aligns the released report with the arbitration-narrowed recommendation', async () => {
     const narrowedEnvelope = { ...shippedObject(), recommendation: 'reject_and_resubmit' };
     const harness = mockDeps(
