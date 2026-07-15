@@ -1,0 +1,18 @@
+# gitleaks configuration for the MARA platform.
+# Extends the default ruleset and allowlists a small, explicitly-synthetic set of
+# test fixtures. Every real credential is supplied at runtime through environment
+# variables and the encrypted provider-key vault; none is committed.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic API-key strings used only to exercise the AES-256-GCM key-vault round-trip. Not real credentials; the test master key is a run of zeroes."
+paths = [
+  '''server/src/security/__tests__/key-vault\.test\.ts''',
+  '''server/src/data/__tests__/data\.test\.ts''',
+]
+regexes = [
+  '''sk-live-A1b2C3d4E5f6G7h8''',
+  '''sk-test-abcd1234''',
+]
