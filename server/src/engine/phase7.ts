@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type {
+  FieldContextScoutOutput,
   FullReportEnvelope,
   Recommendation,
   ReviewFinalCriticOutput,
@@ -21,7 +22,7 @@ import {
   upsertCheckpoint,
 } from '../workflow/repo';
 import { DispatchPauseError, type EngineDeps } from './phases-shared';
-import { readArtefact, writeArtefact } from './artefacts';
+import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, type ArbitrationRecord } from './arbitration';
@@ -35,6 +36,23 @@ const MAX_FIX_CYCLES = 2;
 
 function checkpointKey(phase: string): string {
   return `engine_${phase}`;
+}
+
+function fieldDossierContent(reviewId: string): string | null {
+  if (!artefactExists(reviewId, 'p2-context')) {
+    return null;
+  }
+  const dossier = readArtefact<FieldContextScoutOutput>(reviewId, 'p2-context');
+  const keyPapers = Array.isArray(dossier.keyPapers) ? dossier.keyPapers : [];
+  if (keyPapers.length === 0) {
+    return null;
+  }
+  return JSON.stringify({
+    keyPapers,
+    benchmarks: dossier.benchmarks,
+    contestedClaims: dossier.contestedClaims,
+    methodNorms: dossier.methodNorms,
+  });
 }
 
 function emitGateVerdict(
@@ -167,6 +185,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   const options = getReviewOptions(db, reviewId);
   const report = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
   const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
+  const dossierContent = fieldDossierContent(reviewId);
 
   await withPhase('phase_7', async () => {
     updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
@@ -238,6 +257,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               label: 'Author-facing ledger (cite only these ids; editor-only findings are excluded by construction)',
               content: JSON.stringify(ledgerForReport(authorFacing), null, 2),
             },
+            ...(dossierContent !== null
+              ? [{ label: 'Field dossier (the only literature you may name)', content: redact(dossierContent) }]
+              : []),
           ],
           routingNote:
             `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,

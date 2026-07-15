@@ -6,16 +6,18 @@ import type {
   FullReportEnvelope,
   IntegrityScreenerOutput,
   ManuscriptStructure,
+  ScoutPlan,
   SpecialistReviewerOutput,
   SwarmEvaluation,
 } from '@mara/shared';
 import { randomBytes } from 'node:crypto';
 import type { MaraDatabase } from '../db/client';
+import { searchTopics, type TopicSearchResult } from '../citations';
 import { getCurrentFindings } from '../ledger';
 import { buildProtectedCorpus } from '../security';
 import { withPhase } from '../tracing';
 import { getCheckpoint, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
-import { readArtefact, writeArtefact } from './artefacts';
+import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { computeComposite } from './composite';
 import { mergeFindingsOnce } from './merge';
 import {
@@ -152,6 +154,45 @@ function reconcileExistence(
   };
 }
 
+function topicSearchCap(preset: string): number | null {
+  if (preset === 'thorough') {
+    return 8;
+  }
+  if (preset === 'balanced') {
+    return 5;
+  }
+  return null;
+}
+
+const OFFLINE_SCOUT_NOTE =
+  'No web retrieval tool is available in this build. Work from the manuscript and the provided context only. Where a comparator or benchmark would normally need retrieval, record it as not performable with the reason rather than inventing a source. Prefix findings REV-CTX.';
+
+const SCOUT_PLAN_NOTE =
+  'Mode plan. Derive the query vocabulary and 3 to 8 sharp topic queries from construct, method, and field terms only. Never place a manuscript sentence, the title, or an author name into a query: the deterministic egress guard blocks any query that shares an eight-gram with the manuscript, so a quoting query is refused and its search is recorded as not performable. Return only the plan; emit no dossier and no findings in this mode.';
+
+const DOSSIER_SCOUT_NOTE =
+  'Build the field dossier from the topic search results only. Populate keyPapers (at most 15, each whyItMatters tied to THIS manuscript), benchmarks, contestedClaims, recentReviews, and methodNorms, plus the query vocabulary. Keep an honest retrievalLog from the executed queries, the gapMap, and the biasStatement. Engage only sources present in the results: a paper you cannot see in the results is a fabrication and must not appear. Prefix findings REV-CTX.';
+
+function fieldDossierArtefact(reviewId: string, label: string): { label: string; content: string } | null {
+  if (!artefactExists(reviewId, 'p2-context')) {
+    return null;
+  }
+  const dossier = readArtefact<FieldContextScoutOutput>(reviewId, 'p2-context');
+  const keyPapers = Array.isArray(dossier.keyPapers) ? dossier.keyPapers : [];
+  if (keyPapers.length === 0) {
+    return null;
+  }
+  return {
+    label,
+    content: JSON.stringify({
+      keyPapers,
+      benchmarks: dossier.benchmarks,
+      contestedClaims: dossier.contestedClaims,
+      methodNorms: dossier.methodNorms,
+    }),
+  };
+}
+
 export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<void> {
   const { db } = deps;
   if (phaseDone(db, reviewId, 'phase_2')) {
@@ -161,30 +202,60 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
   const digest = manuscriptDigest(ctx.sectionMap);
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const matrixJson = JSON.stringify(analystB.claimEvidenceMatrix);
+  const topicCap = topicSearchCap(ctx.preset);
 
   await withPhase('phase_2', async () => {
     enterPhase(db, reviewId, 'phase_2');
 
+    let scoutPlan: ScoutPlan | null = null;
+    if (topicCap !== null) {
+      scoutPlan = await runAgent<ScoutPlan>(deps, {
+        reviewId,
+        phase: 'phase_2',
+        agent: 'field-context-scout',
+        mode: 'plan',
+        artefactName: 'p2-scout-plan',
+        assembleInput: {
+          mode: 'plan',
+          parseQuality: ctx.parseQuality,
+          manuscriptExcerpt: digest,
+          artefacts: [{ label: 'Claim-evidence matrix', content: matrixJson }],
+          routingNote: SCOUT_PLAN_NOTE,
+        },
+      });
+    }
+
+    let executedQueries: string[] = [];
+    let skippedQueries: string[] = [];
+    if (scoutPlan !== null) {
+      const cap = topicCap ?? scoutPlan.topicQueries.length;
+      executedQueries = scoutPlan.topicQueries.slice(0, cap).map((entry) => entry.query);
+      skippedQueries = scoutPlan.topicQueries.slice(cap).map((entry) => entry.query);
+    }
+
     const clientVerdicts: ClientVerdict[] = [];
-    if (deps.citationClient !== undefined) {
-      const references = referencesForVerification(ctx.sectionMap);
-      if (deps.egress !== undefined) {
-        deps.egress.begin({
-          reviewId,
-          signingKey: randomBytes(32),
-          corpus: buildProtectedCorpus(ctx.sectionMap),
-          log: (entry) =>
-            insertEvent(db, {
-              reviewId,
-              kind: 'web_query',
-              phase: 'phase_2',
-              egressTarget: entry.target,
-              egressQuery: entry.query,
-              payload: { blocked: entry.blocked, reason: entry.reason, signature: entry.signature },
-            }),
-        });
-      }
-      try {
+    let topicResults: TopicSearchResult[] = [];
+    const retrievalActive =
+      deps.egress !== undefined && (deps.citationClient !== undefined || executedQueries.length > 0);
+    if (retrievalActive && deps.egress !== undefined) {
+      deps.egress.begin({
+        reviewId,
+        signingKey: randomBytes(32),
+        corpus: buildProtectedCorpus(ctx.sectionMap),
+        log: (entry) =>
+          insertEvent(db, {
+            reviewId,
+            kind: 'web_query',
+            phase: 'phase_2',
+            egressTarget: entry.target,
+            egressQuery: entry.query,
+            payload: { blocked: entry.blocked, reason: entry.reason, signature: entry.signature },
+          }),
+      });
+    }
+    try {
+      if (deps.citationClient !== undefined) {
+        const references = referencesForVerification(ctx.sectionMap);
         for (const reference of references) {
           const { index, ...metadata } = reference;
           const verdict = await deps.citationClient.verifyReference(metadata);
@@ -197,11 +268,34 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
             matchedDoi: verdict.matchedDoi ?? null,
           });
         }
-      } finally {
+      }
+      if (executedQueries.length > 0 && deps.egress !== undefined) {
+        topicResults = await searchTopics(executedQueries, deps.egress.fetch, {
+          maxQueries: topicCap ?? executedQueries.length,
+          perQueryPerSource: 5,
+        });
+      }
+    } finally {
+      if (retrievalActive) {
         deps.egress?.end();
       }
     }
     const clientVerdictJson = JSON.stringify(clientVerdicts, null, 2);
+
+    const topicResultsPayload = { executedQueries, skippedQueries, results: topicResults };
+    if (scoutPlan !== null) {
+      writeArtefact(reviewId, 'p2-topic-results', topicResultsPayload);
+    }
+
+    const scoutArtefacts = [{ label: 'Claim-evidence matrix', content: matrixJson }];
+    let scoutRoutingNote = OFFLINE_SCOUT_NOTE;
+    if (scoutPlan !== null) {
+      scoutArtefacts.push({
+        label: 'Topic search results (engage only sources present here)',
+        content: JSON.stringify(topicResultsPayload),
+      });
+      scoutRoutingNote = DOSSIER_SCOUT_NOTE;
+    }
 
     const [scout, citation] = await Promise.all([
       runAgent<FieldContextScoutOutput>(deps, {
@@ -212,9 +306,8 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
         assembleInput: {
           parseQuality: ctx.parseQuality,
           manuscriptExcerpt: digest,
-          artefacts: [{ label: 'Claim-evidence matrix', content: matrixJson }],
-          routingNote:
-            'No web retrieval tool is available in this build. Work from the manuscript and the provided context only. Where a comparator or benchmark would normally need retrieval, record it as not performable with the reason rather than inventing a source. Prefix findings REV-CTX.',
+          artefacts: scoutArtefacts,
+          routingNote: scoutRoutingNote,
         },
       }),
       runAgent<CitationAuditorOutput>(deps, {
@@ -303,6 +396,8 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
   const matrixJson = JSON.stringify(analystB.claimEvidenceMatrix);
   const active = selectActiveLenses(ctx.preset, analystB.activationMap);
 
+  const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (engage these works by name)');
+
   await withPhase('phase_3', async () => {
     enterPhase(db, reviewId, 'phase_3');
 
@@ -320,6 +415,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
             artefacts: [
               { label: 'Manuscript map', content: mapJson },
               { label: 'Claim-evidence matrix', content: matrixJson },
+              ...(dossierArtefact !== null ? [dossierArtefact] : []),
             ],
             routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.`,
           },
@@ -374,6 +470,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
               { label: "Other lenses' findings (anonymised)", content: JSON.stringify(anonymiseFindings(others)) },
               { label: 'Field context (Phase 2)', content: context2 },
               { label: 'Citation audit (Phase 2)', content: citations2 },
+              ...(dossierArtefact !== null ? [dossierArtefact] : []),
             ],
             routingNote: `Challenge round for ${lens.display} (REV-${lens.prefix}). In "findings", return ONLY new or updated findings; an update sets supersedes to the existing canonical id shown in your first-pass findings, and you never re-list an unchanged finding. Update a position ONLY on named new evidence, never because another lens disagreed. Preserve evidence-based dissent held at confidence 0.75 or higher in challengeRound.dissentPreserved rather than converging.`,
           },
@@ -641,6 +738,8 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
     }
   };
 
+  const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (the only literature you may name)');
+
   await withPhase('phase_6', async () => {
     enterPhase(db, reviewId, 'phase_6');
 
@@ -659,6 +758,7 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
             content: JSON.stringify(findingsForReport, null, 2),
           },
           { label: 'Swarm summary', content: JSON.stringify(swarm, null, 2) },
+          ...(dossierArtefact !== null ? [dossierArtefact] : []),
         ],
         routingNote:
           'Mode A full internal report. Every claim in bodyMarkdown and every provisional rubric row must cite Finding IDs that exist in the ledger above; list every id you cite in citedFindingIds. Order concerns by severity then fixability. Provide provisional 15-criterion scores each citing at least one Finding ID, the provisional average, and the three lowest criteria as bottlenecks.',

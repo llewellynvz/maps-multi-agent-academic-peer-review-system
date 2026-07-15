@@ -33,10 +33,31 @@ export const sourceAvailabilityItemSchema = z.object({
   broken: z.boolean(),
 });
 
+export const topicQuerySchema = z.object({
+  query: z.string().min(3),
+  purpose: z.string().min(1),
+});
+
+export const scoutPlanSchema = z.object({
+  mode: z.literal('plan'),
+  queryVocabulary: z.array(z.string()).min(1),
+  topicQueries: z.array(topicQuerySchema).min(3).max(8),
+  selfCritique: selfCritiqueSchema,
+});
+
+export const keyPaperSchema = z.object({
+  citation: z.string(),
+  whyItMatters: z.string(),
+});
+
 export const fieldContextScoutSchema = z.object({
   queryVocabulary: z.array(z.string()),
   retrievalLog: z.array(retrievalLogEntrySchema),
   comparators: z.array(comparatorSchema),
+  keyPapers: z.array(keyPaperSchema).max(15),
+  contestedClaims: z.array(z.string()),
+  recentReviews: z.array(z.string()),
+  methodNorms: z.array(z.string()),
   gapMap: z.string(),
   biasStatement: z.string(),
   benchmarks: z.array(benchmarkSchema),
@@ -45,4 +66,7 @@ export const fieldContextScoutSchema = z.object({
   selfCritique: selfCritiqueSchema,
 });
 
+export type TopicQuery = z.infer<typeof topicQuerySchema>;
+export type ScoutPlan = z.infer<typeof scoutPlanSchema>;
+export type KeyPaper = z.infer<typeof keyPaperSchema>;
 export type FieldContextScoutOutput = z.infer<typeof fieldContextScoutSchema>;

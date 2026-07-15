@@ -12,6 +12,7 @@ import {
   reviewCalibratorSchema,
   reviewFinalCriticSchema,
   reviewMetaReviewerSchema,
+  scoutPlanSchema,
   shippedReportEnvelopeSchema,
   specialistReviewerSchema,
   swarmEvaluationSchema,
@@ -39,7 +40,7 @@ const byMode =
 const SCHEMA_RESOLVERS: Record<string, SchemaResolver> = {
   'manuscript-sanitizer': single(manuscriptSanitizerSchema),
   'manuscript-analyst': byMode({ A: manuscriptStructureSchema, B: claimDesignAnalysisSchema }),
-  'field-context-scout': single(fieldContextScoutSchema),
+  'field-context-scout': byMode({ dossier: fieldContextScoutSchema, plan: scoutPlanSchema }),
   'citation-auditor': single(citationAuditorSchema),
   'specialist-reviewer': single(specialistReviewerSchema),
   'integrity-screener': single(integrityScreenerSchema),

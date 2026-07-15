@@ -1,7 +1,8 @@
 {
   "name": "field-context-scout",
-  "promptVersion": "1.1.0",
+  "promptVersion": "1.2.0",
   "phase": [2],
   "role": "cheap",
-  "knowledge": ["01_REVIEW_GOVERNANCE.md", "05_REVIEW_TEMPLATES.md", "02_REVIEW_LENSES.md"]
+  "knowledge": ["01_REVIEW_GOVERNANCE.md", "05_REVIEW_TEMPLATES.md", "02_REVIEW_LENSES.md"],
+  "modes": ["dossier", "plan"]
 }

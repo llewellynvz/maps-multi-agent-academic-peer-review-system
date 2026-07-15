@@ -15,6 +15,7 @@ import type {
   ReviewCalibratorOutput,
   ReviewFinalCriticOutput,
   ReviewMetaReviewerOutput,
+  ScoutPlan,
   ShippedReportEnvelope,
   SpecialistReviewerOutput,
   SwarmEvaluation,
@@ -92,6 +93,22 @@ const bindings: GoldenBinding[] = [
       const value = output as FieldContextScoutOutput;
       expect(value.retrievalLog.some((entry) => entry.resultsReviewed === 0)).toBe(true);
       expect(value.findings.length).toBeGreaterThan(0);
+      expect(Array.isArray(value.keyPapers)).toBe(true);
+      expect(Array.isArray(value.methodNorms)).toBe(true);
+    },
+  },
+  {
+    label: 'field-context-scout plan mode returns vocabulary and three to eight topic queries',
+    agent: 'field-context-scout',
+    mode: 'plan',
+    file: 'field-context-scout-plan.json',
+    assert: (output) => {
+      const value = output as ScoutPlan;
+      expect(value.mode).toBe('plan');
+      expect(value.queryVocabulary.length).toBeGreaterThan(0);
+      expect(value.topicQueries.length).toBeGreaterThanOrEqual(3);
+      expect(value.topicQueries.length).toBeLessThanOrEqual(8);
+      expect(value.topicQueries.every((entry) => entry.query.length >= 3 && entry.purpose.length >= 1)).toBe(true);
     },
   },
   {
@@ -321,6 +338,7 @@ describe('AGENT-30 golden fixtures', () => {
       'manuscript-analyst:A',
       'manuscript-analyst:B',
       'field-context-scout:default',
+      'field-context-scout:plan',
       'citation-auditor:default',
       'specialist-reviewer:default',
       'integrity-screener:default',

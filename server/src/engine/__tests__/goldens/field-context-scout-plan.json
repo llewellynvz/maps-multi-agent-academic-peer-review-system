@@ -1,0 +1,27 @@
+{
+  "mode": "plan",
+  "queryVocabulary": [
+    "brief mindfulness intervention",
+    "student wellbeing",
+    "WEMWBS",
+    "randomised controlled trial effect size"
+  ],
+  "topicQueries": [
+    {
+      "query": "brief mindfulness intervention student wellbeing randomised controlled trial",
+      "purpose": "Find comparator RCTs of brief mindfulness on student wellbeing to benchmark the reported effect."
+    },
+    {
+      "query": "WEMWBS validation student population",
+      "purpose": "Locate validation evidence for the wellbeing measure the study relies on."
+    },
+    {
+      "query": "mindfulness intervention wellbeing effect size meta-analysis",
+      "purpose": "Anchor the reported 0.42 SD effect against pooled field estimates."
+    }
+  ],
+  "selfCritique": {
+    "strongestObjection": "The queries lean on the intervention label and may miss adjacent contemplative-training comparators indexed under other names.",
+    "confidenceRaisers": ["A synonym expansion of the intervention term before the comparator search runs."]
+  }
+}
