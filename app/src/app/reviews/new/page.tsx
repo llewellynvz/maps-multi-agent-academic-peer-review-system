@@ -3,10 +3,21 @@
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { api, type Detected } from '@/lib/api';
+import { detectedTitle } from '@/lib/intake';
 import { Icon, Meter, Pill } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
+import { DetectedSummary } from '@/components/DetectedSummary';
+import { EmptyState } from '@/components/EmptyState';
 
 type Phase = 'idle' | 'uploading' | 'parsing' | 'ready' | 'error';
+
+const STAGES = ['Uploading the file', 'Reading the structure', 'Classifying the study'];
+
+const NEXT_STEPS = [
+  'Confirm what we detected and give this review a name.',
+  'Choose the review depth and any extra verification checks.',
+  'We run the full review and return a developmental letter with the evidence behind it.',
+];
 
 export default function NewReviewPage(): ReactNode {
   const router = useRouter();
@@ -15,7 +26,18 @@ export default function NewReviewPage(): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [detected, setDetected] = useState<Detected | null>(null);
+  const [title, setTitle] = useState<string | null>(null);
+  const [stage, setStage] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (phase !== 'uploading' && phase !== 'parsing') {
+      setStage(0);
+      return;
+    }
+    const tick = setInterval(() => setStage((current) => Math.min(current + 1, STAGES.length - 1)), 1600);
+    return () => clearInterval(tick);
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== 'parsing' || reviewId === null) {
@@ -25,6 +47,7 @@ export default function NewReviewPage(): ReactNode {
       try {
         const result = await api.getQuestions(reviewId);
         setDetected(result.detected);
+        setTitle(detectedTitle(result));
         setPhase('ready');
         clearInterval(poll);
       } catch (err) {
@@ -67,16 +90,7 @@ export default function NewReviewPage(): ReactNode {
     }
   };
 
-  const rows: Array<{ label: string; value: string }> = detected === null
-    ? []
-    : [
-        { label: 'Field', value: detected.field },
-        { label: 'Study design', value: detected.studyDesign },
-        { label: 'Manuscript type', value: detected.manuscriptType },
-        { label: 'Language', value: detected.language },
-        { label: 'Word count', value: String(detected.wordCount) },
-        { label: 'Parse quality', value: detected.parseQuality },
-      ];
+  const working = phase === 'uploading' || phase === 'parsing';
 
   return (
     <div>
@@ -86,7 +100,7 @@ export default function NewReviewPage(): ReactNode {
         sub="Upload a PDF or DOCX. We read the structure, then ask a few quick questions before the review starts."
       />
       <div className="grid-2" style={{ gridTemplateColumns: '3fr 2fr' }}>
-        <div>
+        <div className="stack-16">
           <div
             className={`dropzone ${dragOver ? 'dragover' : ''} ${phase === 'error' ? 'reject' : ''}`}
             onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
@@ -101,47 +115,45 @@ export default function NewReviewPage(): ReactNode {
             <h2 className="h3" style={{ marginTop: 12 }}>Drop a manuscript here</h2>
             <p className="sub muted" style={{ margin: '4px auto 0' }}>PDF or DOCX, up to 40 MB</p>
             <input ref={inputRef} type="file" accept=".pdf,.docx" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file !== undefined) void accept(file); }} />
-            {phase === 'uploading' || phase === 'parsing' ? (
-              <div style={{ marginTop: 20 }}>
+            {working ? (
+              <div className="stack-12" style={{ marginTop: 20, alignItems: 'stretch', textAlign: 'left' }}>
                 <Meter indeterminate />
-                <p className="sub muted" style={{ marginTop: 8 }}>{phase === 'uploading' ? 'Uploading' : 'Reading your manuscript'}</p>
+                <ol className="numbered-list">
+                  {STAGES.map((label, index) => (
+                    <li key={label} style={index <= stage ? undefined : { color: 'var(--fg-4)' }}>{label}</li>
+                  ))}
+                </ol>
               </div>
             ) : null}
             {phase === 'error' ? <div style={{ marginTop: 16 }}><Pill tone="fail" label={message} /></div> : null}
           </div>
           {phase === 'ready' && reviewId !== null ? (
-            <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => router.push(`/reviews/${reviewId}/clarify`)}>
+            <button className="btn btn-primary" onClick={() => router.push(`/reviews/${reviewId}/clarify`)}>
               Continue to questions <Icon name="arrow" />
             </button>
           ) : null}
         </div>
 
-        <div className="card">
-          <h2 className="h3">Detected metadata</h2>
+        <div className="stack-16">
           {detected === null ? (
-            <div className="table-scroll">
-              <table className="table">
-                <tbody>
-                  {['Field', 'Study design', 'Word count', 'Parse quality'].map((label) => (
-                    <tr key={label}><td>{label}</td><td className="num muted">Awaiting file</td></tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="card">
+              <h2 className="h3">Detected metadata</h2>
+              <div className="table-scroll">
+                <table className="table">
+                  <tbody>
+                    {['Field', 'Study design', 'Word count', 'Parse quality'].map((label) => (
+                      <tr key={label}><td>{label}</td><td className="muted">Awaiting file</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
-            <div className="table-scroll">
-              <table className="table">
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.label}><td>{row.label}</td><td className="num">{row.value}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <DetectedSummary detected={detected} title={title} />
+              <EmptyState title="What happens next" steps={NEXT_STEPS} />
+            </>
           )}
-          {detected?.parseQuality === 'degraded' ? (
-            <div style={{ marginTop: 12 }}><Pill tone="warn" label="Degraded parse" /></div>
-          ) : null}
         </div>
       </div>
     </div>

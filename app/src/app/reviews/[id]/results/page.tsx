@@ -20,6 +20,8 @@ import { ReportMarkdown } from '@/components/ReportMarkdown';
 import { ChipReport } from '@/components/ChipReport';
 import { EvidenceIndex } from '@/components/EvidenceIndex';
 import { EvidencePanel } from '@/components/EvidencePanel';
+import { PriorPanel } from '@/components/PriorPanel';
+import { hasPriorStressTest } from '@/lib/intake';
 
 const DELIVERABLE_LABEL: Record<string, string> = {
   peer_review_report: 'Peer review report',
@@ -88,7 +90,10 @@ export default function ResultsPage(): ReactNode {
     : null;
 
   const hasEvidence = visibleEvidence.length > 0;
+  const prior = evidence?.priorStressTest ?? null;
+  const showPrior = hasPriorStressTest(evidence);
   let n = 2;
+  const priorNum = showPrior ? (n += 1) : 0;
   const evidenceNum = hasEvidence ? (n += 1) : 0;
   const statsNum = runStats !== null ? (n += 1) : 0;
   const downloadsNum = (n += 1);
@@ -180,6 +185,10 @@ export default function ResultsPage(): ReactNode {
           </div>
         )}
       </Section>
+
+      {showPrior && prior !== null ? (
+        <PriorPanel number={priorNum} data={prior} findingsById={findingsById} onFinding={setDrawerFinding} />
+      ) : null}
 
       {hasEvidence ? (
         <EvidenceIndex

@@ -47,6 +47,9 @@ export interface Detected {
   language: string;
   wordCount: number;
   parseQuality: 'good' | 'degraded';
+  sectionCount?: number;
+  referenceCount?: number;
+  hasAbstract?: boolean;
 }
 
 export interface Question {
@@ -98,9 +101,18 @@ export interface EvidenceMapView {
   findingIds: string[];
 }
 
+export interface PriorStressTest {
+  prior: string;
+  caseFor: string;
+  caseAgainst: string;
+  alignment: string;
+  hingeFindingIds: string[];
+}
+
 export interface EvidenceData {
   evidenceMap: EvidenceMapView[];
   findings: EvidenceFinding[];
+  priorStressTest?: PriorStressTest | null;
 }
 
 export interface InstanceStats {

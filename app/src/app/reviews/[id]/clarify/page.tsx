@@ -2,14 +2,19 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
-import { api, type Question, type QuestionsResponse } from '@/lib/api';
+import { api, type QuestionsResponse } from '@/lib/api';
+import { buildAnswersPayload, detectedTitle, humanizeOption, resolveAnswer, resolveIntake } from '@/lib/intake';
 import { Icon, Meter, Pill, Spinner } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
+import { Section } from '@/components/Section';
+import { ChoiceChips } from '@/components/ChoiceChips';
+import { CheckCard } from '@/components/CheckCard';
+import { DetectedSummary } from '@/components/DetectedSummary';
 
-const PRESET_DELTA: Record<string, { cost: string; time: string }> = {
-  fast: { cost: 'cost -60%', time: 'time -55%' },
-  balanced: { cost: 'baseline', time: 'baseline' },
-  thorough: { cost: 'cost +150%', time: 'time +120%' },
+const PRESET_TIME: Record<string, string> = {
+  fast: '~7 min',
+  balanced: '~12-16 min',
+  thorough: '~20-28 min',
 };
 
 const FOCUS_OPTIONS = ['Statistics', 'Methods', 'Theory', 'Writing', 'Ethics'];
@@ -55,22 +60,9 @@ export default function ClarifyPage(): ReactNode {
   const submit = async (useDefaults: boolean): Promise<void> => {
     setSubmitting(true);
     try {
-      const payload: Array<{ questionId: string; value: string | string[] }> = [];
-      if (!useDefaults && data !== null) {
-        for (const question of data.questions) {
-          if (question.id === 'preset') {
-            payload.push({ questionId: 'preset', value: preset });
-          } else if (question.id === 'journal') {
-            payload.push({ questionId: 'journal', value: journal.length > 0 ? journal : 'None' });
-          } else if (answers[question.id] !== undefined) {
-            payload.push({ questionId: question.id, value: answers[question.id] ?? '' });
-          }
-        }
-        payload.push({ questionId: 'feedback_focus', value: focus });
-        if (notes.length > 0) {
-          payload.push({ questionId: 'notes', value: notes });
-        }
-      }
+      const payload = !useDefaults && data !== null
+        ? buildAnswersPayload(data.questions, { answers, preset, journal, focus, notes })
+        : [];
       await api.submitAnswers(id, { answers: payload, useDefaults });
       router.push(`/reviews/${id}/run`);
     } catch (err) {
@@ -99,7 +91,11 @@ export default function ClarifyPage(): ReactNode {
     );
   }
 
-  const blockA = data.questions.filter((q) => q.kind === 'confirm' || (q.kind === 'choice' && q.id !== 'preset'));
+  const layout = resolveIntake(data);
+  let running = 2;
+  const verificationNum = layout.showVerification ? (running += 1) : 0;
+  const assessmentNum = layout.showAssessment ? (running += 1) : 0;
+  const notesNum = (running += 1);
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
@@ -109,57 +105,132 @@ export default function ClarifyPage(): ReactNode {
         sub="Everything here is optional. Skip with defaults to proceed using the detected values."
       />
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h2 className="h3">What we read</h2>
-        {blockA.map((question: Question) => (
-          <div key={question.id} className="field">
-            <label>{question.prompt}</label>
-            {question.options !== undefined ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {question.options.map((option) => (
-                  <button key={option} className="chip" aria-pressed={(answers[question.id] ?? question.default) === option}
-                    onClick={() => setAnswers((prev) => ({ ...prev, [question.id]: option }))}>{option}</button>
-                ))}
-              </div>
-            ) : (
-              <input value={answers[question.id] ?? question.detectedValue ?? ''} onChange={(event) => setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))} />
-            )}
-          </div>
-        ))}
-      </div>
+      <Section number={1} eyebrow="What we detected" title="Confirm the essentials">
+        <div className="stack-16">
+          <DetectedSummary detected={data.detected} title={detectedTitle(data)} compact />
+          {layout.metadataQuestions.map((question) => (
+            <div key={question.id} className="field">
+              <label>{question.prompt}</label>
+              {question.options !== undefined ? (
+                <ChoiceChips
+                  options={question.options.map((option) => ({ value: option, label: humanizeOption(option) }))}
+                  value={resolveAnswer(question, answers)}
+                  onChange={(value) => setAnswers((prev) => ({ ...prev, [question.id]: value as string }))}
+                />
+              ) : (
+                <input
+                  value={answers[question.id] ?? question.detectedValue ?? ''}
+                  onChange={(event) => setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))}
+                />
+              )}
+            </div>
+          ))}
+          {layout.reviewTitle !== null ? (
+            <div className="field">
+              <label>The name this review will carry</label>
+              <input
+                value={resolveAnswer(layout.reviewTitle, answers)}
+                onChange={(event) => setAnswers((prev) => ({ ...prev, reviewTitle: event.target.value }))}
+              />
+            </div>
+          ) : null}
+        </div>
+      </Section>
 
-      <div className="card">
-        <h2 className="h3">Shape the review</h2>
-        <div className="field">
-          <label>Target journal</label>
-          <input value={journal} onChange={(event) => setJournal(event.target.value)} placeholder="None" />
-        </div>
-        <div className="field">
-          <label>Review preset</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['fast', 'balanced', 'thorough'].map((option) => (
-              <button key={option} className="chip" aria-pressed={preset === option} onClick={() => setPreset(option)}>
-                {option}
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>{PRESET_DELTA[option]?.cost}</span>
-              </button>
-            ))}
+      <Section number={2} eyebrow="Review scope" title="Shape the review">
+        {layout.paperType !== null ? (
+          <div className="field">
+            <label>Manuscript type</label>
+            <ChoiceChips
+              options={(layout.paperType.options ?? []).map((option) => ({ value: option, label: humanizeOption(option) }))}
+              value={resolveAnswer(layout.paperType, answers)}
+              onChange={(value) => setAnswers((prev) => ({ ...prev, paperType: value as string }))}
+            />
           </div>
+        ) : null}
+        <div className="field">
+          <label>{layout.preset?.prompt ?? 'Review depth'}</label>
+          <ChoiceChips
+            options={(layout.preset?.options ?? ['fast', 'balanced', 'thorough']).map((option) => ({
+              value: option,
+              label: humanizeOption(option),
+              ...(PRESET_TIME[option] !== undefined ? { hint: PRESET_TIME[option] } : {}),
+            }))}
+            value={preset}
+            onChange={(value) => setPreset(value as string)}
+          />
         </div>
+        {layout.journal !== null ? (
+          <div className="field">
+            <label>Target journal</label>
+            <input value={journal} onChange={(event) => setJournal(event.target.value)} placeholder="None" />
+          </div>
+        ) : null}
         <div className="field">
           <label>Feedback focus</label>
           <p className="sub muted" style={{ margin: '0 0 8px', fontSize: 13 }}>This adjusts emphasis only. It never turns a review lens off.</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {FOCUS_OPTIONS.map((option) => (
-              <button key={option} className="chip" aria-pressed={focus.includes(option)}
-                onClick={() => setFocus((prev) => (prev.includes(option) ? prev.filter((f) => f !== option) : [...prev, option]))}>{option}</button>
-            ))}
-          </div>
+          <ChoiceChips
+            multi
+            options={FOCUS_OPTIONS.map((option) => ({ value: option, label: option }))}
+            value={focus}
+            onChange={(value) => setFocus(value as string[])}
+          />
         </div>
+      </Section>
+
+      {layout.showVerification ? (
+        <Section number={verificationNum} eyebrow="Verification options" title="Extra checks before we start">
+          <div className="stack-12">
+            {layout.referenceAudit !== null ? (
+              <CheckCard
+                checked={resolveAnswer(layout.referenceAudit, answers) === 'forensic'}
+                onChange={(checked) => setAnswers((prev) => ({ ...prev, referenceAudit: checked ? 'forensic' : 'standard' }))}
+                title="Forensic reference audit"
+                description="Every reference is located and checked, with nothing dropped by the standard cap."
+                costNote="Slower"
+              />
+            ) : null}
+            {layout.claimCheck !== null ? (
+              <CheckCard
+                checked={resolveAnswer(layout.claimCheck, answers) === 'yes'}
+                onChange={(checked) => setAnswers((prev) => ({ ...prev, claimCheck: checked ? 'yes' : 'no' }))}
+                title="Claims-vs-citation check"
+                description="We fetch the abstracts of the load-bearing sources and check the manuscript's claims against them."
+              />
+            ) : null}
+            {layout.aiDetection !== null ? (
+              <CheckCard
+                checked={resolveAnswer(layout.aiDetection, answers) === 'yes'}
+                onChange={(checked) => setAnswers((prev) => ({ ...prev, aiDetection: checked ? 'yes' : 'no' }))}
+                title="AI-content screening"
+                description="In-context signals with clear false-positive caveats. This stays editor-only and is never phrased as an accusation."
+              />
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
+
+      {layout.showAssessment && layout.userPrior !== null ? (
+        <Section number={assessmentNum} eyebrow="Your assessment" title="Your preliminary view">
+          <div className="stack-12">
+            <ChoiceChips
+              options={(layout.userPrior.options ?? []).map((option) => ({ value: option, label: humanizeOption(option) }))}
+              value={resolveAnswer(layout.userPrior, answers)}
+              onChange={(value) => setAnswers((prev) => ({ ...prev, userPrior: value as string }))}
+            />
+            <p className="sub" style={{ margin: 0 }}>
+              We keep this sealed until the review is done, then stress-test it against the evidence: the strongest case
+              for it, the strongest case against it, and whether the findings support it.
+            </p>
+          </div>
+        </Section>
+      ) : null}
+
+      <Section number={notesNum} eyebrow="Notes" title="Anything the reviewer should know">
         <div className="field">
-          <label>Anything the reviewer should know</label>
           <textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </div>
-      </div>
+      </Section>
 
       <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
         <button className="btn btn-primary" onClick={() => submit(false)} disabled={submitting}>
