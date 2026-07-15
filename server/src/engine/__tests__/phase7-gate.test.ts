@@ -404,6 +404,29 @@ describe('phase 7 release gate routing', () => {
     expect(repaired?.label).toBe('ACT in the workplace');
   });
 
+  it('repairs a near-miss label through token overlap with a body heading', async () => {
+    const nearMiss = {
+      ...shippedObject(),
+      bodyMarkdown: `${shippedObject().bodyMarkdown}\n\n### Outcomes, processes, and statistical analyses\nDetail follows.`,
+      evidenceMap: [
+        ...shippedObject().evidenceMap,
+        {
+          section: '4B Outcomes',
+          label: 'Outcomes and processes and statistical analyses',
+          anchor: 'Section 3',
+          findingIds: ['REV-METH-0001'],
+        },
+      ],
+    };
+    const harness = mockDeps([critic('pass')], nearMiss);
+    await runPhase7(harness.deps, reviewId);
+    expect(checkpointRow().snapshot.released).toBe(true);
+    const final = readArtefact<{ evidenceMap: Array<{ section: string; label: string }> }>(reviewId, 'p7-shipped-final');
+    expect(final.evidenceMap.find((entry) => entry.section === '4B Outcomes')?.label).toBe(
+      'Outcomes, processes, and statistical analyses',
+    );
+  });
+
   it('derives citedFindingIds from the evidence map when the writer omits an id', async () => {
     const sloppyUnion = { ...shippedObject(), citedFindingIds: ['REV-STAT-0001'] };
     const harness = mockDeps([critic('pass')], sloppyUnion);

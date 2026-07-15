@@ -127,12 +127,45 @@ export function bodyHeadings(body: string): string[] {
   return headings;
 }
 
+function comparableLabel(value: string): string {
+  return canonicalPunctuation(value).trim().replace(/[.:]+$/, '');
+}
+
 export function labelAppearsInBody(body: string, label: string): boolean {
-  const wanted = canonicalPunctuation(label).trim();
-  if (canonicalPunctuation(body).includes(`**${wanted}`)) {
+  const wanted = comparableLabel(label);
+  if (canonicalPunctuation(body).includes(`**${canonicalPunctuation(label).trim()}`)) {
     return true;
   }
-  return bodyHeadings(body).some((heading) => heading === wanted || heading.startsWith(wanted));
+  return bodyHeadings(body).some((heading) => {
+    const comparable = comparableLabel(heading);
+    if (comparable.length < 4) {
+      return false;
+    }
+    return comparable === wanted || comparable.startsWith(wanted) || wanted.startsWith(comparable);
+  });
+}
+
+export function tokenOverlap(a: string, b: string): { ratio: number; shared: number } {
+  const tokens = (value: string): Set<string> =>
+    new Set(
+      comparableLabel(value)
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((token) => token.length > 1),
+    );
+  const setA = tokens(a);
+  const setB = tokens(b);
+  if (setA.size === 0 || setB.size === 0) {
+    return { ratio: 0, shared: 0 };
+  }
+  let shared = 0;
+  for (const token of setA) {
+    if (setB.has(token)) {
+      shared += 1;
+    }
+  }
+  const union = setA.size + setB.size - shared;
+  return { ratio: union === 0 ? 0 : shared / union, shared };
 }
 
 export function scanMachineTokens(content: string): string[] {

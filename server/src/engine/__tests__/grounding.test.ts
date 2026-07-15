@@ -293,6 +293,18 @@ describe('id-free prose and evidence map validation', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('tolerates a trailing full stop on the map label that the heading lacks', () => {
+    const input = idFreeBase();
+    input.authorFacingBody += '\n\n### 4A.4 Overstated global effectiveness claims (major)\nDetail follows.';
+    input.evidenceMap.push({
+      section: '4A.4',
+      label: 'Overstated global effectiveness claims (major).',
+      anchor: 'Abstract',
+      findingIds: ['REV-MAP-0001'],
+    });
+    expect(validateGrounding(input).ok).toBe(true);
+  });
+
   it('keeps legacy behaviour when idFreeProse and evidenceMap are absent', () => {
     const result = validateGrounding(base());
     expect(result.ok).toBe(true);

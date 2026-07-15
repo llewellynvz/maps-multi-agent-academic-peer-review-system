@@ -32,6 +32,7 @@ import {
   labelAppearsInBody,
   redactEditorOnlyIds,
   redactSupersededIds,
+  tokenOverlap,
   validateGrounding,
   type GroundingFailureKind,
 } from './grounding';
@@ -132,7 +133,19 @@ function repairEvidenceLabels(shipped: ShippedReportEnvelope): ShippedReportEnve
       (heading) =>
         heading === sectionKey || heading.startsWith(sectionKey) || (sectionKey.startsWith(heading) && heading.length >= 8),
     );
-    return index >= 0 ? { ...entry, label: headings[index] as string } : entry;
+    if (index >= 0) {
+      return { ...entry, label: headings[index] as string };
+    }
+    let best = -1;
+    let bestRatio = 0;
+    for (let i = 0; i < headings.length; i += 1) {
+      const overlap = tokenOverlap(entry.label, headings[i] as string);
+      if (overlap.ratio >= 0.6 && overlap.shared >= 3 && overlap.ratio > bestRatio) {
+        best = i;
+        bestRatio = overlap.ratio;
+      }
+    }
+    return best >= 0 ? { ...entry, label: headings[best] as string } : entry;
   });
 }
 
