@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { api, type ReviewSummary } from '@/lib/api';
-import { formatDate, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
-import { Icon, Pill, Spinner, StatTile } from '@/components/ui';
+import { formatDate, formatRelative, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
+import { Icon, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 import { Section } from '@/components/Section';
 import { EmptyState } from '@/components/EmptyState';
@@ -35,7 +35,37 @@ function CardTop({ review }: { review: ReviewSummary }): ReactNode {
         <Pill tone={tone.tone} label={label} />
         {running ? <span className="timeline-dot node-active" aria-hidden="true" /> : null}
       </span>
-      <span className="mono" style={{ color: 'var(--fg-4)', fontSize: 13 }}>{formatDate(review.createdAt)}</span>
+      <span className="mono" style={{ color: 'var(--fg-4)', fontSize: 13 }} title={formatDate(review.createdAt)}>
+        {formatRelative(review.createdAt)}
+      </span>
+    </div>
+  );
+}
+
+function CardFooter({ review }: { review: ReviewSummary }): ReactNode {
+  if (review.status === 'completed') {
+    return (
+      <div className="spread" style={{ marginTop: 'auto' }}>
+        {review.recommendation !== null ? (
+          <Pill tone="neutral" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} />
+        ) : (
+          <span />
+        )}
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span className="mono stat-num" style={{ fontSize: 22 }}>
+            {review.rubricAverage !== null ? review.rubricAverage.toFixed(1) : '--'}
+          </span>
+          <span className="muted" style={{ fontSize: 13 }}>/ 5</span>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="spread" style={{ marginTop: 'auto' }}>
+      <span className="chip-hint">
+        {isRunning(review.status) && review.currentPhase !== null ? phaseLabel(review.currentPhase) : statusTone(review.status).label}
+      </span>
+      <span />
     </div>
   );
 }
@@ -53,10 +83,11 @@ function CardBody({ review }: { review: ReviewSummary }): ReactNode {
   );
 }
 
-function ReviewCard({ review }: { review: ReviewSummary }): ReactNode {
+function ReviewCard({ review, index }: { review: ReviewSummary; index: number }): ReactNode {
+  const style = { ...CARD_STYLE, '--i': index } as CSSProperties;
   if (review.status === 'failed') {
     return (
-      <article className="card" style={CARD_STYLE}>
+      <article className="card card-enter" style={style}>
         <CardTop review={review} />
         <CardBody review={review} />
         <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
@@ -68,24 +99,10 @@ function ReviewCard({ review }: { review: ReviewSummary }): ReactNode {
   }
 
   return (
-    <Link href={reviewHref(review)} className="card card-hover" style={CARD_STYLE}>
+    <Link href={reviewHref(review)} className="card card-hover card-enter" style={style}>
       <CardTop review={review} />
       <CardBody review={review} />
-      {review.status === 'completed' ? (
-        <div className="spread" style={{ marginTop: 'auto' }}>
-          {review.recommendation !== null ? (
-            <Pill tone="neutral" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} />
-          ) : (
-            <span />
-          )}
-          <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="mono stat-num" style={{ fontSize: 22 }}>
-              {review.rubricAverage !== null ? review.rubricAverage.toFixed(1) : '--'}
-            </span>
-            <span className="muted" style={{ fontSize: 13 }}>/ 5</span>
-          </span>
-        </div>
-      ) : null}
+      <CardFooter review={review} />
     </Link>
   );
 }
@@ -140,7 +157,13 @@ export default function LibraryPage(): ReactNode {
       return null;
     }
     const filtered = reviews.filter((review) => (review.title ?? '').toLowerCase().includes(query.toLowerCase()));
-    return [...filtered].sort((a, b) => Number(isRunning(b.status)) - Number(isRunning(a.status)));
+    return [...filtered].sort((a, b) => {
+      const running = Number(isRunning(b.status)) - Number(isRunning(a.status));
+      if (running !== 0) {
+        return running;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }, [reviews, query]);
 
   const hasReviews = reviews !== null && reviews.length > 0;
@@ -167,8 +190,10 @@ export default function LibraryPage(): ReactNode {
       {error !== null ? <div style={{ marginBottom: 20 }}><Pill tone="fail" label={error} /></div> : null}
 
       {reviews === null && error === null ? (
-        <div className="row" style={{ color: 'var(--fg-3)' }}>
-          <Spinner /> Loading reviews
+        <div className="grid-auto" aria-busy="true" aria-label="Loading reviews">
+          {[0, 1, 2, 3, 4, 5].map((key) => (
+            <div key={key} className="skeleton" />
+          ))}
         </div>
       ) : null}
 
@@ -187,7 +212,7 @@ export default function LibraryPage(): ReactNode {
 
       {hasReviews && stats !== null ? (
         <Section number={1} eyebrow="At a glance" title="Your review activity">
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+          <div className="stat-band" style={{ marginTop: 'var(--space-4)' }}>
             <StatTile label="Total reviews" value={String(stats.total)} />
             <StatTile label="Completed" value={String(stats.completed)} />
             <StatTile label="Running" value={String(stats.running)} />
@@ -199,9 +224,9 @@ export default function LibraryPage(): ReactNode {
       {hasReviews && sorted !== null ? (
         <Section number={2} eyebrow="Library" title="All reviews">
           {sorted.length > 0 ? (
-            <div className="grid-3" style={{ marginTop: 'var(--space-4)' }}>
-              {sorted.map((review) => (
-                <ReviewCard key={review.id} review={review} />
+            <div className="grid-auto" style={{ marginTop: 'var(--space-4)' }}>
+              {sorted.map((review, index) => (
+                <ReviewCard key={review.id} review={review} index={index} />
               ))}
             </div>
           ) : (

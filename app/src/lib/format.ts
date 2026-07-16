@@ -41,6 +41,30 @@ export function formatDate(iso: string): string {
   }
 }
 
+const RELATIVE = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' });
+
+export function formatRelative(iso: string, now: number = Date.now()): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) {
+    return iso;
+  }
+  const seconds = Math.round((then - now) / 1000);
+  const absolute = Math.abs(seconds);
+  if (absolute < 60) {
+    return RELATIVE.format(Math.round(seconds / 1), 'second');
+  }
+  if (absolute < 3600) {
+    return RELATIVE.format(Math.round(seconds / 60), 'minute');
+  }
+  if (absolute < 86400) {
+    return RELATIVE.format(Math.round(seconds / 3600), 'hour');
+  }
+  if (absolute < 604800) {
+    return RELATIVE.format(Math.round(seconds / 86400), 'day');
+  }
+  return formatDate(iso);
+}
+
 export function formatUsd(value: number): string {
   return `$${value.toFixed(4)}`;
 }
@@ -95,9 +119,6 @@ export function confidenceSentence(confidence: number | null): string {
   return `This recommendation is made with ${confidenceBandPhrase(confidence)}.`;
 }
 
-export function hasFindingIds(text: string): boolean {
-  return /REV-[A-Z]{3,4}-\d{4}/.test(text);
-}
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -119,7 +140,7 @@ export type StatusTone = 'info' | 'success' | 'warn' | 'fail' | 'neutral';
 export function statusTone(status: ReviewStatus): { tone: StatusTone; label: string } {
   switch (status) {
     case 'completed':
-      return { tone: 'info', label: 'Complete' };
+      return { tone: 'success', label: 'Complete' };
     case 'running':
     case 'sanitizing':
       return { tone: 'info', label: 'Running' };
