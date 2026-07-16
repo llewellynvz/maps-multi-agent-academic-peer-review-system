@@ -19,7 +19,7 @@ import {
   runPhase8,
 } from './engine';
 import { createGrobidClient } from './ingest';
-import { createDispatchRunner, createRegistry } from './providers';
+import { createDispatchRunner, createRegistry, getEnv } from './providers';
 import { initTracing, startRun } from './tracing';
 import { getManuscript, getReviewOptions, maxEventSeq, mergeReviewOptions, pauseReview, recordEngineFailure } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
@@ -85,16 +85,15 @@ async function main(): Promise<void> {
   });
   const engineDeps: EngineDeps = { db, runDispatch, citationClient, egress, preDispatch: createCostCeilingGate({ db }) };
 
-  const grobidUrl = (process.env.GROBID_URL ?? 'http://127.0.0.1:8070').replace('localhost', '127.0.0.1');
+  const grobidUrl = (getEnv(process.env, 'GROBID_URL') ?? 'http://127.0.0.1:8070').replace('localhost', '127.0.0.1');
   const grobid = createGrobidClient({ baseUrl: grobidUrl });
-  const grobidAlive = await grobid.isAlive().catch(() => false);
-  log(`GROBID at ${grobidUrl}: ${grobidAlive ? 'alive' : 'unreachable, unpdf fallback'}`);
+  log(`GROBID configured at ${grobidUrl}; liveness is probed per review, and a PDF that cannot be structured halts for retry`);
 
   const presetDefault = readSetting<string>(db, 'preset_default') ?? undefined;
   const ingestMastra: Mastra = buildIngestMastra({
     db,
     runDispatch,
-    ...(grobidAlive ? { grobid } : {}),
+    grobid,
     ...(presetDefault !== undefined ? { presetDefault } : {}),
     mastraDbPath: mastraDbPath(),
   });

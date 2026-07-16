@@ -10,6 +10,7 @@ scratch/
 .next/
 next-env.d.ts
 REVIEW.md
+*.local.md
 .claude/
 /docs/*
 !/docs/OPERATIONS.md

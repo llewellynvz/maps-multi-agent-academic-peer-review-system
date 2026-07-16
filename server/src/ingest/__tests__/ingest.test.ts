@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { assembleSectionMap } from '../assemble';
 import { docxSectionMap } from '../docx';
-import { ingestManuscript } from '../index';
+import { ingestManuscript, ParseHaltError } from '../index';
 import { sectionMapFromPlainText } from '../plaintext';
 import { parseTei } from '../tei';
 
@@ -121,11 +121,49 @@ describe('ingestManuscript', () => {
     expect(persistTei).toHaveBeenCalledOnce();
   });
 
-  it('falls back to unpdf with a degraded flag and recorded reason when GROBID errors', async () => {
+  it('hard-halts a PDF when GROBID errors and fallback is not allowed', async () => {
+    await expect(
+      ingestManuscript(
+        { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
+        {
+          grobidExtract: async () => {
+            throw new Error('GROBID returned HTTP 503');
+          },
+        },
+      ),
+    ).rejects.toThrow(ParseHaltError);
+  });
+
+  it('names the real cause when it hard-halts a PDF', async () => {
+    let caught: unknown;
+    try {
+      await ingestManuscript(
+        { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
+        {
+          grobidExtract: async () => {
+            throw new Error('GROBID returned HTTP 503');
+          },
+        },
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ParseHaltError);
+    expect((caught as ParseHaltError).reason).toBe('GROBID returned HTTP 503');
+  });
+
+  it('hard-halts a PDF when no GROBID extractor is configured', async () => {
+    await expect(
+      ingestManuscript({ bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' }, {}),
+    ).rejects.toThrow(ParseHaltError);
+  });
+
+  it('still falls back to unpdf with a degraded flag when fallback is explicitly allowed', async () => {
     const decisions: string[] = [];
     const result = await ingestManuscript(
       { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
       {
+        allowPdfFallback: true,
         grobidExtract: async () => {
           throw new Error('GROBID returned HTTP 503');
         },
@@ -143,13 +181,9 @@ describe('ingestManuscript', () => {
     expect(decisions).toEqual(['unpdf']);
   });
 
-  it('falls back to unpdf when no GROBID extractor is configured', async () => {
-    const result = await ingestManuscript(
-      { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
-      { pdfTextExtract: async () => ['Title', '', 'Body without grobid.'].join('\n') },
-    );
-
-    expect(result.decision.parser).toBe('unpdf');
-    expect(result.decision.fallbackReason).toMatch(/not configured/);
+  it('leaves DOCX unaffected by the PDF hard-halt policy', async () => {
+    const result = await ingestManuscript({ bytes: docxBytes, kind: 'docx' }, {});
+    expect(result.decision.parser).toBe('mammoth');
+    expect(result.decision.parseQuality).toBe('good');
   });
 });

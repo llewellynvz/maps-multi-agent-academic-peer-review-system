@@ -5,7 +5,7 @@ import { LibSQLStore } from '@mastra/libsql';
 import { z } from 'zod';
 import { type SectionMap, sectionMapSchema } from '@mara/shared';
 import type { MaraDatabase } from '../db/client';
-import { grobidExtractor, type GrobidClient, type IngestDeps, ingestManuscript, kindFromMime } from '../ingest';
+import { grobidExtractor, type GrobidClient, type IngestDeps, ingestManuscript, kindFromMime, ParseHaltError } from '../ingest';
 import type { DispatchRunner } from '../providers';
 import { type QuarantineItem, scrubSectionMap } from '../sanitize';
 import { clarifyingQuestionSchema, liteParse } from './lite-parse';
@@ -127,13 +127,43 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
       }
       const bytes = readFileSync(resolveRepoPath(manuscript.blobPath));
 
+      const haltParse = (reason: string): z.infer<typeof parseOutputSchema> => {
+        const output = { reviewId: inputData.reviewId, halted: true, parser: 'unpdf' as const, parseQuality: 'degraded' as const };
+        upsertCheckpoint(db, { reviewId: inputData.reviewId, phase: 'parse', status: 'failed', snapshot: { ...output, haltReason: reason } });
+        insertEvent(db, {
+          reviewId: inputData.reviewId,
+          kind: 'error',
+          phase: 'phase_0',
+          payload: { step: 'parse', halted: true, reason },
+        });
+        return output;
+      };
+
+      if (inputData.kind === 'pdf' && deps.ingestOverrides?.grobidExtract === undefined) {
+        if (deps.grobid === undefined) {
+          return haltParse('GROBID is not configured, and a structured parse is required for PDF manuscripts');
+        }
+        const alive = await deps.grobid.isAlive().catch(() => false);
+        if (!alive) {
+          return haltParse(`GROBID at ${deps.grobid.baseUrl} is unreachable, and a structured parse is required for PDF manuscripts`);
+        }
+      }
+
       const ingestDeps: IngestDeps = {
         ...(deps.grobid !== undefined ? { grobidExtract: grobidExtractor(deps.grobid) } : {}),
         persistTei: (tei) => writeManuscriptBlob(inputData.reviewId, 'manuscript/structure.tei.xml', tei),
         ...(deps.ingestOverrides ?? {}),
       };
 
-      const result = await ingestManuscript({ bytes, kind: inputData.kind }, ingestDeps);
+      let result;
+      try {
+        result = await ingestManuscript({ bytes, kind: inputData.kind }, ingestDeps);
+      } catch (error) {
+        if (error instanceof ParseHaltError) {
+          return haltParse(error.reason);
+        }
+        throw error;
+      }
       writeManuscriptBlob(inputData.reviewId, SECTION_MAP_BLOB, JSON.stringify(result.sectionMap));
       if (result.teiPath !== null) {
         updateManuscript(db, inputData.reviewId, { teiStructurePath: result.teiPath });
@@ -161,6 +191,9 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
     inputSchema: parseOutputSchema,
     outputSchema: sanitizeOutputSchema,
     execute: async ({ inputData }) => {
+      if (inputData.halted) {
+        return { reviewId: inputData.reviewId, halted: true, tier: 0 };
+      }
       const done = getCheckpoint(db, inputData.reviewId, 'sanitize');
       if (done?.status === 'completed' || done?.status === 'failed') {
         return sanitizeOutputSchema.parse(done.snapshot);

@@ -14,6 +14,11 @@ services:
     extra_hosts:
       # lets the container reach a Langfuse running on the host (Linux compatibility)
       - "host.docker.internal:host-gateway"
+    depends_on:
+      # ordering only, never condition: service_healthy. A health gate would keep the whole
+      # platform from booting while the GROBID JVM warms, and liveness is probed per review anyway.
+      grobid:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -23,7 +28,6 @@ services:
     restart: unless-stopped
 
   grobid:
-    profiles: ["grobid"]
     image: grobid/grobid:0.9.0-crf
     ports:
       - "8070:8070"
