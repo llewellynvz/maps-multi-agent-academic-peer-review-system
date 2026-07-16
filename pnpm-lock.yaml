@@ -120,6 +120,9 @@ importers:
       '@opentelemetry/sdk-trace-node':
         specifier: 2.9.0
         version: 2.9.0(@opentelemetry/api@1.9.0)
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       ai:
         specifier: 7.0.22
         version: 7.0.22(zod@3.25.76)
@@ -141,6 +144,15 @@ importers:
       mammoth:
         specifier: ^1.11.0
         version: 1.12.0
+      mdast-util-from-markdown:
+        specifier: ^2.0.3
+        version: 2.0.3
+      mdast-util-gfm-table:
+        specifier: ^2.0.0
+        version: 2.0.0
+      micromark-extension-gfm-table:
+        specifier: ^2.1.1
+        version: 2.1.1
       ollama-ai-provider-v2:
         specifier: 4.0.1
         version: 4.0.1(ai@7.0.22(zod@3.25.76))(zod@3.25.76)

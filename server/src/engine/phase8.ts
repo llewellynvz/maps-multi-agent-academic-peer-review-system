@@ -24,7 +24,8 @@ import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext } from './context';
 import { persistDeliverable } from './deliverables';
 import { runAgent } from './dispatch-agent';
-import { renderDeliverableDocx, type DeliverableMetadataRow } from './docx';
+import { buildNotesJob, buildReportJob } from './deliverable-jobs';
+import { renderDeliverableDocx } from './docx';
 import { appendRunAudit } from './private-notes';
 import { writeManuscriptBlob } from '../workflow/storage';
 import type { EngineDeps } from './phases-shared';
@@ -39,16 +40,6 @@ const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
 
 function checkpointKey(phase: string): string {
   return `engine_${phase}`;
-}
-
-function confidenceBandPhrase(confidence: number): string {
-  if (confidence >= 0.9) {
-    return 'high confidence';
-  }
-  if (confidence >= 0.7) {
-    return 'reasonable confidence';
-  }
-  return 'stated reservations';
 }
 
 function journalName(options: Record<string, unknown>): string | null {
@@ -195,21 +186,17 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
           : 'Peer review report';
       const manuscriptTitle = ctx.sectionMap.title ?? 'not extracted';
 
-      const reportMeta: DeliverableMetadataRow[] = [
-        { label: 'Manuscript', value: manuscriptTitle.length > 110 ? `${manuscriptTitle.slice(0, 107)}...` : manuscriptTitle, mono: false },
-        { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation], mono: false },
-        { label: 'Confidence', value: confidenceBandPhrase(confidence), mono: false },
-        { label: 'Rubric average', value: (typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : (meta?.average ?? 0)).toFixed(1), mono: true },
-        { label: 'Date', value: nowDate, mono: true },
-      ];
-      const reportDocx = await renderDeliverableDocx({
-        title: reviewTitle,
-        kicker: 'Peer review',
-        subtitle: `${RECOMMENDATION_LABEL[recommendation]}, held with ${confidenceBandPhrase(confidence)}.`,
-        metadata: reportMeta,
-        bodyMarkdown: shipped.bodyMarkdown,
-        confidential: false,
-      });
+      const reportDocx = await renderDeliverableDocx(
+        buildReportJob({
+          reviewTitle,
+          manuscriptTitle,
+          recommendation,
+          confidence,
+          rubricAverage: typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : (meta?.average ?? 0),
+          date: nowDate,
+          bodyMarkdown: shipped.bodyMarkdown,
+        }),
+      );
 
       const editorAddenda = [coverageGapsMarkdown(deps, reviewId), alignmentFallbackMarkdown(reviewId)].filter(
         (section): section is string => section !== null,
@@ -217,17 +204,9 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
       const notesWithGaps =
         editorAddenda.length > 0 ? `${privateNotes.markdown}\n\n${editorAddenda.join('\n\n')}` : privateNotes.markdown;
       const privateNotesBody = appendRunAudit(notesWithGaps, runAuditText(gateRecord));
-      const notesDocx = await renderDeliverableDocx({
-        title: 'Reviewer\'s private notes',
-        kicker: 'Editor-only',
-        subtitle: 'Editorial signals and run audit for the handling editor.',
-        metadata: [
-          { label: 'Review', value: reviewId, mono: true },
-          { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation], mono: false },
-        ],
-        bodyMarkdown: privateNotesBody,
-        confidential: true,
-      });
+      const notesDocx = await renderDeliverableDocx(
+        buildNotesJob({ reviewId, recommendation, confidence, date: nowDate, bodyMarkdown: privateNotesBody }),
+      );
 
       persistDeliverable(db, {
         reviewId,
