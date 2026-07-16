@@ -30,9 +30,12 @@ import { arbitrate, groundingKindsForceHalt, type ArbitrationRecord } from './ar
 import {
   bodyHeadings,
   labelAppearsInBody,
+  NARRATIVE_WORD_BAND,
   redactEditorOnlyIds,
   redactSupersededIds,
   sanitiseAuthorFacingBody,
+  scanAiTropes,
+  scrubProsePunctuation,
   tokenOverlap,
   validateGrounding,
   type GroundingFailureKind,
@@ -44,6 +47,7 @@ import { assemblePrivateNotes, RECOMMENDATION_LABEL } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
 const MAX_FIX_CYCLES = 2;
+const TROPE_REPASS_THRESHOLD = 3;
 
 function checkpointKey(phase: string): string {
   return `engine_${phase}`;
@@ -336,6 +340,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       const shipped: ShippedReportEnvelope = {
         ...derived,
         bodyMarkdown: bodyScrub.body,
+        evidenceMap: derived.evidenceMap.map((entry) => ({ ...entry, label: scrubProsePunctuation(entry.label) })),
         rubricTable: derived.rubricTable.map((row) => {
           const justificationScrub = sanitiseAuthorFacingBody(row.justification);
           scrubbedTokens.push(...justificationScrub.removed);
@@ -364,12 +369,19 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         idFreeProse: true,
         evidenceMap: shipped.evidenceMap,
         authorFacingAncillary: shipped.rubricTable.map((row) => row.justification).join('\n'),
+        humanizePairs: shipped.humanizePairs,
+        narrativeBand: NARRATIVE_WORD_BAND,
       });
 
       if (!grounding.ok) {
         lastGroundingFailureKinds = grounding.kinds;
         lastObjection = grounding.failures.join('; ');
         const maskedObjection = redactSupersededIds(redactEditorOnlyIds(lastObjection, editorOnlyIds), ledgerIdsNow);
+        const tropeCount = grounding.kinds.includes('ai-trope') ? scanAiTropes(shipped.bodyMarkdown).length : 0;
+        const tropeInstruction =
+          tropeCount >= TROPE_REPASS_THRESHOLD
+            ? `${tropeCount} distinct tells means the draft is pervasively machine-written, so run the full humanize pass over the whole body per knowledge/06 rather than patching these phrases`
+            : 'run the humanize pass and rewrite exactly these phrases in your own expert voice, changing nothing else';
         priorDefect =
           grounding.kind === 'editor-only-leak'
             ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
@@ -380,10 +392,14 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
                 : grounding.kind === 'machine-token'
                   ? `grounding validator: the shipped report body contains internal machine tokens; rewrite exactly these spots as natural reviewer prose and change nothing else: ${maskedObjection}`
                   : grounding.kind === 'ai-trope'
-                    ? `grounding validator: the shipped report body contains machine-writing tells; run the humanize pass and rewrite exactly these phrases in your own expert voice, changing nothing else: ${maskedObjection}`
+                    ? `grounding validator: the shipped report body contains machine-writing tells; ${tropeInstruction}: ${maskedObjection}`
                     : grounding.kind === 'evidence-map-mismatch'
                       ? `grounding validator: the evidence map does not line up with the ledger and the body: ${maskedObjection}`
-                      : `grounding validator: ${maskedObjection}`;
+                      : grounding.kind === 'humanize-unproven'
+                        ? `grounding validator: your humanizePairs are not evidence that the humanise pass ran. Every "before" must be a phrase you actually removed, so it must not survive anywhere in the body, and every "after" must be copied verbatim from a sentence in your final bodyMarkdown. Repair the pairs against the body you are shipping, or run the pass properly: ${maskedObjection}`
+                        : grounding.kind === 'word-band'
+                          ? `grounding validator: ${maskedObjection}. Land inside the band by expanding the thinnest majors or cutting restatement, and change no finding, severity, or score while you do it.`
+                          : `grounding validator: ${maskedObjection}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {

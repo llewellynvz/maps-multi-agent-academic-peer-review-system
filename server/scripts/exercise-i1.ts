@@ -163,7 +163,7 @@ async function watchAndVerify(reviewId: string): Promise<void> {
     .replace(/# References[\s\S]*/, '')
     .replace(/\|[^\n]*\|/g, '');
   const words = narrative.split(/\s+/).filter(Boolean).length;
-  check('wordBudget', words >= 2000 && words <= 4400, `${words} narrative words (band 2500-4000, critic-enforced)`);
+  check('wordBudget', words >= 4000 && words <= 6000, `${words} narrative words (band 4000-6000, gate-enforced)`);
   check('fourA', body.includes('4A'), body.includes('4A') ? '4A present' : 'missing 4A');
   check('fourB', body.includes('4B'), body.includes('4B') ? '4B present' : 'missing 4B');
   check('discussion', /###?\s*.*Discussion/i.test(body), 'Discussion subsection');

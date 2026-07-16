@@ -1,6 +1,6 @@
 import type { ParseQuality } from '@mara/shared';
 import { CONSTITUTION_FRAME } from './constitution';
-import { readKnowledgeModules } from './knowledge';
+import { readExemplars, readKnowledgeModules } from './knowledge';
 import { type AgentManifest, readManifest, readPrompt } from './manifest';
 
 export interface AssembleInput {
@@ -19,6 +19,20 @@ export interface AssembledPrompt {
 
 const frameCache = new Map<string, string>();
 
+const EXEMPLAR_PREAMBLE = `## Voice exemplars
+
+Past reviews by the reviewer you write as, supplied as voice benchmarks. Read them for register, rhythm, and shape: how an opening states the decision, how a concern opens on its label, how severity is carried without destruction, how a close lands. Match that voice.
+
+Match the voice only. Never carry over their content. The findings, sentences, comparator works and phrasing in an exemplar belong to a different manuscript, and a sentence transplanted from one review into another says nothing about the manuscript in front of you. It fails the transplant test, and reviews that reuse their own phrasing across manuscripts are the template reuse this pipeline exists to avoid. If an exemplar's sentence would fit this review unchanged, that is the signal to write your own.`;
+
+export function exemplarFrame(exemplars: string[]): string[] {
+  if (exemplars.length === 0) {
+    return [];
+  }
+  const sections = exemplars.map((content, index) => `### Exemplar ${index + 1}\n\n${content}`);
+  return [[EXEMPLAR_PREAMBLE, ...sections].join('\n\n')];
+}
+
 export function buildStaticFrame(agentName: string): string {
   const cached = frameCache.get(agentName);
   if (cached !== undefined) {
@@ -26,8 +40,9 @@ export function buildStaticFrame(agentName: string): string {
   }
   const manifest: AgentManifest = readManifest(agentName);
   const modules = readKnowledgeModules(manifest.knowledge);
+  const exemplars = exemplarFrame(manifest.exemplars === true ? readExemplars() : []);
   const prompt = readPrompt(agentName);
-  const frame = [CONSTITUTION_FRAME, ...modules, prompt].join('\n\n');
+  const frame = [CONSTITUTION_FRAME, ...modules, ...exemplars, prompt].join('\n\n');
   frameCache.set(agentName, frame);
   return frame;
 }

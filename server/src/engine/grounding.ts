@@ -50,6 +50,8 @@ export type GroundingFailureKind =
   | 'machine-token'
   | 'ai-trope'
   | 'evidence-map-mismatch'
+  | 'humanize-unproven'
+  | 'word-band'
   | null;
 
 export interface EvidenceMapEntry {
@@ -58,6 +60,18 @@ export interface EvidenceMapEntry {
   anchor: string;
   findingIds: string[];
 }
+
+export interface HumanizePair {
+  before: string;
+  after: string;
+}
+
+export interface NarrativeBand {
+  min: number;
+  max: number;
+}
+
+export const NARRATIVE_WORD_BAND: NarrativeBand = { min: 4000, max: 6000 };
 
 export interface GroundingInput {
   authorFacingBody: string;
@@ -69,6 +83,8 @@ export interface GroundingInput {
   idFreeProse?: boolean;
   evidenceMap?: EvidenceMapEntry[];
   authorFacingAncillary?: string;
+  humanizePairs?: HumanizePair[];
+  narrativeBand?: NarrativeBand;
 }
 
 export interface GroundingResult {
@@ -178,6 +194,48 @@ export function labelAppearsInBody(body: string, label: string): boolean {
   });
 }
 
+const TABLE_LINE = /^\s*\|/;
+const REFERENCES_HEADING = /^#{1,6}\s*(?:\d+[.)]\s*)?references\b.*$/im;
+const PROSE_WORD = /[A-Za-z0-9][A-Za-z0-9'-]*/g;
+
+export function narrativeWordCount(body: string): number {
+  const withoutTables = canonicalPunctuation(body)
+    .split('\n')
+    .filter((line) => !TABLE_LINE.test(line))
+    .join('\n');
+  const references = REFERENCES_HEADING.exec(withoutTables);
+  const narrative = references === null ? withoutTables : withoutTables.slice(0, references.index);
+  return (narrative.match(PROSE_WORD) ?? []).length;
+}
+
+function comparableProse(value: string): string {
+  return canonicalPunctuation(value)
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+export function humanizePairFailures(body: string, pairs: HumanizePair[]): string[] {
+  const haystack = comparableProse(body);
+  const failures: string[] = [];
+  for (const pair of pairs) {
+    const before = comparableProse(pair.before);
+    const after = comparableProse(pair.after);
+    if (before.length > 0 && haystack.includes(before)) {
+      failures.push(`the humanize pair still shows its "before" text in the shipped body, so that tell was never removed: "${pair.before.slice(0, 90)}"`);
+    }
+    if (after.length === 0) {
+      failures.push('a humanize pair has an empty "after", which proves nothing about the pass');
+      continue;
+    }
+    if (!haystack.includes(after)) {
+      failures.push(`the humanize pair "after" text is not in the shipped body, so the pair is an illustration rather than evidence the pass ran: "${pair.after.slice(0, 90)}"`);
+    }
+  }
+  return failures;
+}
+
 export function tokenOverlap(a: string, b: string): { ratio: number; shared: number } {
   const tokens = (value: string): Set<string> =>
     new Set(
@@ -234,6 +292,8 @@ const MACHINE_TOKEN_LINE = /^((?:[\s>+-]|\*\s|\d{1,2}[.)]\s)*)(decision|recommen
 // pre matches only mid-sentence positions (after terminal punctuation), never a line start, so a
 // problem label or heading that opens with a connective is never rewritten out of sync with its map.
 const CONNECTIVE_OPENER = new RegExp(`([.!?]\\s+)(${CONNECTIVE_WORDS})\\s*,\\s*(\\w)(\\S?)`, 'gi');
+// A plain prose line carries no markdown marker, so it can never be an evidence-map label, and its opener is safe to scrub.
+const CONNECTIVE_LINE_OPENER = new RegExp(`^(${CONNECTIVE_WORDS})\\s*,\\s*(\\w)(\\S?)`, 'i');
 
 // Internal enum tokens are replaced with plain reviewer language rather than deleted, so a stray token becomes readable prose instead of a lost sentence.
 const ENUM_HUMANISE: Array<[RegExp, string]> = [
@@ -257,6 +317,21 @@ const TROPE_REPLACE: Array<[RegExp, string]> = [
   [/\ba\s+testament\s+to\b/gi, 'evidence of'],
 ];
 
+// En dashes are deliberately untouched: they carry id and page ranges, where a comma would corrupt the meaning.
+const PROSE_PUNCTUATION: Array<[RegExp, string]> = [
+  [/[‘’]/g, String.fromCharCode(39)],
+  [/[“”]/g, String.fromCharCode(34)],
+  [/\s*—\s*/g, ', '],
+];
+
+export function scrubProsePunctuation(value: string): string {
+  let result = value;
+  for (const [pattern, replacement] of PROSE_PUNCTUATION) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 const NUMERIC_CONFIDENCE_INLINE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;
 const PIPE_KEY_VALUE_INLINE = /\s*\|\s*(?:decision|recommendation|confidence|verdict|severity|fixability)\s*[:=]\s*[^|\n]*/gi;
 
@@ -269,13 +344,26 @@ function safeCapitalise(first: string, second: string): string | null {
   return first.toUpperCase() + second;
 }
 
+function stripLineInitialConnective(line: string, removed: string[]): string {
+  const match = CONNECTIVE_LINE_OPENER.exec(line);
+  if (match === null) {
+    return line;
+  }
+  const capped = safeCapitalise(match[2] ?? '', match[3] ?? '');
+  if (capped === null) {
+    return line;
+  }
+  removed.push((match[1] ?? '').toLowerCase());
+  return `${capped}${line.slice(match[0].length)}`;
+}
+
 export function sanitiseAuthorFacingBody(body: string): { body: string; removed: string[] } {
   const removed: string[] = [];
   const kept: string[] = [];
   for (const line of body.split('\n')) {
     const match = MACHINE_TOKEN_LINE.exec(line);
     if (match === null) {
-      kept.push(line);
+      kept.push(stripLineInitialConnective(line, removed));
       continue;
     }
     const [, prefix, label, sep, rest] = match;
@@ -312,7 +400,7 @@ export function sanitiseAuthorFacingBody(body: string): { body: string; removed:
     removed.push(conn.toLowerCase());
     return `${pre}${capped}`;
   });
-  return { body: cleaned, removed };
+  return { body: scrubProsePunctuation(cleaned), removed };
 }
 
 export function validateGrounding(input: GroundingInput): GroundingResult {
@@ -374,6 +462,26 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
       kind = 'ai-trope';
       kinds.push('ai-trope');
       failures.push(`the shipped report body contains machine-writing tells the humanize pass must remove: ${[...new Set(tropes)].join('; ')}`);
+    }
+  }
+
+  if (input.humanizePairs !== undefined) {
+    const pairFailures = humanizePairFailures(input.authorFacingBody, input.humanizePairs);
+    if (pairFailures.length > 0) {
+      kind = 'humanize-unproven';
+      kinds.push('humanize-unproven');
+      failures.push(...pairFailures);
+    }
+  }
+
+  if (input.narrativeBand !== undefined) {
+    const count = narrativeWordCount(input.authorFacingBody);
+    if (count < input.narrativeBand.min || count > input.narrativeBand.max) {
+      kind = 'word-band';
+      kinds.push('word-band');
+      failures.push(
+        `the shipped narrative runs ${count} words excluding the rubric table and references, outside the ${input.narrativeBand.min} to ${input.narrativeBand.max} band`,
+      );
     }
   }
 

@@ -12,6 +12,28 @@ A handling editor reads the report in about ninety seconds before deciding. A bu
 
 The benchmark is the reviewer who has read everything, refuses hype, and would rather show you the evidence than tell you it matters. Direct, warm, specific. Firm when the science is not met. Never robotic, never abstract, never a wall of qualified clauses.
 
+## The default reviewing voice
+
+This is the voice to write in, mined from the reviewer's own journal reviews. It is the default. When the exemplar corpus supplies past letters, they refine this profile rather than replace it, and a per-review voice profile supplied at intake overrides both. The stance behind the voice, the banned destructive phrasing, and the language mechanics belong to knowledge/04 and are not restated here. This section owns the moves.
+
+**The opening.** One paragraph, four beats in fixed order: thanks, one clause on what the manuscript does, the recommendation, then the binding constraint that drives it. The decision arrives by sentence three, never at the end. Anything deliberately not covered is named up front with its reason, rather than left as a silent gap.
+
+**The concern.** The bold label is a noun phrase naming the fault ("A category error.", "Reporting integrity."), closed with a full stop, and carrying its severity flag where it earns one. Then the mechanism in one causal sentence, and only then the numbers. Mechanism before evidence, because a number the reader cannot interpret is not yet an argument.
+
+**Severity.** Severity is stated flatly about the argument. A claim is "asserted, not measured". A contrast "does not survive examination". A section "cannot stand". A fatal problem is signalled by naming its consequence, never by reaching for an adjective: "These are not edge cases. They are the spine of your argument." Before the hardest sentence in the review, say "I want to be direct with you" or "with respect", and then say the thing. Those are honesty markers, not softeners, and the sentence after them must land. Sort the concerns into fatal-if-unfixed and repairable-with-revision, and say which set the recommendation rests on. Scope the verdict in time: the scores describe the manuscript in its current form, not its potential after revision.
+
+**Strengths.** Two or three, specific, and honestly caveated in the same breath: acknowledging an alternative explanation "is, in principle, the right kind of move. It is, however, dispatched in a single paragraph with no engagement of the literature." One strength survives into the close.
+
+**Literature.** Author-year, always carrying the function of the source in the same sentence. Bosco et al. (2015) "caution against" this move. This configuration "is the textbook case for" that bias. Literature makes the argument, it is never a reading list. Name what is absent and say what engaging it would settle.
+
+**Auditability is the standard.** The recurring question is whether a reader could check the claim from what is on the page. "The reader cannot audit the analytic decisions from what is on the page" is a finding, not a complaint. Where claims cannot be traced to their sources, require a traceability table: one row per claim, with the estimate, the model it came from, and the source consulted.
+
+**Reinterpret rather than reject.** The stronger move is to say what the result would be expected from anyway, and what it would take to show otherwise. "This is exactly what operational overlap would produce" does more work than "the evidence is weak", because it hands the authors the discriminating test.
+
+**Rhythm.** A long analytic sentence carrying the evidence, then a short verdict pair. "I" is for judgements only. Decimal-number the developmental points.
+
+**The close.** Four moves, in order: what is worth saving, that it does not work in its current form, that the fixes are reachable ("the fixes are concrete and you are well placed to make them"), and the paper that would succeed. Frame the whole as an invitation to rebuild rather than to defend. End on "I look forward to the revised version."
+
 ## The per-concern micro-pattern (the unit of the report)
 
 Every major concern is written as one scannable unit, not a paragraph of run-ons. The unit has a fixed shape:
@@ -62,6 +84,16 @@ Run this scan over every draft before it ships. These patterns make prose read a
 
 **False agency and narrator-from-a-distance**: "the claim collapses", "the overlap runs", "the evidence tells us". Name the actor. "CPP's abstract already states this." "You have not yet shown."
 
+**Vague attribution** (the one that is a substantive defect, not a style tell): "Experts argue", "Studies show", "Research suggests", "Observers have cited", "Industry reports", "It is widely accepted that". In a peer review an unattributed claim is a reviewer asserting authority they have not shown. Name the source and cite it in APA 7, or delete the claim. No citation, no claim. This binds hardest on the sentence where you tell an author the field expects something: if you cannot name who established the expectation, you cannot require it.
+
+**Copula avoidance**: "serves as", "stands as", "acts as", "boasts", "features", "marks". Write "is" or "are". A plain copula reads as a person wrote it.
+
+**Elegant variation**: renaming one concept across a passage to avoid repeating a word. This corrupts a review. A construct has a name, and the manuscript's construct must keep that exact name throughout: an item about "career agency" never rotates through "professional autonomy" and "work ownership". Repetition of the construct term is correct and expected. The same holds for the instrument, the estimator, and the criterion under discussion.
+
+**The concessive formula**: "Despite its rigorous design, the study faces challenges." It concedes a virtue, then gestures at difficulty without naming any. Name the specific problem, or cut the sentence.
+
+**Formatting tells**: Title Case headings (use sentence case), curly quotes and smart apostrophes (use straight ones), en dashes used as punctuation (the em-dash ban in knowledge/04 extends to these), decorative emoji, and mechanically bolding every acronym on first use.
+
 The full field guide is the humanize-text discipline. This section is its review-prose subset. The lists above are illustrative, not a closed set: the test is not "does the sentence match a listed tell" but "would a careful reader take this as machine-written". Unlisted tells ("plays a crucial role", "sheds light on", "it is important to note", the profound short declarative used as filler) fail the same test. When unsure, simplify.
 
 ## What to keep (legitimate review structure, not an AI tell)
@@ -76,6 +108,14 @@ The humanize discipline warns against bold lead-ins and heavy structure in essay
 - **The leanest-then-ideal fix pattern.**
 
 The humanize pass cleans the prose inside each point. It never strips the scannable skeleton.
+
+These survive the pass too, and stripping them is itself a defect:
+
+- **Technical vocabulary in its exact sense.** The Latinate swaps above apply with judgement, never mechanically. "Methodology" means the study of method and is not a long way of writing "method". Utilise, implement, and facilitate have plain replacements; a named statistical or psychometric term does not. Do not casualise a passage about estimation to make it sound human.
+- **Exact construct, instrument, and estimator wording**, repeated as often as the argument needs it. See elegant variation above: the repetition is the precision.
+- **Formal register.** The target is a person writing plainly, not a person writing casually. Contractions are optional and sparse in a referee report.
+- **Dated and era-specific terms** when discussing a literature in its own period.
+- **One calibrated hedge** where the evidence genuinely underdetermines the claim. The ban is on stacked hedges that dissolve a finding, never on honest uncertainty.
 
 ## Anonymity in the prose
 

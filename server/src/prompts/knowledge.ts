@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { repoRoot } from '../paths';
 
@@ -16,4 +16,23 @@ export function readKnowledgeModule(moduleFile: string): string {
 
 export function readKnowledgeModules(moduleFiles: string[]): string[] {
   return moduleFiles.map(readKnowledgeModule);
+}
+
+export function exemplarDir(): string {
+  return resolve(repoRoot, 'knowledge', 'exemplars');
+}
+
+export function readExemplarsFrom(dir: string): string[] {
+  if (!existsSync(dir)) {
+    return [];
+  }
+  return readdirSync(dir)
+    .filter((entry) => entry.endsWith('.md') && entry !== 'README.md')
+    .sort()
+    .map((entry) => readFileSync(resolve(dir, entry), 'utf8'))
+    .filter((content) => content.trim().length > 0);
+}
+
+export function readExemplars(): string[] {
+  return readExemplarsFrom(exemplarDir());
 }

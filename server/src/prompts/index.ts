@@ -8,5 +8,5 @@ export {
   readPrompt,
   roleFor,
 } from './manifest';
-export { readKnowledgeModule, readKnowledgeModules } from './knowledge';
-export { assemble, type AssembledPrompt, type AssembleInput, buildStaticFrame } from './assemble';
+export { exemplarDir, readExemplars, readExemplarsFrom, readKnowledgeModule, readKnowledgeModules } from './knowledge';
+export { assemble, type AssembledPrompt, type AssembleInput, buildStaticFrame, exemplarFrame } from './assemble';

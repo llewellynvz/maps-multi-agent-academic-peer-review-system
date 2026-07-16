@@ -108,6 +108,19 @@ function metaObject() {
   };
 }
 
+const HUMANISED = [
+  'Table 2 reports a mean of 6.8 on a five-point scale, which cannot occur.',
+  'The sampling frame and the exclusions are not reported, so attrition cannot be assessed.',
+  'The Discussion reads the association as causal, which the design cannot support.',
+];
+
+// The band check measures the real narrative, so the fixture carries a realistic body rather than three lines.
+function narrativeFiller(wordCount: number): string {
+  const sentence = 'The manuscript reports the estimate and the supplementary material describes each analytic step in full detail.';
+  const perSentence = sentence.split(' ').length;
+  return Array.from({ length: Math.ceil(wordCount / perSentence) }, () => sentence).join(' ');
+}
+
 function shippedObject() {
   return {
     mode: 'B',
@@ -115,8 +128,10 @@ function shippedObject() {
     recommendationConfidence: 0.8,
     bodyMarkdown: [
       'Dear Editor and Authors, I recommend major revision, and I hold this with moderate confidence.',
-      '**The reported mean is impossible.** Table 2 reports a value outside the scale range.',
-      '**Sampling is under-described.** The frame and exclusions are not yet reported.',
+      `**The reported mean is impossible.** ${HUMANISED[0]}`,
+      `**Sampling is under-described.** ${HUMANISED[1]}`,
+      HUMANISED[2],
+      narrativeFiller(4500),
     ].join('\n\n'),
     evidenceMap: [
       {
@@ -136,9 +151,9 @@ function shippedObject() {
     citedFindingIds: AUTHOR_IDS,
     editorOnlyLeak: false,
     humanizePairs: [
-      { before: 'a', after: 'b' },
-      { before: 'c', after: 'd' },
-      { before: 'e', after: 'f' },
+      { before: 'It is worth noting that the reported mean appears somewhat problematic.', after: HUMANISED[0] },
+      { before: 'Furthermore, the sampling approach could benefit from additional clarification.', after: HUMANISED[1] },
+      { before: 'The Discussion sheds light on the causal nature of the association.', after: HUMANISED[2] },
     ],
     selfCritique,
   };

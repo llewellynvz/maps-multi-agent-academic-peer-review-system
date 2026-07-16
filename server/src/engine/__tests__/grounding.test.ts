@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { groundingKindsForceHalt } from '../arbitration';
 import {
+  humanizePairFailures,
   loadBannedVerdictTerms,
+  narrativeWordCount,
   redactEditorOnlyIds,
   redactSupersededIds,
   sanitiseAuthorFacingBody,
   scanAiTropes,
   scanMachineTokens,
+  scrubProsePunctuation,
   validateGrounding,
 } from '../grounding';
 
@@ -465,5 +469,119 @@ describe('deterministic author-facing scrub', () => {
   it('does not corrupt a statistical symbol after a stripped connective', () => {
     const { body } = sanitiseAuthorFacingBody('The result held. Notably, p values were low.');
     expect(body).toContain('p values');
+  });
+
+  it('strips a connective opening a plain prose line, which previously cost a fix cycle', () => {
+    const { body, removed } = sanitiseAuthorFacingBody('Furthermore, the sampling frame is not reported.');
+    expect(body).toBe('The sampling frame is not reported.');
+    expect(removed).toContain('furthermore');
+  });
+
+  it('never rewrites a connective inside a bold label, because the evidence map must still match it', () => {
+    const label = '**Moreover, the frame is unreported.**';
+    expect(sanitiseAuthorFacingBody(label).body).toBe(label);
+  });
+});
+
+describe('prose punctuation scrub', () => {
+  it('replaces em dashes and curly quotes, which knowledge/04 bans absolutely', () => {
+    expect(scrubProsePunctuation('The estimate — a large one — is unreported.')).toBe('The estimate, a large one, is unreported.');
+    expect(scrubProsePunctuation('word—word')).toBe('word, word');
+    expect(scrubProsePunctuation('“the claim” and ‘the design’')).toBe('"the claim" and \'the design\'');
+  });
+
+  it('leaves en dashes alone, because they carry id and page ranges', () => {
+    const ranges = 'See REV-RPX-0068–REV-RPX-0071 and pp. 10–15.';
+    expect(scrubProsePunctuation(ranges)).toBe(ranges);
+  });
+
+  it('runs as part of the author-facing scrub so no em dash can reach the reader', () => {
+    expect(sanitiseAuthorFacingBody('The design — cross-sectional — cannot support this.').body).not.toContain('—');
+  });
+});
+
+describe('narrativeWordCount', () => {
+  it('counts the narrative only, excluding the rubric table and the references', () => {
+    const body = [
+      'One two three four five.',
+      '| criterion | score |',
+      '| --- | --- |',
+      '| Novelty | 3 |',
+      '# References',
+      'Riketta, M. (2008). The causal relation between job attitudes and performance.',
+    ].join('\n');
+    expect(narrativeWordCount(body)).toBe(5);
+  });
+
+  it('counts the whole body when no references section is present', () => {
+    expect(narrativeWordCount('One two three four five six.')).toBe(6);
+  });
+});
+
+describe('humanizePairFailures', () => {
+  const body = 'Table 2 reports a mean of 6.8 on a five-point scale, which cannot occur.';
+
+  it('accepts a pair whose before is gone and whose after is in the shipped body', () => {
+    expect(humanizePairFailures(body, [{ before: 'It is worth noting that the mean seems off.', after: 'Table 2 reports a mean of 6.8' }])).toEqual([]);
+  });
+
+  it('rejects the placeholder pair the writer could previously self-attest with', () => {
+    const failures = humanizePairFailures(body, [{ before: 'zzz', after: 'qqq' }]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain('illustration rather than evidence');
+  });
+
+  it('catches a before that still survives in the body, which means the tell was never removed', () => {
+    const failures = humanizePairFailures(body, [{ before: 'which cannot occur', after: 'Table 2 reports a mean' }]);
+    expect(failures.some((failure) => failure.includes('never removed'))).toBe(true);
+  });
+
+  it('matches through markdown emphasis and curly punctuation rather than failing on formatting', () => {
+    const emphasised = 'The **mean** of 6.8 “cannot” occur.';
+    expect(humanizePairFailures(emphasised, [{ before: 'nowhere near this text', after: 'The mean of 6.8 "cannot" occur.' }])).toEqual([]);
+  });
+});
+
+describe('shipped-report band and humanize gates', () => {
+  function shipped(overrides: Record<string, unknown>) {
+    return {
+      ...base(),
+      authorFacingBody: 'The manuscript reports a concern.',
+      authorFacingCitedIds: [],
+      privateNotesBody: 'Editorial note.',
+      privateNotesReferencedIds: [],
+      ...overrides,
+    };
+  }
+
+  it('flags a narrative outside the band and names the count', () => {
+    const result = validateGrounding(shipped({ narrativeBand: { min: 4000, max: 6000 } }));
+    expect(result.ok).toBe(false);
+    expect(result.kinds).toContain('word-band');
+    expect(result.failures.join(' ')).toContain('outside the 4000 to 6000 band');
+  });
+
+  it('passes a narrative inside the band', () => {
+    const body = Array.from({ length: 4200 }, () => 'word').join(' ');
+    const result = validateGrounding(shipped({ authorFacingBody: body, narrativeBand: { min: 4000, max: 6000 } }));
+    expect(result.kinds).not.toContain('word-band');
+  });
+
+  it('skips both checks when the caller does not ask for them, so mode A is untouched', () => {
+    const result = validateGrounding(shipped({}));
+    expect(result.kinds).not.toContain('word-band');
+    expect(result.kinds).not.toContain('humanize-unproven');
+  });
+
+  it('flags unproven humanize pairs', () => {
+    const result = validateGrounding(shipped({ humanizePairs: [{ before: 'a', after: 'not in the body at all' }] }));
+    expect(result.ok).toBe(false);
+    expect(result.kinds).toContain('humanize-unproven');
+  });
+
+  it('never halts a complete review over a cosmetic defect: neither kind forces a halt', () => {
+    expect(groundingKindsForceHalt(['word-band'])).toBe(false);
+    expect(groundingKindsForceHalt(['humanize-unproven'])).toBe(false);
+    expect(groundingKindsForceHalt(['editor-only-leak'])).toBe(true);
   });
 });
