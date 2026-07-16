@@ -10,7 +10,10 @@ import type {
   SpecialistReviewerOutput,
   SwarmEvaluation,
   SwarmReportCritique,
+  VoiceProfile,
 } from '@mara/shared';
+import { scrubVoiceProfile } from '@mara/shared';
+import { readVoiceSampleTexts } from '../data/voice';
 import type { CurrentFinding } from '../ledger';
 import { getCurrentFindings } from '../ledger';
 import { annotatePhase, recordRunScores, withPhase } from '../tracing';
@@ -68,6 +71,63 @@ function fieldDossierContent(reviewId: string): string | null {
     contestedClaims: dossier.contestedClaims,
     methodNorms: dossier.methodNorms,
   });
+}
+
+function renderVoiceProfile(raw: VoiceProfile): string {
+  const profile = scrubVoiceProfile(raw);
+  return [
+    'Write this review in the voice below, mined from the reviewer\'s own past letters. Match the moves, never carry any content from them.',
+    `Register and rhythm: ${profile.register}`,
+    `Opening: ${profile.openingMove}`,
+    `Each concern: ${profile.concernPattern}`,
+    `Severity: ${profile.severitySignalling}`,
+    `Strengths: ${profile.strengthsHandling}`,
+    `Close: ${profile.closePattern}`,
+    `Distinctive habits: ${profile.distinctiveTics.join(' ')}`,
+    `Voice rules:\n${profile.voiceRules.map((rule) => `- ${rule}`).join('\n')}`,
+  ].join('\n\n');
+}
+
+// The raw sample text is derived once into an abstract profile and never threaded to the writer, so no
+// third-party manuscript detail from a past review can reach or be transplanted into this review.
+async function deriveVoiceProfile(deps: EngineDeps, reviewId: string): Promise<string | null> {
+  try {
+    if (artefactExists(reviewId, 'voice-profile')) {
+      return renderVoiceProfile(readArtefact<VoiceProfile>(reviewId, 'voice-profile'));
+    }
+    const texts = await readVoiceSampleTexts(deps.db, reviewId);
+    if (texts.length === 0) {
+      return null;
+    }
+    const profile = await runAgent<VoiceProfile>(deps, {
+      reviewId,
+      phase: 'phase_7',
+      agent: 'voice-profiler',
+      artefactName: 'voice-profile',
+      assembleInput: {
+        artefacts: texts.map((text, index) => ({
+          label: `Past review letter ${index + 1} (voice sample: derive style only, carry no content)`,
+          content: text,
+        })),
+        routingNote:
+          'Derive the abstract voice profile from these past review letters. Capture how they are written, not what they are about. Carry no manuscript title, finding, number, author, or institution into any field. Set carriesNoThirdPartyContent true only after checking every field.',
+      },
+    });
+    return renderVoiceProfile(profile);
+  } catch (error) {
+    if (error instanceof DispatchPauseError) {
+      throw error;
+    }
+    // An optional voice sample must never fail a complete review: an unreadable file or a failed
+    // derivation degrades to the mined default voice, exactly as if none were supplied.
+    insertEvent(deps.db, {
+      reviewId,
+      kind: 'error',
+      phase: 'phase_7',
+      payload: { message: 'Voice profile skipped after an internal error; using the default reviewing voice.' },
+    });
+    return null;
+  }
 }
 
 function emitGateVerdict(
@@ -257,6 +317,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   await withPhase('phase_7', async () => {
     updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
 
+    const voiceProfileContent = await deriveVoiceProfile(deps, reviewId);
+
     const findings = getCurrentFindings(db, reviewId);
     const ledgerIds = new Set(findings.map((finding) => finding.id));
 
@@ -327,6 +389,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             },
             ...(dossierContent !== null
               ? [{ label: 'Field dossier (the only literature you may name)', content: redact(dossierContent) }]
+              : []),
+            ...(voiceProfileContent !== null
+              ? [{ label: 'Voice profile (write in this reviewer voice; carry none of its content)', content: voiceProfileContent }]
               : []),
           ],
           routingNote:

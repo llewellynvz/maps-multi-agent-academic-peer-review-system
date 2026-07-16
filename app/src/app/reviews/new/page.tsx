@@ -28,7 +28,10 @@ export default function NewReviewPage(): ReactNode {
   const [detected, setDetected] = useState<Detected | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [stage, setStage] = useState(0);
+  const [voiceNames, setVoiceNames] = useState<string[]>([]);
+  const [voiceError, setVoiceError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const voiceInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (phase !== 'uploading' && phase !== 'parsing') {
@@ -81,6 +84,23 @@ export default function NewReviewPage(): ReactNode {
     }
   };
 
+  const acceptVoice = async (file: File): Promise<void> => {
+    if (reviewId === null) {
+      return;
+    }
+    if (!/\.(pdf|docx|txt|md)$/i.test(file.name)) {
+      setVoiceError('Upload a past review as PDF, DOCX, TXT, or Markdown.');
+      return;
+    }
+    setVoiceError('');
+    try {
+      await api.uploadVoiceSample(reviewId, file);
+      setVoiceNames((current) => (current.includes(file.name) ? current : [...current, file.name]));
+    } catch (err) {
+      setVoiceError(err instanceof Error ? err.message : 'The voice sample upload failed.');
+    }
+  };
+
   const onDrop = (event: React.DragEvent): void => {
     event.preventDefault();
     setDragOver(false);
@@ -128,9 +148,40 @@ export default function NewReviewPage(): ReactNode {
             {phase === 'error' ? <div style={{ marginTop: 16 }}><Pill tone="fail" label={message} /></div> : null}
           </div>
           {phase === 'ready' && reviewId !== null ? (
-            <button className="btn btn-primary" onClick={() => router.push(`/reviews/${reviewId}/clarify`)}>
-              Continue to questions <Icon name="arrow" />
-            </button>
+            <>
+              <div className="card">
+                <h2 className="h3" style={{ margin: 0 }}>Write it in your voice (optional)</h2>
+                <p className="sub muted" style={{ margin: '4px 0 12px' }}>
+                  Add one or two of your own past review letters and the report is written in your register. They stay on this machine, and only the writing style is used, never their content. Without them, the house reviewing voice is used.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={voiceNames.length >= 2}
+                  onClick={() => voiceInputRef.current?.click()}
+                >
+                  <Icon name="upload" /> {voiceNames.length === 0 ? 'Add a past review' : 'Add another'}
+                </button>
+                <input
+                  ref={voiceInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,.md"
+                  hidden
+                  onChange={(event) => { const file = event.target.files?.[0]; if (file !== undefined) void acceptVoice(file); event.target.value = ''; }}
+                />
+                {voiceNames.length > 0 ? (
+                  <ul className="stack-12" style={{ listStyle: 'none', margin: '12px 0 0', padding: 0 }}>
+                    {voiceNames.map((name) => (
+                      <li key={name} className="chip-hint"><Icon name="check" /> {name}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {voiceError.length > 0 ? <div style={{ marginTop: 12 }}><Pill tone="fail" label={voiceError} /></div> : null}
+              </div>
+              <button className="btn btn-primary" onClick={() => router.push(`/reviews/${reviewId}/clarify`)}>
+                Continue to questions <Icon name="arrow" />
+              </button>
+            </>
           ) : null}
         </div>
 

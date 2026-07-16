@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
-import { manuscripts, phaseCheckpoints, reviewEvents, reviews } from '../db/schema';
+import { manuscripts, phaseCheckpoints, reviewEvents, reviews, voiceSamples } from '../db/schema';
 import { nowIso } from '../data/db';
 import type { ReviewStatus } from '../data/types';
 
@@ -66,6 +66,32 @@ export function insertManuscript(db: MaraDatabase, input: InsertManuscriptInput)
       byteSize: input.byteSize,
       sha256: input.sha256,
       ingestedAt: nowIso(),
+    })
+    .run();
+  return id;
+}
+
+export interface InsertVoiceSampleInput {
+  reviewId: string;
+  originalFilename: string;
+  mimeType: string;
+  blobPath: string;
+  byteSize: number;
+  sha256: string;
+}
+
+export function insertVoiceSample(db: MaraDatabase, input: InsertVoiceSampleInput): string {
+  const id = randomUUID();
+  db.insert(voiceSamples)
+    .values({
+      id,
+      reviewId: input.reviewId,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      blobPath: input.blobPath,
+      byteSize: input.byteSize,
+      sha256: input.sha256,
+      uploadedAt: nowIso(),
     })
     .run();
   return id;

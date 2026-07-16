@@ -30,6 +30,7 @@ export * from './agents/phase-critic';
 export * from './agents/journal-scope-scorer';
 export * from './agents/quality-metrics-engine';
 export * from './agents/review-calibrator';
+export * from './agents/voice-profiler';
 
 export type ReviewStatus =
   | 'created'

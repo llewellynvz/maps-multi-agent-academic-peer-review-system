@@ -79,6 +79,27 @@ export const manuscripts = sqliteTable(
   ],
 );
 
+export const voiceSamples = sqliteTable(
+  'voice_samples',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => reviews.id, { onDelete: 'cascade' }),
+    originalFilename: text('original_filename').notNull(),
+    mimeType: text('mime_type').notNull(),
+    blobPath: text('blob_path').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    sha256: text('sha256').notNull(),
+    uploadedAt: text('uploaded_at').notNull(),
+  },
+  (t) => [
+    check('voice_samples_sha256_length_check', sql`length(${t.sha256}) = 64`),
+    unique('voice_samples_review_sha256_unique').on(t.reviewId, t.sha256),
+    index('idx_voice_samples_review').on(t.reviewId),
+  ],
+);
+
 export const findings = sqliteTable(
   'findings',
   {

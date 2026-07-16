@@ -206,6 +206,18 @@ export const api = {
     return json as { manuscriptId: string; sha256: string; byteSize: number };
   },
 
+  uploadVoiceSample: async (id: string, file: File): Promise<{ voiceSampleId: string; count: number }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(`/api/reviews/${id}/voice`, { method: 'POST', body: form, credentials: 'include' });
+    const json = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | Record<string, unknown> | null;
+    if (!response.ok) {
+      const error = (json as { error?: { code?: string; message?: string } } | null)?.error;
+      throw new ApiError(response.status, error?.code ?? 'error', error?.message ?? 'Voice sample upload failed.');
+    }
+    return json as { voiceSampleId: string; count: number };
+  },
+
   getQuestions: (id: string) => request<QuestionsResponse>('GET', `/api/reviews/${id}/questions`),
   submitAnswers: (id: string, body: { answers: Array<{ questionId: string; value: string | string[] }>; useDefaults?: boolean }) =>
     request<{ accepted: boolean }>('POST', `/api/reviews/${id}/answers`, body),
