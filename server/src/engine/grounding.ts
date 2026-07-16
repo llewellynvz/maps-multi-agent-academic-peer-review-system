@@ -195,7 +195,13 @@ export function labelAppearsInBody(body: string, label: string): boolean {
 }
 
 const TABLE_LINE = /^\s*\|/;
-const REFERENCES_HEADING = /^#{1,6}\s*(?:\d+[.)]\s*)?references\b.*$/im;
+const REFERENCE_WORDS = 'references|reference list|bibliography|works cited';
+// A references section opens either as a heading or as a standalone bold label line. The bold arm is
+// anchored to end of line so an inline "**References** to prior work are thin" is not mistaken for one.
+const REFERENCES_HEADING = new RegExp(
+  `^(?:#{1,6}\\s*(?:\\d+[.)]\\s*)?(?:${REFERENCE_WORDS})\\b.*|\\*\\*\\s*(?:${REFERENCE_WORDS})\\s*\\*\\*[.:]?\\s*)$`,
+  'im',
+);
 const PROSE_WORD = /[A-Za-z0-9][A-Za-z0-9'-]*/g;
 
 export function narrativeWordCount(body: string): number {
@@ -318,10 +324,12 @@ const TROPE_REPLACE: Array<[RegExp, string]> = [
 ];
 
 // En dashes are deliberately untouched: they carry id and page ranges, where a comma would corrupt the meaning.
+// The em-dash spacing uses [ \t] rather than \s so a line-terminal or line-initial em dash cannot swallow a
+// paragraph break or a following list marker into the previous line.
 const PROSE_PUNCTUATION: Array<[RegExp, string]> = [
   [/[‘’]/g, String.fromCharCode(39)],
   [/[“”]/g, String.fromCharCode(34)],
-  [/\s*—\s*/g, ', '],
+  [/[ 	]*—[ 	]*/g, ', '],
 ];
 
 export function scrubProsePunctuation(value: string): string {
@@ -330,6 +338,18 @@ export function scrubProsePunctuation(value: string): string {
     result = result.replace(pattern, replacement);
   }
   return result;
+}
+
+// An evidence-map label must survive the same rewrites the body applies to that label's text, or the two
+// fall out of step and the map fails to bind. The body applies the enum and trope word rewrites and the
+// punctuation scrub to a bold label's inner text, but not the line-anchored strips, because the label there
+// is shielded by its ** markers. This mirrors exactly that set, so a label carrying a trope word stays bound.
+export function scrubLabel(label: string): string {
+  let result = label;
+  for (const [pattern, replacement] of [...ENUM_HUMANISE, ...TROPE_REPLACE]) {
+    result = result.replace(pattern, replacement);
+  }
+  return scrubProsePunctuation(result);
 }
 
 const NUMERIC_CONFIDENCE_INLINE = /\bconfidence\b[*:=\s]*(?:of|at|is|was)?[*:=\s]*[01]\.\d{1,2}\b/gi;

@@ -212,6 +212,8 @@ The pipeline is built so that no review is lost to a single failure. A non-criti
 
 Collegia sits beside the author. Severity stays honest, and the wording stays developmental. A destructive letter fails the release gate no matter how correct its findings, and generic feedback that would fit any manuscript is treated as a defect. Integrity concerns are always framed as editorial signals for a handling editor to verify, never as determinations of misconduct.
 
+The letter can be written in your own reviewing voice. At intake you may add one or two of your past review letters, and the report matches their register. Those letters stay on the local machine, and only the writing style is drawn from them, never their content. Without them, Collegia writes in a default reviewing voice.
+
 ## Author
 
 Prof. Llewellyn van Zyl, PhD, is the Founder and Chief AI Solutions Architect at Psynalytics, and works within Optentia at North-West University. His work sits at the intersection of data science, positive psychology, and the governance of artificial intelligence systems.

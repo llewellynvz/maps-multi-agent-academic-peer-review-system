@@ -5,37 +5,11 @@ import type { MaraDatabase } from '../db/client';
 import { voiceSamples } from '../db/schema';
 import { extractPdfText } from '../ingest/pdf';
 import { insertVoiceSample } from '../workflow/repo';
-import { resolveRepoPath, sha256Hex, writeManuscriptBlob } from '../workflow/storage';
+import { detectUploadExtension, resolveRepoPath, sha256Hex, writeManuscriptBlob } from '../workflow/storage';
 import { ApiError } from './errors';
 import { requireReview } from './reviews';
 
 export const MAX_VOICE_SAMPLES = 2;
-
-type VoiceExtension = 'pdf' | 'docx' | 'txt' | 'md';
-
-const ACCEPTED_MIME = new Set([
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-  'text/markdown',
-]);
-
-function extensionFor(mimeType: string, filename: string): VoiceExtension | null {
-  const name = filename.toLowerCase();
-  if (mimeType === 'application/pdf' || name.endsWith('.pdf')) {
-    return 'pdf';
-  }
-  if (mimeType.includes('wordprocessingml') || name.endsWith('.docx')) {
-    return 'docx';
-  }
-  if (name.endsWith('.md') || mimeType === 'text/markdown') {
-    return 'md';
-  }
-  if (name.endsWith('.txt') || mimeType === 'text/plain') {
-    return 'txt';
-  }
-  return null;
-}
 
 export interface VoiceSampleRow {
   id: string;
@@ -45,11 +19,7 @@ export interface VoiceSampleRow {
   byteSize: number;
 }
 
-interface VoiceSampleFull extends VoiceSampleRow {
-  sha256: string;
-}
-
-function selectVoiceSamples(db: MaraDatabase, reviewId: string): VoiceSampleFull[] {
+function selectVoiceSamples(db: MaraDatabase, reviewId: string): Array<VoiceSampleRow & { sha256: string }> {
   return db
     .select({
       id: voiceSamples.id,
@@ -65,16 +35,21 @@ function selectVoiceSamples(db: MaraDatabase, reviewId: string): VoiceSampleFull
 }
 
 export function listVoiceSamples(db: MaraDatabase, reviewId: string): VoiceSampleRow[] {
-  return selectVoiceSamples(db, reviewId).map(({ sha256, ...row }) => {
-    void sha256;
-    return row;
-  });
+  return db
+    .select({
+      id: voiceSamples.id,
+      originalFilename: voiceSamples.originalFilename,
+      mimeType: voiceSamples.mimeType,
+      blobPath: voiceSamples.blobPath,
+      byteSize: voiceSamples.byteSize,
+    })
+    .from(voiceSamples)
+    .where(eq(voiceSamples.reviewId, reviewId))
+    .all();
 }
 
 export interface VoiceUploadResult {
   voiceSampleId: string;
-  sha256: string;
-  byteSize: number;
   count: number;
 }
 
@@ -85,8 +60,8 @@ export function uploadVoiceSample(
 ): VoiceUploadResult {
   requireReview(db, reviewId);
 
-  const extension = extensionFor(file.mimeType, file.filename);
-  if (extension === null && !ACCEPTED_MIME.has(file.mimeType)) {
+  const extension = detectUploadExtension(file.mimeType, file.filename);
+  if (extension === null) {
     throw new ApiError('unprocessable', 'Upload a past review letter as PDF, DOCX, TXT, or Markdown.', {
       field: 'file',
       mimeType: file.mimeType,
@@ -97,14 +72,14 @@ export function uploadVoiceSample(
   const sha256 = sha256Hex(file.bytes);
   const match = existing.find((row) => row.sha256 === sha256);
   if (match !== undefined) {
-    return { voiceSampleId: match.id, sha256, byteSize: file.bytes.byteLength, count: existing.length };
+    return { voiceSampleId: match.id, count: existing.length };
   }
 
   if (existing.length >= MAX_VOICE_SAMPLES) {
     throw new ApiError('unprocessable', `A review takes at most ${MAX_VOICE_SAMPLES} voice samples.`, { field: 'file' });
   }
 
-  const blobPath = writeManuscriptBlob(reviewId, `voice/sample-${existing.length + 1}.${extension ?? 'txt'}`, file.bytes);
+  const blobPath = writeManuscriptBlob(reviewId, `voice/sample-${existing.length + 1}.${extension}`, file.bytes);
   const voiceSampleId = insertVoiceSample(db, {
     reviewId,
     originalFilename: file.filename,
@@ -114,7 +89,7 @@ export function uploadVoiceSample(
     sha256,
   });
 
-  return { voiceSampleId, sha256, byteSize: file.bytes.byteLength, count: existing.length + 1 };
+  return { voiceSampleId, count: existing.length + 1 };
 }
 
 async function extractText(bytes: Uint8Array, blobPath: string): Promise<string> {

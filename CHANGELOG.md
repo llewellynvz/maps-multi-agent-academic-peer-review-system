@@ -4,6 +4,47 @@ All notable changes to Collegia are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-17
+
+### Added
+- The letter can be written in your own reviewing voice. At intake you may add
+  one or two of your past review letters, and the report matches their register.
+  The uploaded letters stay on the local machine, and only the writing style is
+  used, never their content. Without them, the review uses a default reviewing
+  voice mined from developmental-review craft, refined by an optional local
+  exemplar corpus when present.
+- Two offline measures of review quality, computed from stored reviews with no
+  model cost. Template reuse measures the phrasing overlap between letters, which
+  stays near zero and confirms each review is written to its own manuscript.
+  Viewpoint diversity measures the overlap between specialist perspectives within
+  a review, which stays low and confirms the perspectives genuinely differ.
+- Review-quality scores, the critic verdict, rubric average, recommendation, and
+  a composite, are recorded on the observability trace for each run.
+- Optional content capture on the observability trace for local debugging,
+  allowed only when the trace host resolves to this machine, so manuscript text
+  never leaves it.
+
+### Changed
+- A PDF manuscript is now reviewed only on a correctly structured parse. The
+  structured parser starts with the stack, and a PDF that cannot be structured
+  halts for retry with a readable reason rather than being reviewed on a degraded
+  reading of the file. Word documents are unaffected.
+- The Word letter is rebuilt on a real document model. Numbered lists count
+  through correctly, bullets are small and consistent, headings are clearly
+  tiered, and the letter opens on its own cover page.
+- The on-screen letter renders through one path with a comfortable reading width
+  and clearer type, and the review library reads more clearly.
+- The reviewing voice is enforced, not just requested. The plain-language pass is
+  checked against the letter that actually ships, and the narrative length target
+  is 4000 to 6000 words, matching the depth a full developmental review needs.
+
+### Fixed
+- The letter keeps its structure when the writer places an em dash at the end of
+  a line, and the length check no longer miscounts a reference list that carries a
+  heading other than the exact word "References".
+- The unauthenticated document parser is bound to the local machine only, so it is
+  never reachable from the wider network.
+
 ## [1.1.0] - 2026-07-15
 
 ### Changed

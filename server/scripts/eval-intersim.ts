@@ -1,18 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dataDir } from '../src/paths';
+import { listReviewDirs } from '../src/evals/corpus';
 import { crossReviewSimilarity, type SimilarityInput } from '../src/evals/similarity';
 
 // Offline template-reuse metric (InterSim) over stored review letters. Reads the shipped deliverable
 // markdown only, never the manuscript or the PDF path, so it is free and safe to run any time.
 function loadLetters(): SimilarityInput[] {
-  const blobs = join(dataDir(), 'blobs');
-  if (!existsSync(blobs)) {
-    return [];
-  }
   const letters: SimilarityInput[] = [];
-  for (const reviewId of readdirSync(blobs)) {
-    const letter = join(blobs, reviewId, 'output', 'author-letter.md');
+  for (const { reviewId, dir } of listReviewDirs()) {
+    const letter = join(dir, 'output', 'author-letter.md');
     if (!existsSync(letter)) {
       continue;
     }

@@ -9,6 +9,7 @@ import {
   sanitiseAuthorFacingBody,
   scanAiTropes,
   scanMachineTokens,
+  scrubLabel,
   scrubProsePunctuation,
   validateGrounding,
 } from '../grounding';
@@ -497,6 +498,47 @@ describe('prose punctuation scrub', () => {
 
   it('runs as part of the author-facing scrub so no em dash can reach the reader', () => {
     expect(sanitiseAuthorFacingBody('The design — cross-sectional — cannot support this.').body).not.toContain('—');
+  });
+
+  it('does not let a line-terminal em dash swallow the following paragraph or list marker', () => {
+    const { body } = sanitiseAuthorFacingBody('The concern is weak —\n\n- First recommendation\n- Second recommendation');
+    expect(body).toContain('\n\n- First recommendation');
+    expect(body).not.toContain('weak, - First');
+  });
+});
+
+describe('narrativeWordCount reference stripping', () => {
+  const body = (heading: string): string =>
+    `One two three four five.\n\n${heading}\nSmith, J. (2020). A long reference entry that should not count toward the narrative at all.`;
+
+  it('strips common bibliography heading variants, not only the literal "References"', () => {
+    expect(narrativeWordCount(body('## References'))).toBe(5);
+    expect(narrativeWordCount(body('## Bibliography'))).toBe(5);
+    expect(narrativeWordCount(body('## Reference list'))).toBe(5);
+    expect(narrativeWordCount(body('## Works cited'))).toBe(5);
+  });
+
+  it('strips a bold references label that the writer used instead of a heading', () => {
+    expect(narrativeWordCount(body('**References**'))).toBe(5);
+  });
+
+  it('does not treat an inline bold "References" opener or a look-alike heading as the reference section', () => {
+    const inline = 'One two three.\n\n**References** to prior work are thin, and the discussion does not engage them.';
+    expect(narrativeWordCount(inline)).toBe(16);
+    const lookalike = 'One two three four five.\n\n## Reference implementation\nSix seven eight.';
+    expect(narrativeWordCount(lookalike)).toBe(10);
+  });
+});
+
+describe('scrubLabel', () => {
+  it('applies the same trope and punctuation rewrites the body applies to a bold label, so the map stays bound', () => {
+    expect(scrubLabel('Sheds light on the method')).toBe('clarifies the method');
+    expect(scrubLabel('A cutting-edge contribution')).toBe('A advanced contribution');
+    expect(scrubLabel('The design — cross-sectional')).toBe('The design, cross-sectional');
+  });
+
+  it('leaves an ordinary problem label untouched', () => {
+    expect(scrubLabel('Causal claims on a cross-sectional design.')).toBe('Causal claims on a cross-sectional design.');
   });
 });
 

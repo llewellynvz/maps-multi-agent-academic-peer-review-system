@@ -29,3 +29,22 @@ export function resolveRepoPath(pathValue: string): string {
 export function sha256Hex(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
 }
+
+export type UploadExtension = 'pdf' | 'docx' | 'txt' | 'md';
+
+export function detectUploadExtension(mimeType: string, filename: string): UploadExtension | null {
+  const name = filename.toLowerCase();
+  if (mimeType === 'application/pdf' || name.endsWith('.pdf')) {
+    return 'pdf';
+  }
+  if (mimeType.includes('wordprocessingml') || name.endsWith('.docx')) {
+    return 'docx';
+  }
+  if (name.endsWith('.md') || mimeType === 'text/markdown') {
+    return 'md';
+  }
+  if (name.endsWith('.txt') || mimeType === 'text/plain') {
+    return 'txt';
+  }
+  return null;
+}

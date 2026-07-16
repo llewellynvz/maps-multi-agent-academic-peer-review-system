@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { ApiError, getClient, listVoiceSamples, uploadVoiceSample } from 'server/src/data';
+import { ApiError, getClient, uploadVoiceSample } from 'server/src/data';
 import { guarded } from '@/lib/server';
 
 export const runtime = 'nodejs';
@@ -8,14 +8,6 @@ export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ id: string }> };
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-
-export async function GET(req: NextRequest, context: Context): Promise<NextResponse> {
-  const { id } = await context.params;
-  return guarded(req, async () => {
-    const { db } = getClient();
-    return NextResponse.json({ samples: listVoiceSamples(db, id) });
-  });
-}
 
 export async function POST(req: NextRequest, context: Context): Promise<NextResponse> {
   const { id } = await context.params;

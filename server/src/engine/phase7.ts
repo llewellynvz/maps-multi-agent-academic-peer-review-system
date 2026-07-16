@@ -38,7 +38,7 @@ import {
   redactSupersededIds,
   sanitiseAuthorFacingBody,
   scanAiTropes,
-  scrubProsePunctuation,
+  scrubLabel,
   tokenOverlap,
   validateGrounding,
   type GroundingFailureKind,
@@ -405,7 +405,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       const shipped: ShippedReportEnvelope = {
         ...derived,
         bodyMarkdown: bodyScrub.body,
-        evidenceMap: derived.evidenceMap.map((entry) => ({ ...entry, label: scrubProsePunctuation(entry.label) })),
+        evidenceMap: derived.evidenceMap.map((entry) => ({ ...entry, label: scrubLabel(entry.label) })),
         rubricTable: derived.rubricTable.map((row) => {
           const justificationScrub = sanitiseAuthorFacingBody(row.justification);
           scrubbedTokens.push(...justificationScrub.removed);

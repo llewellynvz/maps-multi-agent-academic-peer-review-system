@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dataDir } from '../src/paths';
+import { listReviewDirs } from '../src/evals/corpus';
 import { crossReviewSimilarity, type SimilarityInput } from '../src/evals/similarity';
 
 // Offline viewpoint-diversity metric. Within one review, each specialist lens should read the
@@ -30,14 +30,9 @@ function lensDocuments(engineDir: string): SimilarityInput[] {
 }
 
 function main(): void {
-  const blobs = join(dataDir(), 'blobs');
-  if (!existsSync(blobs)) {
-    console.log('No stored reviews found.');
-    return;
-  }
   const rows: Array<{ id: string; lenses: number; mean: number; max: number }> = [];
-  for (const reviewId of readdirSync(blobs)) {
-    const engineDir = join(blobs, reviewId, 'engine');
+  for (const { reviewId, dir } of listReviewDirs()) {
+    const engineDir = join(dir, 'engine');
     if (!existsSync(engineDir)) {
       continue;
     }
