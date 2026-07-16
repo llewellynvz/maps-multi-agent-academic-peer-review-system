@@ -23,6 +23,7 @@
     "@ai-sdk/google": "4.0.12",
     "@ai-sdk/openai": "4.0.11",
     "@azure/identity": "4.13.1",
+    "@langfuse/core": "5.9.1",
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
     "@langfuse/vercel-ai-sdk": "5.9.1",

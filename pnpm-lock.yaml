@@ -84,6 +84,9 @@ importers:
       '@azure/identity':
         specifier: 4.13.1
         version: 4.13.1
+      '@langfuse/core':
+        specifier: 5.9.1
+        version: 5.9.1(@opentelemetry/api@1.9.0)
       '@langfuse/otel':
         specifier: 5.9.1
         version: 5.9.1(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.0))(@opentelemetry/exporter-trace-otlp-http@0.220.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.0))

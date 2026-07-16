@@ -13,7 +13,7 @@ import type {
 } from '@mara/shared';
 import type { CurrentFinding } from '../ledger';
 import { getCurrentFindings } from '../ledger';
-import { annotatePhase, withPhase } from '../tracing';
+import { annotatePhase, recordRunScores, withPhase } from '../tracing';
 import {
   getCheckpoint,
   getReviewOptions,
@@ -739,6 +739,14 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       'mara.fix_cycles': fixCycles,
       'mara.released': true,
     });
+
+    recordRunScores([
+      { name: 'critic_verdict', value: releaseVerdict, dataType: 'CATEGORICAL' },
+      { name: 'recommendation', value: finalRecommendation, dataType: 'CATEGORICAL' },
+      ...(typeof currentMeta.average === 'number'
+        ? [{ name: 'rubric_average', value: currentMeta.average, dataType: 'NUMERIC' as const }]
+        : []),
+    ]);
 
     insertEvent(db, {
       reviewId,

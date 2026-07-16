@@ -12,7 +12,7 @@ import type {
 } from '@mara/shared';
 import { getCurrentFindings } from '../ledger';
 import { reviews } from '../db/schema';
-import { annotatePhase, withPhase } from '../tracing';
+import { annotatePhase, recordRunScores, withPhase } from '../tracing';
 import {
   getCheckpoint,
   getReviewOptions,
@@ -383,6 +383,12 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
       'mara.calibration_mode': calibration.mode,
       'mara.recommendation': released ? (meta?.recommendation ?? 'not-released') : 'not-released',
     });
+
+    recordRunScores([
+      ...(typeof metrics.composite === 'number'
+        ? [{ name: 'composite', value: metrics.composite, dataType: 'NUMERIC' as const }]
+        : []),
+    ]);
 
     if (released) {
       updateReview(db, reviewId, { status: 'completed', completedAt: new Date().toISOString() });
