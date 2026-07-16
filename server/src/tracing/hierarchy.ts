@@ -1,4 +1,4 @@
-import { trace } from '@opentelemetry/api';
+import { isSpanContextValid, trace } from '@opentelemetry/api';
 import { propagateAttributes, startActiveObservation, updateActiveObservation } from '@langfuse/tracing';
 
 export const SESSION_ID_ATTRIBUTE = 'langfuse.session.id';
@@ -37,5 +37,5 @@ export function activeTraceId(): string | null {
     return null;
   }
   const spanContext = span.spanContext();
-  return spanContext.traceId === '00000000000000000000000000000000' ? null : spanContext.traceId;
+  return isSpanContextValid(spanContext) ? spanContext.traceId : null;
 }

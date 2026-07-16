@@ -20,7 +20,7 @@ import {
 } from './engine';
 import { createGrobidClient } from './ingest';
 import { createDispatchRunner, createRegistry, getEnv } from './providers';
-import { initTracing, startRun } from './tracing';
+import { contentCaptureAllowed, initTracing, startRun } from './tracing';
 import { getManuscript, getReviewOptions, maxEventSeq, mergeReviewOptions, pauseReview, recordEngineFailure } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
 import { readSetting } from './data/settings-store';
@@ -70,7 +70,13 @@ async function main(): Promise<void> {
   runMigrations(db);
 
   const registry = createRegistry({ env: process.env });
-  const baseDispatch = createDispatchRunner({ db, registry });
+  const contentAllowed = await contentCaptureAllowed(process.env);
+  log(
+    contentAllowed
+      ? 'Langfuse content capture is permitted (host resolves to loopback); prompts and completions are recorded only when the setting is on'
+      : 'Langfuse content capture is disabled; traces carry no prompt or completion text',
+  );
+  const baseDispatch = createDispatchRunner({ db, registry, contentCaptureAllowed: contentAllowed });
   const dispatchTimeoutMs = Number.parseInt(process.env.MARA_DISPATCH_TIMEOUT_MS ?? '300000', 10);
   const runDispatch = superviseDispatch(baseDispatch, {
     timeoutMs: Number.isFinite(dispatchTimeoutMs) ? dispatchTimeoutMs : 300000,
@@ -175,6 +181,8 @@ async function main(): Promise<void> {
           }
           recordEngineFailure(db, reviewId, error instanceof Error ? error.name : 'Error', engineStartSeq);
           return 'failed';
+        } finally {
+          await tracing.forceFlush().catch(() => undefined);
         }
       },
     },

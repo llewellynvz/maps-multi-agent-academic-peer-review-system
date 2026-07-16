@@ -200,6 +200,7 @@ export const dispatches = sqliteTable(
     tokensIn: integer('tokens_in').notNull().default(0),
     tokensOut: integer('tokens_out').notNull().default(0),
     tokensCached: integer('tokens_cached').notNull().default(0),
+    tokensReasoning: integer('tokens_reasoning').notNull().default(0),
     latencyMs: integer('latency_ms').notNull(),
     costUsd: real('cost_usd').notNull().default(0),
     retries: integer('retries').notNull().default(0),

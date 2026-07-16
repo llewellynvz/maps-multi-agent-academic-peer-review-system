@@ -180,7 +180,7 @@ describe('dispatch runner', () => {
     expect(result.object).toEqual({ verdict: 'ok' });
   });
 
-  it('records prompt content in telemetry only when the telemetry setting is on', async () => {
+  it('records prompt content only when the setting is on AND the host is loopback-verified', async () => {
     let captured: { experimental_telemetry?: { recordInputs: boolean; recordOutputs: boolean } } | undefined;
     const generate: GenerateApi = {
       generateText: async (options) => {
@@ -191,20 +191,40 @@ describe('dispatch runner', () => {
         throw new Error('not used');
       },
     };
-    const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
 
-    await run(baseInput());
+    const guarded = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0, contentCaptureAllowed: true });
+
+    await guarded(baseInput());
     expect(captured?.experimental_telemetry?.recordInputs).toBe(false);
     expect(captured?.experimental_telemetry?.recordOutputs).toBe(false);
 
-    writeSetting(db, 'telemetry', true);
-    await run(baseInput());
+    writeSetting(db, 'langfuse_content', true);
+    await guarded(baseInput());
     expect(captured?.experimental_telemetry?.recordInputs).toBe(true);
     expect(captured?.experimental_telemetry?.recordOutputs).toBe(true);
 
-    writeSetting(db, 'telemetry', false);
-    await run(baseInput());
+    writeSetting(db, 'langfuse_content', false);
+    await guarded(baseInput());
     expect(captured?.experimental_telemetry?.recordInputs).toBe(false);
+  });
+
+  it('never records content when the host is not loopback-verified, even with the setting on', async () => {
+    let captured: { experimental_telemetry?: { recordInputs: boolean; recordOutputs: boolean } } | undefined;
+    const generate: GenerateApi = {
+      generateText: async (options) => {
+        captured = options;
+        return { text: 'x', usage: { inputTokens: 1, outputTokens: 1 } };
+      },
+      generateObject: async () => {
+        throw new Error('not used');
+      },
+    };
+    const unguarded = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
+
+    writeSetting(db, 'langfuse_content', true);
+    await unguarded(baseInput());
+    expect(captured?.experimental_telemetry?.recordInputs).toBe(false);
+    expect(captured?.experimental_telemetry?.recordOutputs).toBe(false);
   });
 
   it('drops temperature for a reasoning model but forwards it for a non-reasoning model', async () => {
