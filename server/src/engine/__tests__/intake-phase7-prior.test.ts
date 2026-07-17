@@ -229,10 +229,11 @@ describe('phase 7 prior stress test', () => {
     expect(prompt).not.toContain('REV-SIM-0001');
     expect(prompt).not.toContain('Overlap signal.');
 
-    const panel = getEvidenceData(db, reviewId).priorStressTest;
-    expect(panel?.caseAgainst).not.toContain('REV-SIM-0001');
-    expect(panel?.caseAgainst).toContain('[EDITOR-ONLY]');
-    expect(JSON.stringify(getEvidenceData(db, reviewId))).not.toContain('REV-SIM-0001');
+    const evidence = getEvidenceData(db, reviewId);
+    expect(evidence.priorStressTest?.caseAgainst).not.toContain('REV-SIM-0001');
+    expect(evidence.priorStressTest?.caseAgainst).toContain('[EDITOR-ONLY]');
+    expect(JSON.stringify({ ...evidence, editorOnly: undefined })).not.toContain('REV-SIM-0001');
+    expect(evidence.editorOnly.map((finding) => finding.id)).toEqual(['REV-SIM-0001']);
   });
 
   it('logs an error and still releases when the stress test cites an ungrounded hinge', async () => {

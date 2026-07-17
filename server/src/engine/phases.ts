@@ -115,7 +115,7 @@ export async function runPhase1(deps: EngineDeps, reviewId: string): Promise<voi
     return;
   }
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
 
   await withPhase('phase_1', async () => {
     enterPhase(db, reviewId, 'phase_1');
@@ -293,7 +293,7 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
     return;
   }
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const matrixJson = JSON.stringify(analystB.claimEvidenceMatrix);
   const topicCap = topicSearchCap(ctx.preset);
@@ -568,7 +568,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
     return;
   }
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
   const analystA = readArtefact<ManuscriptStructure>(reviewId, 'p1-analyst-a');
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const mapJson = JSON.stringify(analystA.manuscriptMap);
@@ -773,7 +773,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
     return;
   }
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
   const analystA = readArtefact<ManuscriptStructure>(reviewId, 'p1-analyst-a');
   const analystB = readArtefact<ClaimDesignAnalysis>(reviewId, 'p1-analyst-b');
   const mapJson = JSON.stringify(analystA.manuscriptMap);

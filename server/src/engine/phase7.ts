@@ -306,7 +306,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   }
 
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
   const options = getReviewOptions(db, reviewId);
   const intake = readIntakeOptions(options);
   const typeNote = paperTypeNote(intake.paperType);
