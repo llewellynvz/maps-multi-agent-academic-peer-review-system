@@ -20,6 +20,9 @@ import { EvidenceIndex } from '@/components/EvidenceIndex';
 import { EvidencePanel } from '@/components/EvidencePanel';
 import { PriorPanel } from '@/components/PriorPanel';
 import { hasPriorStressTest } from '@/lib/intake';
+import { SEVERITY_INFO, type Severity } from '@/lib/lenses';
+
+const SEVERITY_ORDER: Severity[] = ['fatal', 'major', 'moderate', 'minor'];
 
 const DELIVERABLE_LABEL: Record<string, string> = {
   peer_review_report: 'Peer review report',
@@ -86,6 +89,7 @@ export default function ResultsPage(): ReactNode {
     : null;
 
   const hasEvidence = visibleEvidence.length > 0;
+  const editorOnly = evidence?.editorOnly ?? [];
   const prior = evidence?.priorStressTest ?? null;
   const showPrior = hasPriorStressTest(evidence);
   let n = 2;
@@ -139,6 +143,38 @@ export default function ResultsPage(): ReactNode {
               <span className="muted">/ 5 rubric average across the fifteen review criteria</span>
             </div>
           ) : null}
+          {SEVERITY_ORDER.some((severity) => (review.severityCounts[severity] ?? 0) > 0) ? (
+            <div className="row wrap" style={{ gap: 8 }}>
+              {SEVERITY_ORDER.map((severity) => {
+                const count = review.severityCounts[severity] ?? 0;
+                if (count === 0) {
+                  return null;
+                }
+                const info = SEVERITY_INFO[severity];
+                return <Pill key={severity} tone={info.tone} label={`${count} ${info.label.toLowerCase()}`} />;
+              })}
+            </div>
+          ) : null}
+          {(review.rubricScores ?? []).length > 0 ? (
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Criterion</th>
+                    <th className="num">Score / 5</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(review.rubricScores ?? []).map((row) => (
+                    <tr key={row.criterionIndex}>
+                      <td>{row.criterion}</td>
+                      <td className="num mono">{row.score}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       </Section>
 
@@ -166,6 +202,28 @@ export default function ResultsPage(): ReactNode {
             ) : (
               <ReportMarkdown text={notes} onFinding={setDrawerFindings} />
             )}
+            {editorOnly.length > 0 ? (
+              <div className="card" style={{ borderLeft: '3px solid var(--psy-teal)' }}>
+                <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+                  <Icon name="shield" className="ico-teal" />
+                  <h3 className="h3" style={{ margin: 0 }}>Editor-only signals</h3>
+                </div>
+                <p className="sub" style={{ marginBottom: 16 }}>
+                  These findings never appear in the letter or any author-facing document. They are signals for editorial
+                  judgement, not conclusions.
+                </p>
+                <div className="stack-24">
+                  {editorOnly.map((finding) => (
+                    <EvidencePanel
+                      key={finding.id}
+                      finding={finding}
+                      fallbackId={finding.id}
+                      ledgerHref={api.deliverableUrl(id, 'ledger_export', 'md')}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </Section>

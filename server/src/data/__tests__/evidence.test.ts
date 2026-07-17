@@ -59,7 +59,7 @@ afterEach(() => {
 });
 
 describe('getEvidenceData editor-only invariant', () => {
-  it('never serialises an editor-only finding even when the evidence map references it', () => {
+  it('keeps editor-only findings out of every author-facing field, surfacing them only in the labelled editorOnly array', () => {
     insertFinding('REV-STAT-0001', 'author_facing', 'The reported analysis lacks effect sizes.');
     insertFinding('REV-METH-0002', 'editor_only', 'Confidential concern held for the editor.');
     writeArtefact(REVIEW_ID, 'p7-shipped-final', {
@@ -79,7 +79,9 @@ describe('getEvidenceData editor-only invariant', () => {
     const mappedIds = evidence.evidenceMap.flatMap((entry) => entry.findingIds);
     expect(mappedIds).toContain('REV-STAT-0001');
     expect(mappedIds).not.toContain('REV-METH-0002');
-    expect(JSON.stringify(evidence)).not.toContain('REV-METH-0002');
+    expect(JSON.stringify({ ...evidence, editorOnly: undefined })).not.toContain('REV-METH-0002');
+    expect(evidence.editorOnly.map((finding) => finding.id)).toEqual(['REV-METH-0002']);
+    expect(evidence.editorOnly[0]?.claim).toBe('Confidential concern held for the editor.');
 
     const served = evidence.findings[0];
     expect(served).toMatchObject({
@@ -109,8 +111,8 @@ describe('getEvidenceData editor-only invariant', () => {
 
     expect(evidence.priorStressTest).not.toBeNull();
     expect(evidence.priorStressTest?.hingeFindingIds).toEqual(['REV-STAT-0001']);
+    expect(JSON.stringify({ ...evidence, editorOnly: undefined })).not.toContain('REV-METH-0002');
     expect(evidence.priorStressTest?.caseAgainst).toContain('[EDITOR-ONLY]');
-    expect(JSON.stringify(evidence)).not.toContain('REV-METH-0002');
   });
 });
 

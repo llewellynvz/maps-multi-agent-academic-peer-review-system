@@ -37,6 +37,7 @@ export interface ReviewDetail extends Review {
   severityCounts: Record<string, number>;
   checkpoints: Array<{ phase: string; status: string; gateVerdict: string | null; fixCycleCount: number }>;
   rubricAverage: number | null;
+  rubricScores?: Array<{ criterion: string; criterionIndex: number; score: number }>;
 }
 
 export interface Detected {
@@ -112,6 +113,7 @@ export interface PriorStressTest {
 export interface EvidenceData {
   evidenceMap: EvidenceMapView[];
   findings: EvidenceFinding[];
+  editorOnly?: EvidenceFinding[];
   priorStressTest?: PriorStressTest | null;
 }
 

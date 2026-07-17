@@ -8,7 +8,7 @@ import { phaseCheckpoints, reviews } from '../db/schema';
 import { blobDir, dataDir, mastraDbPath } from '../paths';
 import { nowIso } from './db';
 import { ApiError } from './errors';
-import type { Review, ReviewDetail, ReviewOptions, ReviewSummary } from './types';
+import type { Review, ReviewDetail, ReviewOptions, ReviewSummary, RubricScoreView } from './types';
 
 const REVIEW_ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 
@@ -102,6 +102,14 @@ function rubricAverage(db: MaraDatabase, reviewId: string): number | null {
   return row?.avg ?? null;
 }
 
+function rubricScores(db: MaraDatabase, reviewId: string): RubricScoreView[] {
+  const rows = db.all(
+    sql`SELECT criterion, criterion_index AS criterionIndex, score FROM rubric_scores
+        WHERE review_id = ${reviewId} AND state = 'final' ORDER BY criterion_index`,
+  ) as RubricScoreView[];
+  return rows;
+}
+
 export function listReviews(db: MaraDatabase): ReviewSummary[] {
   const rows = db.select().from(reviews).orderBy(desc(reviews.createdAt)).all();
   return rows.map((row) => ({
@@ -137,7 +145,7 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
     gateVerdict: row.gateVerdict,
     fixCycleCount: row.fixCycleCount,
   }));
-  return { ...review, severityCounts, checkpoints, rubricAverage: rubricAverage(db, id) };
+  return { ...review, severityCounts, checkpoints, rubricAverage: rubricAverage(db, id), rubricScores: rubricScores(db, id) };
 }
 
 export function purgeReview(client: MaraClient, id: string): void {
