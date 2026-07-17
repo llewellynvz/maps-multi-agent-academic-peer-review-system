@@ -29,6 +29,7 @@ import { getCheckpoint, getReviewOptions, insertEvent, updateReview, upsertCheck
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { computeComposite } from './composite';
 import { mergeFindingsOnce } from './merge';
+import { deterministicStatsFindings } from './stats-check';
 import {
   loadEngineContext,
   manuscriptDigest,
@@ -787,6 +788,18 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
 
   await withPhase('phase_4', async () => {
     enterPhase(db, reviewId, 'phase_4');
+
+    const statFragments = deterministicStatsFindings(ctx.sectionMap);
+    if (statFragments.length > 0) {
+      mergeFindingsOnce(db, {
+        reviewId,
+        lensPrefix: 'STAT',
+        phase: 'phase_4',
+        agent: 'stats-check',
+        fragments: statFragments,
+        marker: 'p4-stats-deterministic',
+      });
+    }
 
     const { results, gaps: integrityGaps } = await settleWithGaps(
       db,
