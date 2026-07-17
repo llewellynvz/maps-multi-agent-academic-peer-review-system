@@ -1,7 +1,10 @@
 import mammoth from 'mammoth';
 import type { SectionMap } from '@mara/shared';
 import { assembleSectionMap, type RawSection } from './assemble';
+import { splitReferences } from './plaintext';
 import { normalizeInline } from './text';
+
+const REFERENCES_HEADING = /^(references|bibliography|works cited)\b/i;
 
 interface HtmlBlock {
   heading: boolean;
@@ -42,6 +45,8 @@ export async function docxSectionMap(docx: Uint8Array): Promise<SectionMap> {
   const sections: RawSection[] = [];
   let heading: string | null = null;
   let buffer: string[] = [];
+  let inReferences = false;
+  const referenceLines: string[] = [];
 
   const flush = (): void => {
     const text = buffer.join('\n').trim();
@@ -61,13 +66,23 @@ export async function docxSectionMap(docx: Uint8Array): Promise<SectionMap> {
       continue;
     }
     if (block.heading) {
-      flush();
-      heading = block.text;
+      if (!inReferences) {
+        flush();
+      }
+      inReferences = REFERENCES_HEADING.test(block.text);
+      if (!inReferences) {
+        heading = block.text;
+      }
+    } else if (inReferences) {
+      referenceLines.push(block.text);
     } else {
       buffer.push(block.text);
     }
   }
-  flush();
+  if (!inReferences) {
+    flush();
+  }
 
-  return assembleSectionMap({ title, abstract, sections, references: [], parser: 'mammoth', parseQuality: 'good' });
+  const references = referenceLines.length > 0 ? splitReferences(referenceLines.join('\n')) : [];
+  return assembleSectionMap({ title, abstract, sections, references, parser: 'mammoth', parseQuality: 'good' });
 }
