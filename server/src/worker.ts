@@ -19,9 +19,9 @@ import {
   runPhase8,
 } from './engine';
 import { createGrobidClient } from './ingest';
-import { createDispatchRunner, createRegistry } from './providers';
-import { initTracing, startRun } from './tracing';
-import { getManuscript, getReviewOptions, mergeReviewOptions, pauseReview, updateReview } from './workflow/repo';
+import { createDispatchRunner, createRegistry, getEnv } from './providers';
+import { contentCaptureAllowed, initTracing, startRun } from './tracing';
+import { getManuscript, getReviewOptions, maxEventSeq, mergeReviewOptions, pauseReview, recordEngineFailure } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
 import { readSetting } from './data/settings-store';
 import { announceFindings } from './worker/announce';
@@ -70,7 +70,13 @@ async function main(): Promise<void> {
   runMigrations(db);
 
   const registry = createRegistry({ env: process.env });
-  const baseDispatch = createDispatchRunner({ db, registry });
+  const contentAllowed = await contentCaptureAllowed(process.env);
+  log(
+    contentAllowed
+      ? 'Langfuse content capture is permitted (host resolves to loopback); prompts and completions are recorded only when the setting is on'
+      : 'Langfuse content capture is disabled; traces carry no prompt or completion text',
+  );
+  const baseDispatch = createDispatchRunner({ db, registry, contentCaptureAllowed: contentAllowed });
   const dispatchTimeoutMs = Number.parseInt(process.env.MARA_DISPATCH_TIMEOUT_MS ?? '300000', 10);
   const runDispatch = superviseDispatch(baseDispatch, {
     timeoutMs: Number.isFinite(dispatchTimeoutMs) ? dispatchTimeoutMs : 300000,
@@ -85,16 +91,15 @@ async function main(): Promise<void> {
   });
   const engineDeps: EngineDeps = { db, runDispatch, citationClient, egress, preDispatch: createCostCeilingGate({ db }) };
 
-  const grobidUrl = (process.env.GROBID_URL ?? 'http://127.0.0.1:8070').replace('localhost', '127.0.0.1');
+  const grobidUrl = (getEnv(process.env, 'GROBID_URL') ?? 'http://127.0.0.1:8070').replace('localhost', '127.0.0.1');
   const grobid = createGrobidClient({ baseUrl: grobidUrl });
-  const grobidAlive = await grobid.isAlive().catch(() => false);
-  log(`GROBID at ${grobidUrl}: ${grobidAlive ? 'alive' : 'unreachable, unpdf fallback'}`);
+  log(`GROBID configured at ${grobidUrl}; liveness is probed per review, and a PDF that cannot be structured halts for retry`);
 
   const presetDefault = readSetting<string>(db, 'preset_default') ?? undefined;
   const ingestMastra: Mastra = buildIngestMastra({
     db,
     runDispatch,
-    ...(grobidAlive ? { grobid } : {}),
+    grobid,
     ...(presetDefault !== undefined ? { presetDefault } : {}),
     mastraDbPath: mastraDbPath(),
   });
@@ -149,6 +154,7 @@ async function main(): Promise<void> {
         return mapIngest(summary);
       },
       runEngine: async (reviewId, shouldStop): Promise<EngineResult> => {
+        const engineStartSeq = maxEventSeq(db, reviewId);
         try {
           let outcome: EngineOutcome = 'completed';
           const announced = new Set<string>();
@@ -173,8 +179,10 @@ async function main(): Promise<void> {
           if (shouldStop() === 'shutdown') {
             return 'stopped';
           }
-          updateReview(db, reviewId, { status: 'failed', errorClass: 'engine_error' });
+          recordEngineFailure(db, reviewId, error instanceof Error ? error.name : 'Error', engineStartSeq);
           return 'failed';
+        } finally {
+          await tracing.forceFlush().catch(() => undefined);
         }
       },
     },

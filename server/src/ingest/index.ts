@@ -24,6 +24,14 @@ export interface IngestDeps {
   docxToSectionMap?: (docx: Uint8Array) => Promise<SectionMap>;
   persistTei?: (tei: string) => string | Promise<string>;
   onDecision?: (decision: ParseDecision) => void;
+  allowPdfFallback?: boolean;
+}
+
+export class ParseHaltError extends Error {
+  constructor(public readonly reason: string) {
+    super(reason);
+    this.name = 'ParseHaltError';
+  }
 }
 
 export interface IngestResult {
@@ -59,7 +67,7 @@ export async function ingestManuscript(input: IngestInput, deps: IngestDeps = {}
 
   try {
     if (deps.grobidExtract === undefined) {
-      throw new Error('GROBID extractor is not configured');
+      throw new Error('GROBID is not reachable for this PDF manuscript');
     }
     const tei = await deps.grobidExtract(input.bytes);
     const sectionMap = parseTei(tei);
@@ -69,6 +77,9 @@ export async function ingestManuscript(input: IngestInput, deps: IngestDeps = {}
     return { sectionMap, teiPath, decision };
   } catch (error) {
     const fallbackReason = error instanceof Error ? error.message : String(error);
+    if (deps.allowPdfFallback !== true) {
+      throw new ParseHaltError(fallbackReason);
+    }
     const text = await pdfTextExtract(input.bytes);
     const sectionMap = sectionMapFromPlainText(text, 'unpdf', 'degraded');
     const decision: ParseDecision = { parser: 'unpdf', parseQuality: 'degraded', fallbackReason };

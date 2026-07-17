@@ -21,6 +21,7 @@ import {
   specialistReviewerSchema,
   swarmEvaluationSchema,
   swarmReportCritiqueSchema,
+  voiceProfileSchema,
 } from '@mara/shared';
 
 export type SchemaResolver = (mode?: string) => z.ZodType;
@@ -58,6 +59,7 @@ const SCHEMA_RESOLVERS: Record<string, SchemaResolver> = {
   'quality-metrics-engine': single(qualityMetricsEngineSchema),
   'journal-scope-scorer': single(journalScopeScorerSchema),
   'review-calibrator': single(reviewCalibratorSchema),
+  'voice-profiler': single(voiceProfileSchema),
 };
 
 export const PHASE_0_6_ROSTER: string[] = [

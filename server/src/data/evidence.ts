@@ -38,6 +38,7 @@ export interface PriorStressTestView {
 export interface EvidenceData {
   evidenceMap: EvidenceMapView[];
   findings: EvidenceFinding[];
+  editorOnly: EvidenceFinding[];
   priorStressTest: PriorStressTestView | null;
 }
 
@@ -54,7 +55,7 @@ export function getEvidenceData(db: MaraDatabase, reviewId: string): EvidenceDat
   const servedIds = new Set(served.map((finding) => finding.id));
   const editorOnlyIds = new Set(all.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id));
 
-  const findings: EvidenceFinding[] = served.map((finding) => {
+  const toView = (finding: (typeof all)[number]): EvidenceFinding => {
     const lensPrefix = lensPrefixOf(finding.id);
     return {
       id: finding.id,
@@ -65,7 +66,10 @@ export function getEvidenceData(db: MaraDatabase, reviewId: string): EvidenceDat
       claim: finding.claim,
       recommendedAction: finding.recommendedAction,
     };
-  });
+  };
+
+  const findings: EvidenceFinding[] = served.map(toView);
+  const editorOnly: EvidenceFinding[] = all.filter((finding) => finding.scope === 'editor_only').map(toView);
 
   let evidenceMap: EvidenceMapView[] = [];
   if (artefactExists(reviewId, 'p7-shipped-final')) {
@@ -95,5 +99,5 @@ export function getEvidenceData(db: MaraDatabase, reviewId: string): EvidenceDat
     }
   }
 
-  return { evidenceMap, findings, priorStressTest };
+  return { evidenceMap, findings, editorOnly, priorStressTest };
 }

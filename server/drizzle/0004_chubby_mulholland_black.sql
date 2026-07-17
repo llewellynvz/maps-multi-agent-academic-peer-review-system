@@ -1,0 +1,1 @@
+ALTER TABLE `dispatches` ADD `tokens_reasoning` integer DEFAULT 0 NOT NULL;

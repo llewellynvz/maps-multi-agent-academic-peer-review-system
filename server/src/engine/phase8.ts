@@ -12,7 +12,7 @@ import type {
 } from '@mara/shared';
 import { getCurrentFindings } from '../ledger';
 import { reviews } from '../db/schema';
-import { annotatePhase, withPhase } from '../tracing';
+import { annotatePhase, recordRunScores, withPhase } from '../tracing';
 import {
   getCheckpoint,
   getReviewOptions,
@@ -24,7 +24,8 @@ import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext } from './context';
 import { persistDeliverable } from './deliverables';
 import { runAgent } from './dispatch-agent';
-import { renderDeliverableDocx, type DeliverableMetadataRow } from './docx';
+import { buildNotesJob, buildReportJob } from './deliverable-jobs';
+import { renderDeliverableDocx } from './docx';
 import { appendRunAudit } from './private-notes';
 import { writeManuscriptBlob } from '../workflow/storage';
 import type { EngineDeps } from './phases-shared';
@@ -41,16 +42,6 @@ function checkpointKey(phase: string): string {
   return `engine_${phase}`;
 }
 
-function confidenceBandPhrase(confidence: number): string {
-  if (confidence >= 0.9) {
-    return 'high confidence';
-  }
-  if (confidence >= 0.7) {
-    return 'reasonable confidence';
-  }
-  return 'stated reservations';
-}
-
 function journalName(options: Record<string, unknown>): string | null {
   const answers = (options.answers ?? {}) as Record<string, unknown>;
   return typeof answers.journal === 'string' ? answers.journal : null;
@@ -64,6 +55,52 @@ function ledgerSnapshotMarkdown(reviewId: string, findings: ReturnType<typeof ge
     lines.push(`| ${finding.id} | ${finding.type} | ${finding.severity} | ${finding.scope} | ${finding.manuscriptAnchor.replace(/\|/g, '/')} |`);
   }
   return `${lines.join('\n')}\n`;
+}
+
+function coverageGapsMarkdown(deps: EngineDeps, reviewId: string): string | null {
+  const gaps: Array<{ step: string; unit: string }> = [];
+  for (const phase of ['phase_3', 'phase_4']) {
+    const snapshot = (getCheckpoint(deps.db, reviewId, checkpointKey(phase))?.snapshot ?? {}) as Record<string, unknown>;
+    const recorded = Array.isArray(snapshot.coverageGaps) ? snapshot.coverageGaps : [];
+    for (const entry of recorded) {
+      if (entry !== null && typeof entry === 'object' && 'unit' in entry && 'step' in entry) {
+        gaps.push({ step: String((entry as { step: unknown }).step), unit: String((entry as { unit: unknown }).unit) });
+      }
+    }
+  }
+  if (gaps.length === 0) {
+    return null;
+  }
+  const lines = [
+    '## Coverage limitations',
+    '',
+    'These review steps could not be completed this run and were recorded as coverage gaps. Weigh the review with them in mind:',
+    '',
+    ...gaps.map((gap) => `- ${gap.unit} (${gap.step}) did not complete and was skipped.`),
+  ];
+  return lines.join('\n');
+}
+
+function alignmentFallbackMarkdown(reviewId: string): string | null {
+  if (!artefactExists(reviewId, 'p7-alignment-fallback')) {
+    return null;
+  }
+  const fallback = readArtefact<{ narrowedRecommendation?: unknown; shippedRecommendation?: unknown }>(
+    reviewId,
+    'p7-alignment-fallback',
+  );
+  const narrowed = fallback.narrowedRecommendation;
+  const shipped = fallback.shippedRecommendation;
+  if (typeof narrowed !== 'string' || typeof shipped !== 'string') {
+    return null;
+  }
+  const narrowedLabel = (RECOMMENDATION_LABEL[narrowed as Recommendation] ?? narrowed).toLowerCase();
+  const shippedLabel = (RECOMMENDATION_LABEL[shipped as Recommendation] ?? shipped).toLowerCase();
+  return [
+    '## Arbitration note',
+    '',
+    `Arbitration judged the evidence to warrant ${narrowedLabel}, but the aligned rewrite of the report could not be produced cleanly this run, so the review ships at ${shippedLabel}. Weigh the recommendation with that in mind.`,
+  ].join('\n');
 }
 
 function runAuditText(gateRecord: Record<string, unknown>): string {
@@ -109,6 +146,16 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
   const snapshot = (phase7?.snapshot ?? {}) as Record<string, unknown>;
   const released = snapshot.released === true;
 
+  if (!released) {
+    upsertCheckpoint(db, {
+      reviewId,
+      phase: checkpointKey('phase_8'),
+      status: 'completed',
+      snapshot: { released: false, skipped: 'blocked_or_halted' },
+    });
+    return;
+  }
+
   const ctx = loadEngineContext(db, reviewId);
   const options = getReviewOptions(db, reviewId);
   const fullReport = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
@@ -139,34 +186,27 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
           : 'Peer review report';
       const manuscriptTitle = ctx.sectionMap.title ?? 'not extracted';
 
-      const reportMeta: DeliverableMetadataRow[] = [
-        { label: 'Manuscript', value: manuscriptTitle.length > 110 ? `${manuscriptTitle.slice(0, 107)}...` : manuscriptTitle, mono: false },
-        { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation], mono: false },
-        { label: 'Confidence', value: confidenceBandPhrase(confidence), mono: false },
-        { label: 'Rubric average', value: (typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : (meta?.average ?? 0)).toFixed(1), mono: true },
-        { label: 'Date', value: nowDate, mono: true },
-      ];
-      const reportDocx = await renderDeliverableDocx({
-        title: reviewTitle,
-        kicker: 'Peer review',
-        subtitle: `${RECOMMENDATION_LABEL[recommendation]}, held with ${confidenceBandPhrase(confidence)}.`,
-        metadata: reportMeta,
-        bodyMarkdown: shipped.bodyMarkdown,
-        confidential: false,
-      });
+      const reportDocx = await renderDeliverableDocx(
+        buildReportJob({
+          reviewTitle,
+          manuscriptTitle,
+          recommendation,
+          confidence,
+          rubricAverage: typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : (meta?.average ?? 0),
+          date: nowDate,
+          bodyMarkdown: shipped.bodyMarkdown,
+        }),
+      );
 
-      const privateNotesBody = appendRunAudit(privateNotes.markdown, runAuditText(gateRecord));
-      const notesDocx = await renderDeliverableDocx({
-        title: 'Reviewer\'s private notes',
-        kicker: 'Editor-only',
-        subtitle: 'Editorial signals and run audit for the handling editor.',
-        metadata: [
-          { label: 'Review', value: reviewId, mono: true },
-          { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation], mono: false },
-        ],
-        bodyMarkdown: privateNotesBody,
-        confidential: true,
-      });
+      const editorAddenda = [coverageGapsMarkdown(deps, reviewId), alignmentFallbackMarkdown(reviewId)].filter(
+        (section): section is string => section !== null,
+      );
+      const notesWithGaps =
+        editorAddenda.length > 0 ? `${privateNotes.markdown}\n\n${editorAddenda.join('\n\n')}` : privateNotes.markdown;
+      const privateNotesBody = appendRunAudit(notesWithGaps, runAuditText(gateRecord));
+      const notesDocx = await renderDeliverableDocx(
+        buildNotesJob({ reviewId, recommendation, confidence, date: nowDate, bodyMarkdown: privateNotesBody }),
+      );
 
       persistDeliverable(db, {
         reviewId,
@@ -322,6 +362,12 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
       'mara.calibration_mode': calibration.mode,
       'mara.recommendation': released ? (meta?.recommendation ?? 'not-released') : 'not-released',
     });
+
+    recordRunScores([
+      ...(typeof metrics.composite === 'number'
+        ? [{ name: 'composite', value: metrics.composite, dataType: 'NUMERIC' as const }]
+        : []),
+    ]);
 
     if (released) {
       updateReview(db, reviewId, { status: 'completed', completedAt: new Date().toISOString() });

@@ -3,8 +3,11 @@ import {
   applyPaperTypeLensPolicy,
   LENSES,
   paperTypeNote,
+  qualitativeRigourNote,
   selectActiveLenses,
   studyDesignAffirmsData,
+  studyDesignIsMixed,
+  studyDesignIsQualitative,
 } from '../lenses';
 import type { PaperType } from '../options';
 
@@ -26,6 +29,81 @@ describe('studyDesignAffirmsData', () => {
     expect(studyDesignAffirmsData('cross-sectional')).toBe(true);
     expect(studyDesignAffirmsData('psychometric')).toBe(true);
     expect(studyDesignAffirmsData('case-study')).toBe(true);
+  });
+
+  it('catches conceptual design labels beyond the original three exact tokens', () => {
+    for (const design of ['conceptual', 'theoretical', 'perspective', 'position paper', 'essay', 'opinion', 'viewpoint', 'editorial']) {
+      expect(studyDesignAffirmsData(design)).toBe(false);
+    }
+  });
+
+  it('does not strip empirical lenses from an empirical design that merely mentions theory', () => {
+    expect(studyDesignAffirmsData('theory-driven survey')).toBe(true);
+    expect(studyDesignAffirmsData('longitudinal cohort')).toBe(true);
+  });
+
+  it('treats an empirical design as data even when a non-data word appears alongside a data marker', () => {
+    expect(studyDesignAffirmsData('opinion survey')).toBe(true);
+    expect(studyDesignAffirmsData('position questionnaire')).toBe(true);
+  });
+});
+
+describe('qualitative handling', () => {
+  it('detects qualitative designs and not quantitative ones', () => {
+    expect(studyDesignIsQualitative('qualitative interview study')).toBe(true);
+    expect(studyDesignIsQualitative('grounded theory')).toBe(true);
+    expect(studyDesignIsQualitative('interpretative phenomenological analysis')).toBe(true);
+    expect(studyDesignIsQualitative('randomized-trial')).toBe(false);
+    expect(studyDesignIsQualitative('cross-sectional survey')).toBe(false);
+  });
+
+  it('does not misclassify quantitative or mixed designs that mention a qualitative term', () => {
+    expect(studyDesignIsQualitative('quantitative content analysis')).toBe(false);
+    expect(studyDesignIsQualitative('mixed methods with thematic analysis and SEM')).toBe(false);
+  });
+
+  it('keeps the statistical lenses and adds MIX and QUAL for a mixed-methods design', () => {
+    const result = applyPaperTypeLensPolicy(empiricalActive, 'empirical', true, 'mixed methods with thematic analysis and regression')
+      .map((lens) => lens.prefix);
+    expect(result).toContain('MIX');
+    expect(result).toContain('QUAL');
+    expect(result).toContain('STAT');
+  });
+
+  it('swaps the quantitative lenses for QUAL on a qualitative design, regardless of paper type', () => {
+    const result = applyPaperTypeLensPolicy(empiricalActive, 'empirical', true, 'qualitative interviews')
+      .map((lens) => lens.prefix);
+    expect(result).toContain('QUAL');
+    for (const dropped of ['STAT', 'MEAS', 'CAUS']) {
+      expect(result).not.toContain(dropped);
+    }
+    expect(result).toContain('METH');
+  });
+
+  it('emits a qualitative-rigour note for qualitative designs only', () => {
+    expect(qualitativeRigourNote('grounded theory')).toContain('trustworthiness');
+    expect(qualitativeRigourNote('randomized-trial')).toBeNull();
+  });
+
+  it('keeps the statistical lenses for a qualitative design that also carries quantitative data', () => {
+    for (const design of ['surveys and interviews', 'content analysis of survey responses', 'questionnaire and focus groups']) {
+      const result = applyPaperTypeLensPolicy(empiricalActive, 'empirical', true, design).map((lens) => lens.prefix);
+      expect(result).toContain('STAT');
+      expect(result).toContain('QUAL');
+      expect(result).toContain('MIX');
+    }
+  });
+
+  it('still strips the statistical lenses for a purely qualitative design with no quantitative data', () => {
+    const result = applyPaperTypeLensPolicy(empiricalActive, 'empirical', true, 'qualitative interviews').map((lens) => lens.prefix);
+    expect(result).not.toContain('STAT');
+    expect(result).toContain('QUAL');
+  });
+
+  it('detects mixed and qualitative designs written with underscores or hyphens', () => {
+    expect(studyDesignIsMixed('mixed_methods')).toBe(true);
+    expect(studyDesignIsMixed('mixed-methods')).toBe(true);
+    expect(studyDesignIsQualitative('grounded_theory')).toBe(true);
   });
 });
 

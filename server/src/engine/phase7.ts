@@ -10,10 +10,13 @@ import type {
   SpecialistReviewerOutput,
   SwarmEvaluation,
   SwarmReportCritique,
+  VoiceProfile,
 } from '@mara/shared';
+import { scrubVoiceProfile } from '@mara/shared';
+import { readVoiceSampleTexts } from '../data/voice';
 import type { CurrentFinding } from '../ledger';
 import { getCurrentFindings } from '../ledger';
-import { annotatePhase, withPhase } from '../tracing';
+import { annotatePhase, recordRunScores, withPhase } from '../tracing';
 import {
   getCheckpoint,
   getReviewOptions,
@@ -26,12 +29,16 @@ import { DispatchPauseError, type EngineDeps } from './phases-shared';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest } from './context';
 import { runAgent } from './dispatch-agent';
-import { arbitrate, type ArbitrationRecord } from './arbitration';
+import { arbitrate, groundingKindsForceHalt, type ArbitrationRecord } from './arbitration';
 import {
   bodyHeadings,
   labelAppearsInBody,
+  NARRATIVE_WORD_BAND,
   redactEditorOnlyIds,
   redactSupersededIds,
+  sanitiseAuthorFacingBody,
+  scanAiTropes,
+  scrubLabel,
   tokenOverlap,
   validateGrounding,
   type GroundingFailureKind,
@@ -43,6 +50,7 @@ import { assemblePrivateNotes, RECOMMENDATION_LABEL } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
 const MAX_FIX_CYCLES = 2;
+const TROPE_REPASS_THRESHOLD = 3;
 
 function checkpointKey(phase: string): string {
   return `engine_${phase}`;
@@ -63,6 +71,63 @@ function fieldDossierContent(reviewId: string): string | null {
     contestedClaims: dossier.contestedClaims,
     methodNorms: dossier.methodNorms,
   });
+}
+
+function renderVoiceProfile(raw: VoiceProfile): string {
+  const profile = scrubVoiceProfile(raw);
+  return [
+    'Write this review in the voice below, mined from the reviewer\'s own past letters. Match the moves, never carry any content from them.',
+    `Register and rhythm: ${profile.register}`,
+    `Opening: ${profile.openingMove}`,
+    `Each concern: ${profile.concernPattern}`,
+    `Severity: ${profile.severitySignalling}`,
+    `Strengths: ${profile.strengthsHandling}`,
+    `Close: ${profile.closePattern}`,
+    `Distinctive habits: ${profile.distinctiveTics.join(' ')}`,
+    `Voice rules:\n${profile.voiceRules.map((rule) => `- ${rule}`).join('\n')}`,
+  ].join('\n\n');
+}
+
+// The raw sample text is derived once into an abstract profile and never threaded to the writer, so no
+// third-party manuscript detail from a past review can reach or be transplanted into this review.
+async function deriveVoiceProfile(deps: EngineDeps, reviewId: string): Promise<string | null> {
+  try {
+    if (artefactExists(reviewId, 'voice-profile')) {
+      return renderVoiceProfile(readArtefact<VoiceProfile>(reviewId, 'voice-profile'));
+    }
+    const texts = await readVoiceSampleTexts(deps.db, reviewId);
+    if (texts.length === 0) {
+      return null;
+    }
+    const profile = await runAgent<VoiceProfile>(deps, {
+      reviewId,
+      phase: 'phase_7',
+      agent: 'voice-profiler',
+      artefactName: 'voice-profile',
+      assembleInput: {
+        artefacts: texts.map((text, index) => ({
+          label: `Past review letter ${index + 1} (voice sample: derive style only, carry no content)`,
+          content: text,
+        })),
+        routingNote:
+          'Derive the abstract voice profile from these past review letters. Capture how they are written, not what they are about. Carry no manuscript title, finding, number, author, or institution into any field. Set carriesNoThirdPartyContent true only after checking every field.',
+      },
+    });
+    return renderVoiceProfile(profile);
+  } catch (error) {
+    if (error instanceof DispatchPauseError) {
+      throw error;
+    }
+    // An optional voice sample must never fail a complete review: an unreadable file or a failed
+    // derivation degrades to the mined default voice, exactly as if none were supplied.
+    insertEvent(deps.db, {
+      reviewId,
+      kind: 'error',
+      phase: 'phase_7',
+      payload: { message: 'Voice profile skipped after an internal error; using the default reviewing voice.' },
+    });
+    return null;
+  }
 }
 
 function emitGateVerdict(
@@ -241,7 +306,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   }
 
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
   const options = getReviewOptions(db, reviewId);
   const intake = readIntakeOptions(options);
   const typeNote = paperTypeNote(intake.paperType);
@@ -251,6 +316,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
 
   await withPhase('phase_7', async () => {
     updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
+
+    const voiceProfileContent = await deriveVoiceProfile(deps, reviewId);
 
     const findings = getCurrentFindings(db, reviewId);
     const ledgerIds = new Set(findings.map((finding) => finding.id));
@@ -287,7 +354,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     let arbitration: ArbitrationRecord | null = null;
     let blocked = false;
     let blockReason = '';
-    let lastGroundingFailureKind: GroundingFailureKind = null;
+    let lastGroundingFailureKinds: Exclude<GroundingFailureKind, null>[] = [];
+    const scrubbedTokens: string[] = [];
     let lastObjection = '';
     let priorDefect = '';
     let lastShipped: ShippedReportEnvelope | null = null;
@@ -322,13 +390,28 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             ...(dossierContent !== null
               ? [{ label: 'Field dossier (the only literature you may name)', content: redact(dossierContent) }]
               : []),
+            ...(voiceProfileContent !== null
+              ? [{ label: 'Voice profile (write in this reviewer voice; carry none of its content)', content: voiceProfileContent }]
+              : []),
           ],
           routingNote:
             `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
 
-      const shipped = withDerivedCitedIds(shippedRaw);
+      const derived = withDerivedCitedIds(shippedRaw);
+      const bodyScrub = sanitiseAuthorFacingBody(derived.bodyMarkdown);
+      scrubbedTokens.push(...bodyScrub.removed);
+      const shipped: ShippedReportEnvelope = {
+        ...derived,
+        bodyMarkdown: bodyScrub.body,
+        evidenceMap: derived.evidenceMap.map((entry) => ({ ...entry, label: scrubLabel(entry.label) })),
+        rubricTable: derived.rubricTable.map((row) => {
+          const justificationScrub = sanitiseAuthorFacingBody(row.justification);
+          scrubbedTokens.push(...justificationScrub.removed);
+          return { ...row, justification: justificationScrub.body };
+        }),
+      };
 
       const privateNotes = assemblePrivateNotes({
         recommendation: currentMeta.recommendation,
@@ -351,12 +434,19 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         idFreeProse: true,
         evidenceMap: shipped.evidenceMap,
         authorFacingAncillary: shipped.rubricTable.map((row) => row.justification).join('\n'),
+        humanizePairs: shipped.humanizePairs,
+        narrativeBand: NARRATIVE_WORD_BAND,
       });
 
       if (!grounding.ok) {
-        lastGroundingFailureKind = grounding.kind;
+        lastGroundingFailureKinds = grounding.kinds;
         lastObjection = grounding.failures.join('; ');
         const maskedObjection = redactSupersededIds(redactEditorOnlyIds(lastObjection, editorOnlyIds), ledgerIdsNow);
+        const tropeCount = grounding.kinds.includes('ai-trope') ? scanAiTropes(shipped.bodyMarkdown).length : 0;
+        const tropeInstruction =
+          tropeCount >= TROPE_REPASS_THRESHOLD
+            ? `${tropeCount} distinct tells means the draft is pervasively machine-written, so run the full humanize pass over the whole body per knowledge/06 rather than patching these phrases`
+            : 'run the humanize pass and rewrite exactly these phrases in your own expert voice, changing nothing else';
         priorDefect =
           grounding.kind === 'editor-only-leak'
             ? 'grounding validator: your text cited confidential editor-only finding ids; cite only ids present in the author-facing ledger artefact'
@@ -367,10 +457,14 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
                 : grounding.kind === 'machine-token'
                   ? `grounding validator: the shipped report body contains internal machine tokens; rewrite exactly these spots as natural reviewer prose and change nothing else: ${maskedObjection}`
                   : grounding.kind === 'ai-trope'
-                    ? `grounding validator: the shipped report body contains machine-writing tells; run the humanize pass and rewrite exactly these phrases in your own expert voice, changing nothing else: ${maskedObjection}`
+                    ? `grounding validator: the shipped report body contains machine-writing tells; ${tropeInstruction}: ${maskedObjection}`
                     : grounding.kind === 'evidence-map-mismatch'
                       ? `grounding validator: the evidence map does not line up with the ledger and the body: ${maskedObjection}`
-                      : `grounding validator: ${maskedObjection}`;
+                      : grounding.kind === 'humanize-unproven'
+                        ? `grounding validator: your humanizePairs are not evidence that the humanise pass ran. Every "before" must be a phrase you actually removed, so it must not survive anywhere in the body, and every "after" must be copied verbatim from a sentence in your final bodyMarkdown. Repair the pairs against the body you are shipping, or run the pass properly: ${maskedObjection}`
+                        : grounding.kind === 'word-band'
+                          ? `grounding validator: ${maskedObjection}. Land inside the band by expanding the thinnest majors or cutting restatement, and change no finding, severity, or score while you do it.`
+                          : `grounding validator: ${maskedObjection}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
         recordGateCheckpoint(db, {
@@ -387,7 +481,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         continue;
       }
 
-      lastGroundingFailureKind = null;
+      lastGroundingFailureKinds = [];
       const runAudit = `Fix cycles used so far: ${fixCycles}. This is gate cycle ${cycle}.`;
       const critic = await runAgent<ReviewFinalCriticOutput>(deps, {
         reviewId,
@@ -485,7 +579,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       const ledgerIdsNow = new Set(currentAll.map((finding) => finding.id));
       arbitration = arbitrate({
         objection: lastObjection,
-        lastGroundingFailureKind,
+        groundingFailureKinds: lastGroundingFailureKinds,
         confidentialityOrVerdictObjection: false,
         recommendation: currentMeta.recommendation,
         decisionHingeIds: currentMeta.decisionHinges.map((hinge) => hinge.findingId),
@@ -538,6 +632,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         alignAll.filter((finding) => finding.scope === 'editor_only').map((finding) => finding.id),
       );
       const alignAuthorFacing = alignAll.filter((finding) => finding.scope !== 'editor_only');
+      let alignmentFallbackDetail: string | null = null;
       try {
         const alignedRaw = await runAgent<ShippedReportEnvelope>(deps, {
           reviewId,
@@ -569,7 +664,18 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
             routingNote: `Deterministic arbitration set the recommendation to "${RECOMMENDATION_LABEL[narrowed].toLowerCase()}" with the attached rationale. Restate the prior report so its recommendation statements argue for that outcome honestly, in natural reviewer prose per the knowledge/06 register: write the category only in plain words exactly as quoted above, never as an underscore token, key-value line, or finding id. Only the recommendation framing changes: keep every section heading and bold problem label byte-identical to the prior report, and return the evidenceMap unchanged (the engine preserves the validated map regardless). In the structured envelope's recommendation field, use the machine value your schema requires; the plain words are for the prose only.`,
           },
         });
-        const aligned = withDerivedCitedIds({ ...alignedRaw, evidenceMap: lastShipped.evidenceMap });
+        const alignedDerived = withDerivedCitedIds({ ...alignedRaw, evidenceMap: lastShipped.evidenceMap });
+        const alignedBodyScrub = sanitiseAuthorFacingBody(alignedDerived.bodyMarkdown);
+        scrubbedTokens.push(...alignedBodyScrub.removed);
+        const aligned: ShippedReportEnvelope = {
+          ...alignedDerived,
+          bodyMarkdown: alignedBodyScrub.body,
+          rubricTable: alignedDerived.rubricTable.map((row) => {
+            const justificationScrub = sanitiseAuthorFacingBody(row.justification);
+            scrubbedTokens.push(...justificationScrub.removed);
+            return { ...row, justification: justificationScrub.body };
+          }),
+        };
         const alignedNotes = assemblePrivateNotes({
           recommendation: narrowed,
           recommendationConfidence: currentMeta.recommendationConfidence,
@@ -588,26 +694,44 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           evidenceMap: aligned.evidenceMap,
           authorFacingAncillary: aligned.rubricTable.map((row) => row.justification).join('\n'),
         });
-        if (alignedGrounding.ok) {
+        // A cosmetic-only residue ships rather than re-destroying an arbitrated review; only a substantive failure falls back.
+        if (alignedGrounding.ok || !groundingKindsForceHalt(alignedGrounding.kinds)) {
           lastShipped = aligned;
           lastPrivateNotes = alignedNotes.markdown;
         } else {
-          released = false;
-          blocked = true;
-          blockReason = `Arbitration narrowed the recommendation to ${narrowed} but the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
+          alignmentFallbackDetail = `the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
         }
       } catch (error) {
         if (error instanceof DispatchPauseError) {
           throw error;
         }
-        released = false;
-        blocked = true;
-        blockReason = `Arbitration narrowed the recommendation to ${narrowed} but no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
+        alignmentFallbackDetail = `no schema-valid aligned report could be produced: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      if (alignmentFallbackDetail !== null) {
+        // The narrowed-recommendation rewrite could not be produced cleanly, so the already-validated
+        // pre-alignment report ships at its own recommendation rather than losing a complete review.
+        finalRecommendation = currentMeta.recommendation;
+        writeArtefact(reviewId, 'p7-alignment-fallback', {
+          narrowedRecommendation: narrowed,
+          shippedRecommendation: finalRecommendation,
+          detail: alignmentFallbackDetail,
+        });
+        insertEvent(db, {
+          reviewId,
+          kind: 'arbitration',
+          phase: 'phase_7',
+          payload: {
+            outcome: 'alignment-fallback',
+            narrowedRecommendation: narrowed,
+            shippedRecommendation: finalRecommendation,
+            reason: 'the narrowed-recommendation rewrite failed validation; the prior validated report shipped instead',
+          },
+        });
       }
       emitGateVerdict(db, reviewId, {
         cycle: fixCycles,
         source: 'arbitration-alignment',
-        verdict: blocked ? 'block' : 'aligned',
+        verdict: alignmentFallbackDetail !== null ? 'aligned-fallback' : 'aligned',
         narrowedRecommendation: narrowed,
       });
     }
@@ -685,6 +809,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       recommendationConfidence: finalConfidence,
       rubricAverage: currentMeta.average,
       ...(arbitration !== null ? { arbitration } : {}),
+      ...(scrubbedTokens.length > 0 ? { scrubbedTokens: [...new Set(scrubbedTokens)] } : {}),
     };
     writeArtefact(reviewId, 'p7-gate-record', gateRecord);
 
@@ -695,6 +820,14 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       'mara.fix_cycles': fixCycles,
       'mara.released': true,
     });
+
+    recordRunScores([
+      { name: 'critic_verdict', value: releaseVerdict, dataType: 'CATEGORICAL' },
+      { name: 'recommendation', value: finalRecommendation, dataType: 'CATEGORICAL' },
+      ...(typeof currentMeta.average === 'number'
+        ? [{ name: 'rubric_average', value: currentMeta.average, dataType: 'NUMERIC' as const }]
+        : []),
+    ]);
 
     insertEvent(db, {
       reviewId,

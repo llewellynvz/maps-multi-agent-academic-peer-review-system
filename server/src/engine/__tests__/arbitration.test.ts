@@ -6,7 +6,7 @@ const ledgerIds = new Set(['REV-STAT-0001', 'REV-METH-0002']);
 function base(): ArbitrationInput {
   return {
     objection: 'severity softened relative to the ledger',
-    lastGroundingFailureKind: null,
+    groundingFailureKinds: [],
     confidentialityOrVerdictObjection: false,
     recommendation: 'major_revision',
     decisionHingeIds: ['REV-STAT-0001', 'REV-METH-0002'],
@@ -30,15 +30,31 @@ describe('deterministic arbitration', () => {
     expect(record.outcome).toBe('halt');
   });
 
-  it('forces halt when a grounding leak or banned term was the last failure', () => {
+  it('forces halt when a grounding leak or banned term was among the failures', () => {
     const input = base();
-    input.lastGroundingFailureKind = 'editor-only-leak';
+    input.groundingFailureKinds = ['editor-only-leak'];
     expect(arbitrate(input).outcome).toBe('halt');
   });
 
   it('forces halt when the final cycle deliverable is still ungrounded', () => {
     const input = base();
-    input.lastGroundingFailureKind = 'ungrounded-id';
+    input.groundingFailureKinds = ['ungrounded-id'];
+    expect(arbitrate(input).outcome).toBe('halt');
+  });
+
+  it('does not halt on cosmetic machine-token or ai-trope residue; ships the review instead', () => {
+    const machineToken = base();
+    machineToken.groundingFailureKinds = ['machine-token'];
+    expect(arbitrate(machineToken).outcome).not.toBe('halt');
+
+    const trope = base();
+    trope.groundingFailureKinds = ['ai-trope'];
+    expect(arbitrate(trope).outcome).not.toBe('halt');
+  });
+
+  it('still halts when a substantive failure sits alongside a cosmetic one', () => {
+    const input = base();
+    input.groundingFailureKinds = ['ai-trope', 'editor-only-leak'];
     expect(arbitrate(input).outcome).toBe('halt');
   });
 

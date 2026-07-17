@@ -310,6 +310,14 @@ export class WorkerRunner {
     this.client.sqlite
       .prepare("UPDATE reviews SET error_class = NULL, updated_at = ? WHERE id = ?")
       .run(new Date().toISOString(), reviewId);
+    // Advance the event sequence past the prior terminal so a fresh terminal is never suppressed by
+    // the intra-run dedup, even if the re-run throws before it emits its own first event.
+    insertEvent(this.db, {
+      reviewId,
+      kind: 'phase_transition',
+      phase: `phase_${start}`,
+      payload: { retry: true, invalidatedFrom: start },
+    });
   }
 
   private clearPendingResume(reviewId: string): void {
@@ -373,10 +381,18 @@ export class WorkerRunner {
   }
 
   async processReview(reviewId: string): Promise<void> {
+    const row = this.db.select({ id: reviews.id }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all();
+    if (row.length === 0) {
+      this.intents.delete(reviewId);
+      this.cancelRequested.delete(reviewId);
+      this.log(`review ${reviewId} no longer exists; dropping its queued command`);
+      return;
+    }
     const intent = this.intents.get(reviewId) ?? { kind: 'run', args: {}, createdAt: new Date().toISOString() };
     this.intents.delete(reviewId);
     this.activeReviewId = reviewId;
     const startedMs = Date.now();
+    const runStartSeq = this.maxEventSeq(reviewId);
 
     try {
       if (this.cancelRequested.has(reviewId)) {
@@ -428,7 +444,7 @@ export class WorkerRunner {
 
       const result = await this.processors.runEngine(reviewId, () => this.shouldStop(reviewId));
       const durationMs = Date.now() - startedMs;
-      this.finishEngine(reviewId, result, durationMs);
+      this.finishEngine(reviewId, result, durationMs, runStartSeq);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (this.shouldStop(reviewId) === 'shutdown') {
@@ -436,7 +452,12 @@ export class WorkerRunner {
         return;
       }
       updateReview(this.db, reviewId, { status: 'failed', errorClass: 'engine_error' });
-      this.emitTerminal(reviewId, 'failed', { errorClass: 'engine_error', message });
+      this.emitTerminal(
+        reviewId,
+        'failed',
+        { errorClass: 'engine_error', message: 'the worker hit an unrecoverable error while finishing the run' },
+        runStartSeq,
+      );
       this.log(`review ${reviewId} failed: ${message}`);
     } finally {
       this.pauseRequested.delete(reviewId);
@@ -444,43 +465,87 @@ export class WorkerRunner {
     }
   }
 
-  private finishEngine(reviewId: string, result: EngineResult, durationMs: number): void {
+  private finishEngine(reviewId: string, result: EngineResult, durationMs: number, runStartSeq: number): void {
     if (result === 'completed') {
       const review = this.db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
       if (review?.status === 'completed') {
-        this.emitTerminal(reviewId, 'complete', {
-          recommendation: review.recommendation ?? null,
-          durationMs,
-        });
+        this.emitTerminal(
+          reviewId,
+          'complete',
+          { recommendation: review.recommendation ?? null, durationMs },
+          runStartSeq,
+        );
         return;
       }
       const errorClass = review?.errorClass ?? 'not_released';
       updateReview(this.db, reviewId, { status: 'failed', errorClass });
-      this.emitTerminal(reviewId, 'failed', { errorClass, durationMs });
+      const message =
+        errorClass === 'release_gate_block'
+          ? 'the release gate blocked the deliverables after the fix-cycle budget was exhausted'
+          : 'the review finished the pipeline without reaching a released state';
+      this.emitTerminal(reviewId, 'failed', { errorClass, message, durationMs }, runStartSeq);
     } else if (result === 'paused') {
       this.pauseRequested.delete(reviewId);
       updateReview(this.db, reviewId, { status: 'paused' });
     } else if (result === 'cancelled') {
       updateReview(this.db, reviewId, { status: 'cancelled' });
-      this.emitTerminal(reviewId, 'cancelled', {});
+      this.emitTerminal(reviewId, 'cancelled', {}, runStartSeq);
     } else if (result === 'failed') {
-      this.emitTerminal(reviewId, 'failed', { errorClass: 'engine_error' });
+      this.emitTerminal(
+        reviewId,
+        'failed',
+        { errorClass: 'engine_error', message: 'the engine reported an unrecoverable failure' },
+        runStartSeq,
+      );
     }
   }
 
-  private emitTerminal(reviewId: string, outcome: string, extra: Record<string, unknown>): void {
-    const existing = this.client.sqlite
-      .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = ? AND kind = 'run_terminal'")
-      .get(reviewId) as { n: number };
-    if (existing.n > 0) {
+  private maxEventSeq(reviewId: string): number {
+    const row = this.client.sqlite.prepare('SELECT max(seq) AS s FROM review_events WHERE review_id = ?').get(reviewId) as {
+      s: number | null;
+    };
+    return row.s ?? 0;
+  }
+
+  private emitTerminal(reviewId: string, outcome: string, extra: Record<string, unknown>, sinceSeq?: number): void {
+    const exists = this.db.select({ id: reviews.id }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all();
+    if (exists.length === 0) {
+      this.log(`review ${reviewId} was deleted while it was being processed; suppressing its terminal event`);
       return;
     }
+    if (sinceSeq !== undefined) {
+      // Suppress only when a terminal already landed during this run, so an intervening event cannot trigger a second contradictory terminal.
+      const termThisRun = this.client.sqlite
+        .prepare("SELECT max(seq) AS s FROM review_events WHERE review_id = ? AND kind = 'run_terminal'")
+        .get(reviewId) as { s: number | null };
+      if (termThisRun.s !== null && termThisRun.s > sinceSeq) {
+        return;
+      }
+    } else {
+      const seqs = this.client.sqlite
+        .prepare(
+          "SELECT (SELECT max(seq) FROM review_events WHERE review_id = ? AND kind = 'run_terminal') AS lastTerm, (SELECT max(seq) FROM review_events WHERE review_id = ?) AS maxSeq",
+        )
+        .get(reviewId, reviewId) as { lastTerm: number | null; maxSeq: number | null };
+      if (seqs.lastTerm !== null && seqs.lastTerm === seqs.maxSeq) {
+        return;
+      }
+    }
+    const phase =
+      typeof extra.phase === 'string' && extra.phase.length > 0 ? extra.phase : this.currentPhaseOf(reviewId);
     insertEvent(this.db, {
       reviewId,
       kind: 'run_terminal',
-      phase: 'phase_8',
-      payload: { outcome, ...extra },
+      phase,
+      payload: { outcome, ...extra, phase },
     });
+  }
+
+  private currentPhaseOf(reviewId: string): string {
+    const row = this.client.sqlite.prepare('SELECT current_phase FROM reviews WHERE id = ?').get(reviewId) as
+      | { current_phase: string | null }
+      | undefined;
+    return row?.current_phase ?? 'phase_8';
   }
 
   private shouldStop(reviewId: string): StopSignal {
@@ -552,9 +617,13 @@ export class WorkerRunner {
     if (this.activeReviewId === null && this.processing === null) {
       const next = this.pickNext();
       if (next !== null) {
-        this.processing = this.processReview(next).finally(() => {
-          this.processing = null;
-        });
+        this.processing = this.processReview(next)
+          .catch((error) => {
+            this.log(`review ${next} escaped its error handling: ${error instanceof Error ? error.message : String(error)}`);
+          })
+          .finally(() => {
+            this.processing = null;
+          });
       }
     }
   }

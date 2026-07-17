@@ -7,8 +7,14 @@ node_modules/
 .DS_Store
 STATE.md
 scratch/
+knowledge/exemplars/*
+!knowledge/exemplars/README.md
 .next/
 next-env.d.ts
 REVIEW.md
+*.local.md
 .claude/
-/docs/
+/docs/*
+!/docs/OPERATIONS.md
+!/docs/LIMITATIONS.md
+!/docs/DATASETS.md

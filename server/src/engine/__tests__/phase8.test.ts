@@ -234,11 +234,82 @@ describe('phase 8 production and close-out', () => {
     expect((JSON.parse(cp.snapshot_json) as { composite: number }).composite).toBe(0.82);
   });
 
+  it('states recorded coverage gaps in the editor-only notes but never in the author letter', async () => {
+    const now = new Date().toISOString();
+    sqlite
+      .prepare(
+        'INSERT INTO phase_checkpoints (id, review_id, phase, status, fix_cycle_count, snapshot_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        `cp4-${reviewId}`,
+        reviewId,
+        'engine_phase_4',
+        'completed',
+        0,
+        JSON.stringify({ coverageGaps: [{ step: 'integrity screening', unit: 'integrity cluster "consistency-and-figures"' }] }),
+        now,
+      );
+    await runPhase7(deps(), reviewId);
+    await runPhase8(deps(), reviewId);
+
+    const notesMd = readFileSync(manuscriptBlobPath(reviewId, 'output/reviewer-private-notes.md'), 'utf8');
+    expect(notesMd).toContain('Coverage limitations');
+    expect(notesMd).toContain('consistency-and-figures');
+
+    const letterMd = readFileSync(manuscriptBlobPath(reviewId, 'output/author-letter.md'), 'utf8');
+    expect(letterMd).not.toContain('Coverage limitations');
+  });
+
+  it('states an arbitration-fallback recommendation discrepancy in the editor notes, not the author letter', async () => {
+    await runPhase7(deps(), reviewId);
+    writeArtefact(reviewId, 'p7-alignment-fallback', {
+      narrowedRecommendation: 'reject_and_resubmit',
+      shippedRecommendation: 'major_revision',
+      detail: 'the aligned report failed the deterministic validator',
+    });
+    await runPhase8(deps(), reviewId);
+
+    const notesMd = readFileSync(manuscriptBlobPath(reviewId, 'output/reviewer-private-notes.md'), 'utf8');
+    expect(notesMd).toContain('Arbitration note');
+    expect(notesMd).toContain('reject and resubmit');
+
+    const letterMd = readFileSync(manuscriptBlobPath(reviewId, 'output/author-letter.md'), 'utf8');
+    expect(letterMd).not.toContain('Arbitration note');
+  });
+
   it('is idempotent on re-entry and does not duplicate deliverable rows', async () => {
     await runPhase7(deps(), reviewId);
     await runPhase8(deps(), reviewId);
     await runPhase8(deps(), reviewId);
     const count = (sqlite.prepare('SELECT count(*) AS n FROM deliverables WHERE review_id = ?').get(reviewId) as { n: number }).n;
     expect(count).toBe(5);
+  });
+
+  it('hard-stops on a blocked release: no dispatch, no deliverables, status untouched', async () => {
+    const now = new Date().toISOString();
+    sqlite
+      .prepare(
+        'INSERT INTO phase_checkpoints (id, review_id, phase, status, fix_cycle_count, snapshot_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(`cp7-${reviewId}`, reviewId, 'engine_phase_7', 'completed', 2, JSON.stringify({ released: false, blocked: true }), now);
+    sqlite.prepare("UPDATE reviews SET status = 'failed', error_class = 'release_gate_block' WHERE id = ?").run(reviewId);
+
+    const noDispatch: EngineDeps = {
+      db,
+      runDispatch: async () => {
+        throw new Error('phase 8 must not dispatch on a blocked review');
+      },
+    };
+    await runPhase8(noDispatch, reviewId);
+
+    const deliverables = (sqlite.prepare('SELECT count(*) AS n FROM deliverables WHERE review_id = ?').get(reviewId) as { n: number }).n;
+    expect(deliverables).toBe(0);
+    const review = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(reviewId) as { status: string };
+    expect(review.status).toBe('failed');
+    const cp = sqlite
+      .prepare("SELECT status, snapshot_json FROM phase_checkpoints WHERE review_id = ? AND phase = 'engine_phase_8'")
+      .get(reviewId) as { status: string; snapshot_json: string };
+    expect(cp.status).toBe('completed');
+    expect((JSON.parse(cp.snapshot_json) as { skipped?: string }).skipped).toBe('blocked_or_halted');
   });
 });

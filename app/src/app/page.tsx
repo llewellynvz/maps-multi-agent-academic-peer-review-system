@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ReviewSummary } from '@/lib/api';
-import { formatDate, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
-import { Icon, Pill, Spinner, StatTile } from '@/components/ui';
+import { formatDate, formatRelative, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
+import { Icon, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 import { Section } from '@/components/Section';
 import { EmptyState } from '@/components/EmptyState';
+import { ConfirmDrawer } from '@/components/ConfirmDrawer';
 
 function isRunning(status: string): boolean {
   return status === 'running' || status === 'sanitizing' || status === 'awaiting_input' || status === 'queued';
@@ -35,7 +36,37 @@ function CardTop({ review }: { review: ReviewSummary }): ReactNode {
         <Pill tone={tone.tone} label={label} />
         {running ? <span className="timeline-dot node-active" aria-hidden="true" /> : null}
       </span>
-      <span className="mono" style={{ color: 'var(--fg-4)', fontSize: 13 }}>{formatDate(review.createdAt)}</span>
+      <span className="mono" style={{ color: 'var(--fg-4)', fontSize: 13 }} title={formatDate(review.createdAt)}>
+        {formatRelative(review.createdAt)}
+      </span>
+    </div>
+  );
+}
+
+function CardFooter({ review }: { review: ReviewSummary }): ReactNode {
+  if (review.status === 'completed') {
+    return (
+      <div className="spread" style={{ marginTop: 'auto' }}>
+        {review.recommendation !== null ? (
+          <Pill tone="neutral" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} />
+        ) : (
+          <span />
+        )}
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span className="mono stat-num" style={{ fontSize: 22 }}>
+            {review.rubricAverage !== null ? review.rubricAverage.toFixed(1) : '--'}
+          </span>
+          <span className="muted" style={{ fontSize: 13 }}>/ 5</span>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="spread" style={{ marginTop: 'auto' }}>
+      <span className="chip-hint">
+        {isRunning(review.status) && review.currentPhase !== null ? phaseLabel(review.currentPhase) : statusTone(review.status).label}
+      </span>
+      <span />
     </div>
   );
 }
@@ -53,39 +84,54 @@ function CardBody({ review }: { review: ReviewSummary }): ReactNode {
   );
 }
 
-function ReviewCard({ review }: { review: ReviewSummary }): ReactNode {
-  if (review.status === 'failed') {
+function ReviewCard({
+  review,
+  index,
+  onCancel,
+  onDelete,
+}: {
+  review: ReviewSummary;
+  index: number;
+  onCancel: (review: ReviewSummary) => void;
+  onDelete: (review: ReviewSummary) => void;
+}): ReactNode {
+  const style = { ...CARD_STYLE, '--i': index } as CSSProperties;
+  if (review.status === 'failed' || review.status === 'cancelled') {
     return (
-      <article className="card" style={CARD_STYLE}>
+      <article className="card card-enter" style={style}>
         <CardTop review={review} />
         <CardBody review={review} />
         <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
           <Link href={`/reviews/${review.id}/run`} className="btn btn-secondary">Resume</Link>
           <Link href={`/reviews/${review.id}/results`} className="btn btn-ghost">View partial results</Link>
+          <button className="btn btn-ghost" aria-label={`Delete ${review.title ?? 'review'}`} onClick={() => onDelete(review)}>
+            <Icon name="trash" /> Delete
+          </button>
+        </div>
+      </article>
+    );
+  }
+
+  if (isRunning(review.status) && review.status !== 'awaiting_input') {
+    return (
+      <article className="card card-enter" style={style}>
+        <CardTop review={review} />
+        <CardBody review={review} />
+        <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
+          <Link href={reviewHref(review)} className="btn btn-secondary">Open</Link>
+          <button className="btn btn-ghost" aria-label={`Cancel ${review.title ?? 'review'}`} onClick={() => onCancel(review)}>
+            Cancel
+          </button>
         </div>
       </article>
     );
   }
 
   return (
-    <Link href={reviewHref(review)} className="card card-hover" style={CARD_STYLE}>
+    <Link href={reviewHref(review)} className="card card-hover card-enter" style={style}>
       <CardTop review={review} />
       <CardBody review={review} />
-      {review.status === 'completed' ? (
-        <div className="spread" style={{ marginTop: 'auto' }}>
-          {review.recommendation !== null ? (
-            <Pill tone="neutral" label={RECOMMENDATION_LABEL[review.recommendation] ?? review.recommendation} />
-          ) : (
-            <span />
-          )}
-          <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="mono stat-num" style={{ fontSize: 22 }}>
-              {review.rubricAverage !== null ? review.rubricAverage.toFixed(1) : '--'}
-            </span>
-            <span className="muted" style={{ fontSize: 13 }}>/ 5</span>
-          </span>
-        </div>
-      ) : null}
+      <CardFooter review={review} />
     </Link>
   );
 }
@@ -94,13 +140,46 @@ export default function LibraryPage(): ReactNode {
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<ReviewSummary | null>(null);
+  const requestSeq = useRef(0);
+
+  const refresh = async (): Promise<void> => {
+    const seq = ++requestSeq.current;
+    const result = await api.listReviews();
+    if (seq === requestSeq.current) {
+      setReviews(result.reviews);
+    }
+  };
+
+  const cancelReview = async (review: ReviewSummary): Promise<void> => {
+    try {
+      await api.cancel(review.id);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel the review.');
+    }
+  };
+
+  const deleteReview = async (): Promise<void> => {
+    if (deleteTarget === null) {
+      return;
+    }
+    try {
+      await api.deleteReview(deleteTarget.id);
+      setDeleteTarget(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the review.');
+    }
+  };
 
   useEffect(() => {
     let active = true;
     const load = async (): Promise<void> => {
+      const seq = ++requestSeq.current;
       try {
         const result = await api.listReviews();
-        if (active) {
+        if (active && seq === requestSeq.current) {
           setReviews(result.reviews);
           setError(null);
         }
@@ -140,7 +219,13 @@ export default function LibraryPage(): ReactNode {
       return null;
     }
     const filtered = reviews.filter((review) => (review.title ?? '').toLowerCase().includes(query.toLowerCase()));
-    return [...filtered].sort((a, b) => Number(isRunning(b.status)) - Number(isRunning(a.status)));
+    return [...filtered].sort((a, b) => {
+      const running = Number(isRunning(b.status)) - Number(isRunning(a.status));
+      if (running !== 0) {
+        return running;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   }, [reviews, query]);
 
   const hasReviews = reviews !== null && reviews.length > 0;
@@ -167,8 +252,10 @@ export default function LibraryPage(): ReactNode {
       {error !== null ? <div style={{ marginBottom: 20 }}><Pill tone="fail" label={error} /></div> : null}
 
       {reviews === null && error === null ? (
-        <div className="row" style={{ color: 'var(--fg-3)' }}>
-          <Spinner /> Loading reviews
+        <div className="grid-auto" aria-busy="true" aria-label="Loading reviews">
+          {[0, 1, 2, 3, 4, 5].map((key) => (
+            <div key={key} className="skeleton" />
+          ))}
         </div>
       ) : null}
 
@@ -187,7 +274,7 @@ export default function LibraryPage(): ReactNode {
 
       {hasReviews && stats !== null ? (
         <Section number={1} eyebrow="At a glance" title="Your review activity">
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+          <div className="stat-band" style={{ marginTop: 'var(--space-4)' }}>
             <StatTile label="Total reviews" value={String(stats.total)} />
             <StatTile label="Completed" value={String(stats.completed)} />
             <StatTile label="Running" value={String(stats.running)} />
@@ -199,9 +286,15 @@ export default function LibraryPage(): ReactNode {
       {hasReviews && sorted !== null ? (
         <Section number={2} eyebrow="Library" title="All reviews">
           {sorted.length > 0 ? (
-            <div className="grid-3" style={{ marginTop: 'var(--space-4)' }}>
-              {sorted.map((review) => (
-                <ReviewCard key={review.id} review={review} />
+            <div className="grid-auto" style={{ marginTop: 'var(--space-4)' }}>
+              {sorted.map((review, index) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  index={index}
+                  onCancel={(target) => void cancelReview(target)}
+                  onDelete={(target) => setDeleteTarget(target)}
+                />
               ))}
             </div>
           ) : (
@@ -209,6 +302,16 @@ export default function LibraryPage(): ReactNode {
           )}
         </Section>
       ) : null}
+
+      <ConfirmDrawer
+        open={deleteTarget !== null}
+        title="Confirm deletion"
+        warning={<>This permanently removes <strong>{deleteTarget?.title ?? 'this review'}</strong> and every artefact on disk.</>}
+        phrase="delete"
+        actionLabel="Delete review"
+        onConfirm={() => void deleteReview()}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

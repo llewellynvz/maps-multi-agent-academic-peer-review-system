@@ -10,8 +10,11 @@ import { normalisePreset, type Preset } from './lenses';
 const SECTION_MAP_BLOB = 'parse/section-map.json';
 const SANITIZED_SECTION_MAP_BLOB = 'parse/section-map.sanitized.json';
 
-const MANUSCRIPT_DIGEST_CHARS = 16000;
-const SECTION_CHARS = 2400;
+const DIGEST_LIMITS: Record<Preset, { digestChars: number; sectionChars: number }> = {
+  fast: { digestChars: 16000, sectionChars: 2400 },
+  balanced: { digestChars: 16000, sectionChars: 2400 },
+  thorough: { digestChars: 32000, sectionChars: 4800 },
+};
 const REFERENCE_CAP = 20;
 
 export interface EngineContext {
@@ -36,7 +39,8 @@ export function loadEngineContext(db: MaraDatabase, reviewId: string): EngineCon
   };
 }
 
-export function manuscriptDigest(sectionMap: SectionMap): string {
+export function manuscriptDigest(sectionMap: SectionMap, preset: Preset = 'balanced'): string {
+  const limits = DIGEST_LIMITS[preset];
   const parts: string[] = [];
   if (sectionMap.title !== null) {
     parts.push(`Title: ${sectionMap.title}`);
@@ -47,9 +51,9 @@ export function manuscriptDigest(sectionMap: SectionMap): string {
   for (const section of sectionMap.sections) {
     const heading = section.heading ?? `Section ${section.index}`;
     const anchor = `lines ${section.lineStart}-${section.lineEnd}`;
-    parts.push(`## ${heading} (${anchor})\n${section.text.slice(0, SECTION_CHARS)}`);
+    parts.push(`## ${heading} (${anchor})\n${section.text.slice(0, limits.sectionChars)}`);
   }
-  return parts.join('\n\n').slice(0, MANUSCRIPT_DIGEST_CHARS);
+  return parts.join('\n\n').slice(0, limits.digestChars);
 }
 
 export function referenceMetadataList(sectionMap: SectionMap): string {

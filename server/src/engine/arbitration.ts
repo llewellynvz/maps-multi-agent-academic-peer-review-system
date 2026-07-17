@@ -19,9 +19,21 @@ export function narrowRecommendation(recommendation: Recommendation): Recommenda
 
 export type ArbitrationOutcome = 'accept-and-narrow' | 'overrule-with-named-evidence' | 'halt';
 
+const HALT_KINDS = new Set<Exclude<GroundingFailureKind, null>>([
+  'editor-only-leak',
+  'banned-verdict-term',
+  'ungrounded-id',
+  'evidence-map-mismatch',
+  'id-in-prose',
+]);
+
+export function groundingKindsForceHalt(kinds: Exclude<GroundingFailureKind, null>[]): boolean {
+  return kinds.some((kind) => HALT_KINDS.has(kind));
+}
+
 export interface ArbitrationInput {
   objection: string;
-  lastGroundingFailureKind: GroundingFailureKind;
+  groundingFailureKinds: Exclude<GroundingFailureKind, null>[];
   confidentialityOrVerdictObjection: boolean;
   recommendation: Recommendation;
   decisionHingeIds: string[];
@@ -39,13 +51,14 @@ export interface ArbitrationRecord {
 }
 
 export function arbitrate(input: ArbitrationInput): ArbitrationRecord {
-  const forcedHalt = input.confidentialityOrVerdictObjection || input.lastGroundingFailureKind !== null;
+  const forcedHalt =
+    input.confidentialityOrVerdictObjection || groundingKindsForceHalt(input.groundingFailureKinds);
   if (forcedHalt) {
     return {
       outcome: 'halt',
       objection: input.objection,
       rationale:
-        'Forced halt: the final cycle deliverable failed the deterministic grounding validator or raised a confidentiality or verdict-term objection, which narrowing and overrule cannot resolve.',
+        'Forced halt: the final cycle deliverable failed a substantive grounding, confidentiality, or verdict-term check that narrowing and overrule cannot resolve.',
       evidenceIds: [],
       narrowedRecommendation: null,
     };

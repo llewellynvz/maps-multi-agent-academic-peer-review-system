@@ -126,7 +126,8 @@ async function redispatchSpecialist(
   lens: LensDef,
   fixInstruction: string,
 ): Promise<void> {
-  const digest = manuscriptDigest(loadEngineContext(deps.db, reviewId).sectionMap);
+  const critiqueCtx = loadEngineContext(deps.db, reviewId);
+  const digest = manuscriptDigest(critiqueCtx.sectionMap, critiqueCtx.preset);
   const mine = getCurrentFindings(deps.db, reviewId).filter((finding) => finding.id.startsWith(`REV-${lens.prefix}-`));
   const result = await runAgent<SpecialistReviewerOutput>(deps, {
     reviewId,
@@ -178,7 +179,7 @@ async function redispatchIntegrity(
     artefactName: `p${n}-critfix-${cluster.name}`,
     assembleInput: {
       parseQuality: ctx.parseQuality,
-      manuscriptExcerpt: manuscriptDigest(ctx.sectionMap),
+      manuscriptExcerpt: manuscriptDigest(ctx.sectionMap, ctx.preset),
       artefacts: [
         { label: 'Manuscript map', content: JSON.stringify(analystA.manuscriptMap) },
         { label: 'Figure and table inventory', content: JSON.stringify(analystA.figureTableInventory) },
@@ -233,7 +234,7 @@ async function redispatchContext(
       artefactName: `p${n}-critfix-context`,
       assembleInput: {
         parseQuality: ctx.parseQuality,
-        manuscriptExcerpt: manuscriptDigest(ctx.sectionMap),
+        manuscriptExcerpt: manuscriptDigest(ctx.sectionMap, ctx.preset),
         artefacts: [{ label: 'Claim-evidence matrix', content: matrixJson }],
         routingNote: `Adversarial phase-critic re-dispatch of the field-context dossier. ${fixInstruction} Work from the manuscript and the provided context only; where a comparator would need retrieval, record it as not performable rather than inventing a source. Prefix findings REV-CTX.`,
       },

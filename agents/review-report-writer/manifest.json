@@ -1,6 +1,6 @@
 {
   "name": "review-report-writer",
-  "promptVersion": "1.3.0",
+  "promptVersion": "1.4.0",
   "phase": [6, 7],
   "role": "frontier",
   "knowledge": [
@@ -10,5 +10,6 @@
     "05_REVIEW_TEMPLATES.md",
     "06_WRITING_CRAFT.md"
   ],
+  "exemplars": true,
   "modes": ["A", "B"]
 }

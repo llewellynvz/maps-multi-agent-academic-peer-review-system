@@ -2,12 +2,43 @@ import { describe, expect, it } from 'vitest';
 import {
   confidenceBandPhrase,
   formatBytes,
-  hasFindingIds,
+  formatRelative,
   PHASE_DESCRIPTIONS,
   PHASES,
   RECOMMENDATION_EXPLANATION,
   RECOMMENDATION_LABEL,
+  statusTone,
 } from '@/lib/format';
+
+describe('statusTone', () => {
+  it('gives a finished review a different tone from an in-flight one', () => {
+    expect(statusTone('completed').tone).toBe('success');
+    expect(statusTone('running').tone).toBe('info');
+    expect(statusTone('completed').tone).not.toBe(statusTone('running').tone);
+  });
+
+  it('keeps failure visually distinct from every other state', () => {
+    const fail = statusTone('failed').tone;
+    for (const status of ['completed', 'running', 'queued', 'paused'] as const) {
+      expect(statusTone(status).tone).not.toBe(fail);
+    }
+  });
+});
+
+describe('formatRelative', () => {
+  it('describes recent timestamps in words rather than a bare date', () => {
+    const now = Date.parse('2026-07-16T12:00:00.000Z');
+    expect(formatRelative('2026-07-16T11:59:30.000Z', now)).toContain('second');
+    expect(formatRelative('2026-07-16T11:30:00.000Z', now)).toContain('minute');
+    expect(formatRelative('2026-07-16T09:00:00.000Z', now)).toContain('hour');
+    expect(formatRelative('2026-07-14T12:00:00.000Z', now)).toContain('day');
+  });
+
+  it('falls back to an absolute date beyond a week', () => {
+    const now = Date.parse('2026-07-16T12:00:00.000Z');
+    expect(formatRelative('2026-06-01T12:00:00.000Z', now)).toBe('2026-06-01');
+  });
+});
 
 describe('PHASE_DESCRIPTIONS', () => {
   it('covers every phase key with a plain-language sentence', () => {
@@ -38,15 +69,6 @@ describe('confidenceBandPhrase', () => {
     expect(confidenceBandPhrase(0.69)).toBe('with reservations');
     expect(confidenceBandPhrase(0)).toBe('with reservations');
     expect(confidenceBandPhrase(null)).toBe('not yet rated');
-  });
-});
-
-describe('hasFindingIds', () => {
-  it('detects legacy inline finding tokens and ignores id-free prose', () => {
-    expect(hasFindingIds('The design is underpowered (REV-STAT-0007).')).toBe(true);
-    expect(hasFindingIds('See REV-METH-0012 and REV-NOV-0003.')).toBe(true);
-    expect(hasFindingIds('The design is underpowered for the stated effect.')).toBe(false);
-    expect(hasFindingIds('REV-XX-1 is not a valid finding id.')).toBe(false);
   });
 });
 

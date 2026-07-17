@@ -37,6 +37,7 @@ export interface ReviewDetail extends Review {
   severityCounts: Record<string, number>;
   checkpoints: Array<{ phase: string; status: string; gateVerdict: string | null; fixCycleCount: number }>;
   rubricAverage: number | null;
+  rubricScores?: Array<{ criterion: string; criterionIndex: number; score: number }>;
 }
 
 export interface Detected {
@@ -112,6 +113,7 @@ export interface PriorStressTest {
 export interface EvidenceData {
   evidenceMap: EvidenceMapView[];
   findings: EvidenceFinding[];
+  editorOnly?: EvidenceFinding[];
   priorStressTest?: PriorStressTest | null;
 }
 
@@ -193,6 +195,10 @@ export const api = {
     request<Review>('POST', '/api/reviews', body),
   getReview: (id: string) => request<ReviewDetail>('GET', `/api/reviews/${id}`),
   deleteReview: (id: string) => request<{ purged: boolean }>('DELETE', `/api/reviews/${id}`),
+  deleteAllReviews: () =>
+    request<{ purged: number; orphansRemoved: number; snapshotsCleared: number }>('DELETE', '/api/reviews', {
+      confirm: 'delete everything',
+    }),
 
   uploadManuscript: async (id: string, file: File): Promise<{ manuscriptId: string; sha256: string; byteSize: number }> => {
     const form = new FormData();
@@ -204,6 +210,18 @@ export const api = {
       throw new ApiError(response.status, error?.code ?? 'error', error?.message ?? 'Upload failed.');
     }
     return json as { manuscriptId: string; sha256: string; byteSize: number };
+  },
+
+  uploadVoiceSample: async (id: string, file: File): Promise<{ voiceSampleId: string; count: number }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(`/api/reviews/${id}/voice`, { method: 'POST', body: form, credentials: 'include' });
+    const json = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | Record<string, unknown> | null;
+    if (!response.ok) {
+      const error = (json as { error?: { code?: string; message?: string } } | null)?.error;
+      throw new ApiError(response.status, error?.code ?? 'error', error?.message ?? 'Voice sample upload failed.');
+    }
+    return json as { voiceSampleId: string; count: number };
   },
 
   getQuestions: (id: string) => request<QuestionsResponse>('GET', `/api/reviews/${id}/questions`),

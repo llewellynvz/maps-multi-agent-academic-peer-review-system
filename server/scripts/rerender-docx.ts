@@ -1,16 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { buildNotesJob, buildReportJob } from '../src/engine/deliverable-jobs';
 import { readArtefact } from '../src/engine/artefacts';
-import { renderDeliverableDocx, type DeliverableMetadataRow } from '../src/engine/docx';
+import { renderDeliverableDocx } from '../src/engine/docx';
 import type { Recommendation, ShippedReportEnvelope } from '@mara/shared';
-
-const RECOMMENDATION_LABEL: Record<string, string> = {
-  accept: 'Accept',
-  minor_revision: 'Minor revision',
-  major_revision: 'Major revision',
-  reject_and_resubmit: 'Reject and resubmit',
-  reject: 'Reject',
-};
 
 async function main(): Promise<void> {
   const reviewId = process.argv[2];
@@ -27,37 +20,27 @@ async function main(): Promise<void> {
   const confidence = typeof gateRecord.recommendationConfidence === 'number'
     ? gateRecord.recommendationConfidence
     : shipped.recommendationConfidence;
-
-  const reportMeta: DeliverableMetadataRow[] = [
-    { label: 'Review', value: reviewId, mono: true },
-    { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation] ?? recommendation, mono: false },
-    { label: 'Confidence', value: confidence.toFixed(2), mono: true },
-    { label: 'Date', value: new Date().toISOString().slice(0, 10), mono: true },
-  ];
+  const rubricAverage = typeof gateRecord.rubricAverage === 'number' ? gateRecord.rubricAverage : 0;
+  const date = new Date().toISOString().slice(0, 10);
 
   mkdirSync(outDir, { recursive: true });
-  const report = await renderDeliverableDocx({
-    title: 'Peer review report',
-    kicker: 'Peer review',
-    subtitle: `${RECOMMENDATION_LABEL[recommendation] ?? recommendation} at confidence ${confidence.toFixed(2)}.`,
-    metadata: reportMeta,
-    bodyMarkdown: shipped.bodyMarkdown,
-    confidential: false,
-  });
+  const report = await renderDeliverableDocx(
+    buildReportJob({
+      reviewTitle: 'Peer review report',
+      manuscriptTitle: null,
+      recommendation,
+      confidence,
+      rubricAverage,
+      date,
+      bodyMarkdown: shipped.bodyMarkdown,
+    }),
+  );
   const reportPath = resolve(outDir, `author-letter-rerendered-${reviewId.slice(0, 8)}.docx`);
   writeFileSync(reportPath, report);
 
-  const notes = await renderDeliverableDocx({
-    title: "Reviewer's private notes",
-    kicker: 'Editor-only',
-    subtitle: 'Editorial signals and run audit for the handling editor.',
-    metadata: [
-      { label: 'Review', value: reviewId, mono: true },
-      { label: 'Recommendation', value: RECOMMENDATION_LABEL[recommendation] ?? recommendation, mono: false },
-    ],
-    bodyMarkdown: privateNotes.markdown,
-    confidential: true,
-  });
+  const notes = await renderDeliverableDocx(
+    buildNotesJob({ reviewId, recommendation, confidence, date, bodyMarkdown: privateNotes.markdown }),
+  );
   const notesPath = resolve(outDir, `private-notes-rerendered-${reviewId.slice(0, 8)}.docx`);
   writeFileSync(notesPath, notes);
 

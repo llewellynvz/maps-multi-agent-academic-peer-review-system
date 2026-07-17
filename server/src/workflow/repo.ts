@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
-import { manuscripts, phaseCheckpoints, reviewEvents, reviews } from '../db/schema';
+import { manuscripts, phaseCheckpoints, reviewEvents, reviews, voiceSamples } from '../db/schema';
 import { nowIso } from '../data/db';
 import type { ReviewStatus } from '../data/types';
 
@@ -66,6 +66,32 @@ export function insertManuscript(db: MaraDatabase, input: InsertManuscriptInput)
       byteSize: input.byteSize,
       sha256: input.sha256,
       ingestedAt: nowIso(),
+    })
+    .run();
+  return id;
+}
+
+export interface InsertVoiceSampleInput {
+  reviewId: string;
+  originalFilename: string;
+  mimeType: string;
+  blobPath: string;
+  byteSize: number;
+  sha256: string;
+}
+
+export function insertVoiceSample(db: MaraDatabase, input: InsertVoiceSampleInput): string {
+  const id = randomUUID();
+  db.insert(voiceSamples)
+    .values({
+      id,
+      reviewId: input.reviewId,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      blobPath: input.blobPath,
+      byteSize: input.byteSize,
+      sha256: input.sha256,
+      uploadedAt: nowIso(),
     })
     .run();
   return id;
@@ -257,6 +283,62 @@ export function updateReview(
     .set({ ...patch, updatedAt: nowIso() })
     .where(eq(reviews.id, reviewId))
     .run();
+}
+
+export function maxEventSeq(db: MaraDatabase, reviewId: string): number {
+  return (
+    db
+      .select({ m: sql<number | null>`max(${reviewEvents.seq})` })
+      .from(reviewEvents)
+      .where(eq(reviewEvents.reviewId, reviewId))
+      .all()[0]?.m ?? 0
+  );
+}
+
+export function recordEngineFailure(db: MaraDatabase, reviewId: string, errorName = 'Error', sinceSeq?: number): void {
+  const row = db
+    .select({ currentPhase: reviews.currentPhase })
+    .from(reviews)
+    .where(eq(reviews.id, reviewId))
+    .limit(1)
+    .all()[0];
+  const phase = row?.currentPhase ?? 'phase_8';
+  // Only a bare error-type identifier reaches the streamed event; a raw exception message can echo
+  // model output that quotes the manuscript, so it stays in the worker log alone.
+  const safeName = /^[A-Za-z][A-Za-z0-9]{0,39}$/.test(errorName) ? errorName : 'Error';
+  updateReview(db, reviewId, { status: 'failed', errorClass: 'engine_error' });
+  const lastTerm =
+    db
+      .select({ m: sql<number | null>`max(${reviewEvents.seq})` })
+      .from(reviewEvents)
+      .where(and(eq(reviewEvents.reviewId, reviewId), eq(reviewEvents.kind, 'run_terminal')))
+      .all()[0]?.m ?? null;
+  if (sinceSeq !== undefined) {
+    if (lastTerm !== null && lastTerm > sinceSeq) {
+      return;
+    }
+  } else {
+    const maxSeq =
+      db
+        .select({ m: sql<number | null>`max(${reviewEvents.seq})` })
+        .from(reviewEvents)
+        .where(eq(reviewEvents.reviewId, reviewId))
+        .all()[0]?.m ?? null;
+    if (lastTerm !== null && lastTerm === maxSeq) {
+      return;
+    }
+  }
+  insertEvent(db, {
+    reviewId,
+    kind: 'run_terminal',
+    phase,
+    payload: {
+      outcome: 'failed',
+      errorClass: 'engine_error',
+      phase,
+      reason: `the engine hit an unrecoverable ${safeName} in ${phase}; see the worker log for detail`,
+    },
+  });
 }
 
 export function pauseReview(

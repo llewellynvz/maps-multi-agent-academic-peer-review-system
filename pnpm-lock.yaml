@@ -84,6 +84,9 @@ importers:
       '@azure/identity':
         specifier: 4.13.1
         version: 4.13.1
+      '@langfuse/core':
+        specifier: 5.9.1
+        version: 5.9.1(@opentelemetry/api@1.9.0)
       '@langfuse/otel':
         specifier: 5.9.1
         version: 5.9.1(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.0))(@opentelemetry/exporter-trace-otlp-http@0.220.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.0))
@@ -117,6 +120,9 @@ importers:
       '@opentelemetry/sdk-trace-node':
         specifier: 2.9.0
         version: 2.9.0(@opentelemetry/api@1.9.0)
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       ai:
         specifier: 7.0.22
         version: 7.0.22(zod@3.25.76)
@@ -138,6 +144,15 @@ importers:
       mammoth:
         specifier: ^1.11.0
         version: 1.12.0
+      mdast-util-from-markdown:
+        specifier: ^2.0.3
+        version: 2.0.3
+      mdast-util-gfm-table:
+        specifier: ^2.0.0
+        version: 2.0.0
+      micromark-extension-gfm-table:
+        specifier: ^2.1.1
+        version: 2.1.1
       ollama-ai-provider-v2:
         specifier: 4.0.1
         version: 4.0.1(ai@7.0.22(zod@3.25.76))(zod@3.25.76)

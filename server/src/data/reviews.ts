@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import DatabaseConstructor from 'better-sqlite3';
 import { desc, eq, sql } from 'drizzle-orm';
 import type { MaraClient, MaraDatabase } from '../db/client';
 import { phaseCheckpoints, reviews } from '../db/schema';
-import { blobDir, dataDir } from '../paths';
+import { blobDir, dataDir, mastraDbPath } from '../paths';
 import { nowIso } from './db';
 import { ApiError } from './errors';
-import type { Review, ReviewDetail, ReviewOptions, ReviewSummary } from './types';
+import type { Review, ReviewDetail, ReviewOptions, ReviewSummary, RubricScoreView } from './types';
 
 const REVIEW_ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 
@@ -89,7 +90,7 @@ export function requireReview(db: MaraDatabase, id: string): Review {
 
 function findingsCount(db: MaraDatabase, reviewId: string): number {
   const row = db.all(
-    sql`SELECT count(*) AS n FROM v_current_findings WHERE review_id = ${reviewId}`,
+    sql`SELECT count(*) AS n FROM v_current_findings WHERE review_id = ${reviewId} AND scope != 'editor_only'`,
   )[0] as { n: number } | undefined;
   return row?.n ?? 0;
 }
@@ -99,6 +100,14 @@ function rubricAverage(db: MaraDatabase, reviewId: string): number | null {
     sql`SELECT avg(score) AS avg FROM rubric_scores WHERE review_id = ${reviewId} AND state = 'final'`,
   )[0] as { avg: number | null } | undefined;
   return row?.avg ?? null;
+}
+
+function rubricScores(db: MaraDatabase, reviewId: string): RubricScoreView[] {
+  const rows = db.all(
+    sql`SELECT criterion, criterion_index AS criterionIndex, score FROM rubric_scores
+        WHERE review_id = ${reviewId} AND state = 'final' ORDER BY criterion_index`,
+  ) as RubricScoreView[];
+  return rows;
 }
 
 export function listReviews(db: MaraDatabase): ReviewSummary[] {
@@ -119,7 +128,8 @@ export function listReviews(db: MaraDatabase): ReviewSummary[] {
 export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
   const review = requireReview(db, id);
   const severityRows = db.all(
-    sql`SELECT severity, count(*) AS n FROM v_current_findings WHERE review_id = ${id} GROUP BY severity`,
+    sql`SELECT severity, count(*) AS n FROM v_current_findings
+        WHERE review_id = ${id} AND scope != 'editor_only' GROUP BY severity`,
   ) as Array<{ severity: string; n: number }>;
   const severityCounts: Record<string, number> = {};
   for (const row of severityRows) {
@@ -136,7 +146,7 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
     gateVerdict: row.gateVerdict,
     fixCycleCount: row.fixCycleCount,
   }));
-  return { ...review, severityCounts, checkpoints, rubricAverage: rubricAverage(db, id) };
+  return { ...review, severityCounts, checkpoints, rubricAverage: rubricAverage(db, id), rubricScores: rubricScores(db, id) };
 }
 
 export function purgeReview(client: MaraClient, id: string): void {
@@ -156,23 +166,26 @@ export function purgeReview(client: MaraClient, id: string): void {
 
   removeReviewDirectories(id);
 
-  const tables = [
-    'manuscripts',
-    'findings',
-    'phase_checkpoints',
-    'review_events',
-    'dispatches',
-    'rubric_scores',
-    'deliverables',
-    'run_commands',
-  ];
-  for (const table of tables) {
+  for (const table of PURGE_CHILD_TABLES) {
     const row = sqlite.prepare(`SELECT count(*) AS n FROM ${table} WHERE review_id = ?`).get(id) as { n: number };
     if (row.n > 0) {
       throw new ApiError('internal', `Purge left ${row.n} rows in ${table} for review ${id}.`);
     }
   }
 }
+
+const PURGE_CHILD_TABLES = [
+  'manuscripts',
+  'findings',
+  'phase_checkpoints',
+  'review_events',
+  'dispatches',
+  'rubric_scores',
+  'deliverables',
+  'run_commands',
+  'merge_markers',
+  'voice_samples',
+];
 
 function removeReviewDirectories(id: string): void {
   assertSafeReviewId(id);
@@ -183,4 +196,97 @@ function removeReviewDirectories(id: string): void {
       throw new ApiError('internal', `Purge could not remove ${directory}. Close any open file handles and retry.`);
     }
   }
+}
+
+const ACTIVE_STATUSES = new Set(['queued', 'sanitizing', 'running']);
+
+export interface PurgeAllRoots {
+  blobsRoot: string;
+  deliverablesRoot: string;
+  mastraPath: string;
+}
+
+export interface PurgeAllResult {
+  purged: number;
+  orphansRemoved: number;
+  snapshotsCleared: number;
+}
+
+function sweepOrphans(root: string): number {
+  if (!existsSync(root)) {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of readdirSync(root)) {
+    if (!REVIEW_ID_PATTERN.test(name)) {
+      continue;
+    }
+    const directory = resolve(root, name);
+    if (!statSync(directory).isDirectory()) {
+      continue;
+    }
+    rmSync(directory, { recursive: true, force: true });
+    if (existsSync(directory)) {
+      throw new ApiError('internal', `Purge could not remove ${directory}. Close any open file handles and retry.`);
+    }
+    removed += 1;
+  }
+  return removed;
+}
+
+function clearIngestSnapshots(mastraPath: string): number {
+  if (!existsSync(mastraPath)) {
+    return 0;
+  }
+  const mastra = new DatabaseConstructor(mastraPath);
+  try {
+    mastra.pragma('busy_timeout = 5000');
+    const table = mastra
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mastra_workflow_snapshot'")
+      .get();
+    if (table === undefined) {
+      return 0;
+    }
+    const result = mastra.prepare('DELETE FROM mastra_workflow_snapshot').run();
+    return result.changes;
+  } finally {
+    mastra.close();
+  }
+}
+
+export function purgeAll(client: MaraClient, roots?: Partial<PurgeAllRoots>): PurgeAllResult {
+  const { sqlite } = client;
+
+  const deleteRows = sqlite.transaction((): string[] => {
+    const rows = sqlite.prepare('SELECT id, status FROM reviews').all() as Array<{ id: string; status: string }>;
+    const active = rows.filter((row) => ACTIVE_STATUSES.has(row.status));
+    if (active.length > 0) {
+      throw new ApiError('conflict', 'A review is still queued or running. Cancel it before deleting everything.', {
+        active: active.length,
+      });
+    }
+    sqlite.exec('CREATE TEMP TABLE IF NOT EXISTS _mara_purge (marker INTEGER)');
+    sqlite.prepare('DELETE FROM reviews').run();
+    sqlite.exec('DROP TABLE IF EXISTS _mara_purge');
+    return rows.map((row) => row.id);
+  });
+  const purgedIds = deleteRows.immediate();
+
+  const snapshotsCleared = clearIngestSnapshots(roots?.mastraPath ?? mastraDbPath());
+
+  for (const id of purgedIds) {
+    removeReviewDirectories(id);
+  }
+  const blobsRoot = roots?.blobsRoot ?? resolve(dataDir(), 'blobs');
+  const deliverablesRoot = roots?.deliverablesRoot ?? resolve(dataDir(), 'deliverables');
+  const orphansRemoved = sweepOrphans(blobsRoot) + sweepOrphans(deliverablesRoot);
+
+  for (const table of PURGE_CHILD_TABLES) {
+    const row = sqlite.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number };
+    if (row.n > 0) {
+      throw new ApiError('internal', `Purge left ${row.n} rows in ${table}.`);
+    }
+  }
+
+  return { purged: purgedIds.length, orphansRemoved, snapshotsCleared };
 }

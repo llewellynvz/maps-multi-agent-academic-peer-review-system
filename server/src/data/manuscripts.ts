@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { manuscripts } from '../db/schema';
 import { insertManuscript } from '../workflow/repo';
-import { sha256Hex, writeManuscriptBlob } from '../workflow/storage';
+import { detectUploadExtension, sha256Hex, writeManuscriptBlob } from '../workflow/storage';
 import { ApiError } from './errors';
 import { insertRunCommand } from './commands';
 import { requireReview } from './reviews';
@@ -10,10 +10,7 @@ import { requireReview } from './reviews';
 const ACCEPTED = new Set(['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
 
 function extensionFor(mimeType: string, filename: string): 'pdf' | 'docx' {
-  if (mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
-    return 'pdf';
-  }
-  return 'docx';
+  return detectUploadExtension(mimeType, filename) === 'pdf' ? 'pdf' : 'docx';
 }
 
 export interface UploadResult {

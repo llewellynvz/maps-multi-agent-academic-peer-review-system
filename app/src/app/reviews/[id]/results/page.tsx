@@ -8,7 +8,6 @@ import {
   formatBytes,
   formatDuration,
   formatUsd,
-  hasFindingIds,
   RECOMMENDATION_EXPLANATION,
   RECOMMENDATION_LABEL,
 } from '@/lib/format';
@@ -17,11 +16,13 @@ import { PageHeader } from '@/components/PageHeader';
 import { Section } from '@/components/Section';
 import { SideDrawer } from '@/components/SideDrawer';
 import { ReportMarkdown } from '@/components/ReportMarkdown';
-import { ChipReport } from '@/components/ChipReport';
 import { EvidenceIndex } from '@/components/EvidenceIndex';
 import { EvidencePanel } from '@/components/EvidencePanel';
 import { PriorPanel } from '@/components/PriorPanel';
 import { hasPriorStressTest } from '@/lib/intake';
+import { SEVERITY_INFO, type Severity } from '@/lib/lenses';
+
+const SEVERITY_ORDER: Severity[] = ['fatal', 'major', 'moderate', 'minor'];
 
 const DELIVERABLE_LABEL: Record<string, string> = {
   peer_review_report: 'Peer review report',
@@ -39,8 +40,7 @@ export default function ResultsPage(): ReactNode {
   const [notes, setNotes] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<EvidenceData | null>(null);
   const [tab, setTab] = useState<'report' | 'notes'>('report');
-  const [notesBannerSeen, setNotesBannerSeen] = useState(false);
-  const [drawerFinding, setDrawerFinding] = useState<string | null>(null);
+  const [drawerFindings, setDrawerFindings] = useState<string[] | null>(null);
   const [runStats, setRunStats] = useState<RunStats | null>(null);
 
   useEffect(() => {
@@ -73,7 +73,6 @@ export default function ResultsPage(): ReactNode {
     return map;
   }, [evidence]);
 
-  const legacy = useMemo(() => hasFindingIds(report ?? ''), [report]);
   const visibleEvidence = useMemo(
     () => (evidence?.evidenceMap ?? []).filter((entry) => (report ?? '').includes(entry.label)),
     [evidence, report],
@@ -90,6 +89,7 @@ export default function ResultsPage(): ReactNode {
     : null;
 
   const hasEvidence = visibleEvidence.length > 0;
+  const editorOnly = evidence?.editorOnly ?? [];
   const prior = evidence?.priorStressTest ?? null;
   const showPrior = hasPriorStressTest(evidence);
   let n = 2;
@@ -143,6 +143,38 @@ export default function ResultsPage(): ReactNode {
               <span className="muted">/ 5 rubric average across the fifteen review criteria</span>
             </div>
           ) : null}
+          {SEVERITY_ORDER.some((severity) => (review.severityCounts[severity] ?? 0) > 0) ? (
+            <div className="row wrap" style={{ gap: 8 }}>
+              {SEVERITY_ORDER.map((severity) => {
+                const count = review.severityCounts[severity] ?? 0;
+                if (count === 0) {
+                  return null;
+                }
+                const info = SEVERITY_INFO[severity];
+                return <Pill key={severity} tone={info.tone} label={`${count} ${info.label.toLowerCase()}`} />;
+              })}
+            </div>
+          ) : null}
+          {(review.rubricScores ?? []).length > 0 ? (
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Criterion</th>
+                    <th className="num">Score / 5</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(review.rubricScores ?? []).map((row) => (
+                    <tr key={row.criterionIndex}>
+                      <td>{row.criterion}</td>
+                      <td className="num mono">{row.score}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       </Section>
 
@@ -151,15 +183,7 @@ export default function ResultsPage(): ReactNode {
           <button className="tab" role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>
             Letter
           </button>
-          <button
-            className="tab"
-            role="tab"
-            aria-selected={tab === 'notes'}
-            onClick={() => {
-              setTab('notes');
-              setNotesBannerSeen(false);
-            }}
-          >
+          <button className="tab" role="tab" aria-selected={tab === 'notes'} onClick={() => setTab('notes')}>
             Reviewer&apos;s private notes
           </button>
         </div>
@@ -167,27 +191,50 @@ export default function ResultsPage(): ReactNode {
         {tab === 'report' ? (
           report === null ? (
             reportReleased ? <Spinner /> : <Pill tone="warn" label="The letter has not been released yet." />
-          ) : legacy ? (
-            <ChipReport text={report} onFinding={setDrawerFinding} />
           ) : (
-            <ReportMarkdown text={report} />
+            <ReportMarkdown text={report} onFinding={setDrawerFindings} />
           )
         ) : (
           <div className="stack-16">
-            {!notesBannerSeen ? (
-              <Pill tone="neutral" label="These are editorial signals, not verdicts." icon="shield" />
-            ) : null}
+            <Pill tone="neutral" label="These are editorial signals, not verdicts." icon="shield" />
             {notes === null ? (
               <Pill tone="warn" label="No private notes available." />
             ) : (
-              <ChipReport text={notes} onFinding={setDrawerFinding} />
+              <ReportMarkdown text={notes} onFinding={setDrawerFindings} />
             )}
+            {editorOnly.length > 0 ? (
+              <div className="card" style={{ borderLeft: '3px solid var(--psy-teal)' }}>
+                <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+                  <Icon name="shield" className="ico-teal" />
+                  <h3 className="h3" style={{ margin: 0 }}>Editor-only signals</h3>
+                </div>
+                <p className="sub" style={{ marginBottom: 16 }}>
+                  These findings never appear in the letter or any author-facing document. They are signals for editorial
+                  judgement, not conclusions.
+                </p>
+                <div className="stack-24">
+                  {editorOnly.map((finding) => (
+                    <EvidencePanel
+                      key={finding.id}
+                      finding={finding}
+                      fallbackId={finding.id}
+                      ledgerHref={api.deliverableUrl(id, 'ledger_export', 'md')}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </Section>
 
       {showPrior && prior !== null ? (
-        <PriorPanel number={priorNum} data={prior} findingsById={findingsById} onFinding={setDrawerFinding} />
+        <PriorPanel
+          number={priorNum}
+          data={prior}
+          findingsById={findingsById}
+          onFinding={(findingId) => setDrawerFindings([findingId])}
+        />
       ) : null}
 
       {hasEvidence ? (
@@ -195,7 +242,7 @@ export default function ResultsPage(): ReactNode {
           number={evidenceNum}
           entries={visibleEvidence}
           findingsById={findingsById}
-          onFinding={setDrawerFinding}
+          onFinding={(findingId) => setDrawerFindings([findingId])}
         />
       ) : null}
 
@@ -245,13 +292,22 @@ export default function ResultsPage(): ReactNode {
         </div>
       </Section>
 
-      <SideDrawer open={drawerFinding !== null} title="Evidence" onClose={() => setDrawerFinding(null)}>
-        {drawerFinding !== null ? (
-          <EvidencePanel
-            finding={findingsById.get(drawerFinding) ?? null}
-            fallbackId={drawerFinding}
-            ledgerHref={api.deliverableUrl(id, 'ledger_export', 'md')}
-          />
+      <SideDrawer
+        open={drawerFindings !== null}
+        title={drawerFindings !== null && drawerFindings.length > 1 ? `Evidence (${drawerFindings.length})` : 'Evidence'}
+        onClose={() => setDrawerFindings(null)}
+      >
+        {drawerFindings !== null ? (
+          <div className="stack-24">
+            {drawerFindings.map((findingId) => (
+              <EvidencePanel
+                key={findingId}
+                finding={findingsById.get(findingId) ?? null}
+                fallbackId={findingId}
+                ledgerHref={api.deliverableUrl(id, 'ledger_export', 'md')}
+              />
+            ))}
+          </div>
         ) : null}
       </SideDrawer>
     </div>

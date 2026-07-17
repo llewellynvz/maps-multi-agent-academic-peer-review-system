@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
@@ -10,7 +11,7 @@ import { writeManuscriptBlob } from '../../workflow/storage';
 import { clearPassphrase, issueToken, passphraseIsSet, setPassphrase, verifyPassphrase, verifyToken } from '../auth';
 import { openKey, sealKey } from '../crypto';
 import { submitAnswers } from '../answers';
-import { createReview, purgeReview } from '../reviews';
+import { createReview, getReviewDetail, purgeAll, purgeReview } from '../reviews';
 
 let tempDir: string;
 let client: MaraClient;
@@ -158,5 +159,104 @@ describe('guarded purge (DATA-19..21)', () => {
       code = (error as { code?: string }).code;
     }
     expect(code).toBe('bad_request');
+  });
+});
+
+describe('severityCounts scope boundary', () => {
+  it('excludes editor-only findings from the author-visible severity counts', () => {
+    const review = createReview(client.db, { title: 'Counts' });
+    const now = new Date().toISOString();
+    const insert = client.sqlite.prepare(
+      `INSERT INTO findings (id, review_id, agent, phase, type, claim, manuscript_anchor, epistemic_status,
+       confidence, confidence_band, severity, fixability, scope, created_at)
+       VALUES (?, ?, 'x', 'phase_4', 'STAT', 'c', 'p1', 'Known', 0.99, 'Green', ?, 'easy', ?, ?)`,
+    );
+    insert.run('REV-STAT-0001', review.id, 'major', 'editor_only', now);
+    insert.run('REV-STAT-0002', review.id, 'minor', 'author_facing', now);
+
+    const detail = getReviewDetail(client.db, review.id);
+    expect(detail.severityCounts.major).toBeUndefined();
+    expect(detail.severityCounts.minor).toBe(1);
+
+    purgeReview(client, review.id);
+  });
+});
+
+describe('purgeAll', () => {
+  it('purges every review, sweeps orphan directories, and clears ingest snapshots', () => {
+    const first = createReview(client.db, { title: 'First' });
+    createReview(client.db, { title: 'Second' });
+    const now = new Date().toISOString();
+    client.sqlite
+      .prepare(
+        `INSERT INTO findings (id, review_id, agent, phase, type, claim, manuscript_anchor, epistemic_status,
+         confidence, confidence_band, severity, fixability, scope, created_at)
+         VALUES ('REV-STAT-0001', ?, 'x', 'phase_3', 't', 'c', 'p1', 'Known', 0.9, 'Yellow', 'minor', 'easy', 'author_facing', ?)`,
+      )
+      .run(first.id, now);
+    client.sqlite
+      .prepare('INSERT INTO review_events (id, review_id, seq, ts, kind, payload_json) VALUES (?, ?, 1, ?, ?, ?)')
+      .run(randomUUID(), first.id, now, 'phase_transition', '{}');
+    client.sqlite
+      .prepare('INSERT INTO merge_markers (id, review_id, marker, created_at) VALUES (?, ?, ?, ?)')
+      .run(randomUUID(), first.id, 'p4-stats-deterministic', now);
+
+    const blobsRoot = join(tempDir, 'blobs');
+    const deliverablesRoot = join(tempDir, 'deliverables');
+    mkdirSync(join(blobsRoot, 'orphan-review-id'), { recursive: true });
+    mkdirSync(join(deliverablesRoot, 'another-orphan'), { recursive: true });
+    mkdirSync(join(blobsRoot, 'not_a.review.id'), { recursive: true });
+
+    const mastraPath = join(tempDir, 'mastra.db');
+    const mastra = new Database(mastraPath);
+    mastra.exec('CREATE TABLE mastra_workflow_snapshot (workflow_name TEXT, run_id TEXT, snapshot TEXT)');
+    mastra.prepare('INSERT INTO mastra_workflow_snapshot VALUES (?, ?, ?)').run('ingest', 'run-1', '{}');
+    mastra.close();
+
+    const result = purgeAll(client, { blobsRoot, deliverablesRoot, mastraPath });
+
+    expect(result.purged).toBe(2);
+    expect(result.orphansRemoved).toBe(2);
+    expect(result.snapshotsCleared).toBe(1);
+    const rows = client.sqlite.prepare('SELECT count(*) AS n FROM reviews').get() as { n: number };
+    expect(rows.n).toBe(0);
+    for (const table of ['findings', 'review_events', 'merge_markers']) {
+      const child = client.sqlite.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number };
+      expect(child.n).toBe(0);
+    }
+    expect(existsSync(join(blobsRoot, 'orphan-review-id'))).toBe(false);
+    expect(existsSync(join(deliverablesRoot, 'another-orphan'))).toBe(false);
+    expect(existsSync(join(blobsRoot, 'not_a.review.id'))).toBe(true);
+
+    const reopened = new Database(mastraPath, { readonly: true });
+    const snapshots = reopened.prepare('SELECT count(*) AS n FROM mastra_workflow_snapshot').get() as { n: number };
+    reopened.close();
+    expect(snapshots.n).toBe(0);
+  });
+
+  it('refuses while any review is queued, sanitizing, or running, leaving ingest snapshots intact', () => {
+    const review = createReview(client.db, { title: 'Active' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'running' WHERE id = ?").run(review.id);
+
+    const mastraPath = join(tempDir, 'mastra.db');
+    const mastra = new Database(mastraPath);
+    mastra.exec('CREATE TABLE mastra_workflow_snapshot (workflow_name TEXT, run_id TEXT, snapshot TEXT)');
+    mastra.prepare('INSERT INTO mastra_workflow_snapshot VALUES (?, ?, ?)').run('ingest', 'run-live', '{}');
+    mastra.close();
+
+    let code: string | undefined;
+    try {
+      purgeAll(client, { blobsRoot: join(tempDir, 'blobs'), deliverablesRoot: join(tempDir, 'deliverables'), mastraPath });
+    } catch (error) {
+      code = (error as { code?: string }).code;
+    }
+    expect(code).toBe('conflict');
+    const rows = client.sqlite.prepare('SELECT count(*) AS n FROM reviews').get() as { n: number };
+    expect(rows.n).toBe(1);
+
+    const reopened = new Database(mastraPath, { readonly: true });
+    const snapshots = reopened.prepare('SELECT count(*) AS n FROM mastra_workflow_snapshot').get() as { n: number };
+    reopened.close();
+    expect(snapshots.n).toBe(1);
   });
 });

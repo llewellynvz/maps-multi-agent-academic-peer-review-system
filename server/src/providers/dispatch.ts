@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { isSpanContextValid, trace } from '@opentelemetry/api';
 import { generateObject, generateText, type LanguageModel, type ModelMessage } from 'ai';
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { MaraDatabase } from '../db/client';
 import { dispatches } from '../db/schema';
 import { readSetting } from '../data/settings-store';
+import { activeTraceId as sharedActiveTraceId } from '../tracing/hierarchy';
 import { estimateCostUsd, hasPricing } from './pricing';
 import type { Registry } from './registry';
 import type { DispatchProvider, ModelRef, Role } from './types';
@@ -84,6 +84,7 @@ export interface DispatchRunnerOptions {
   generate?: GenerateApi;
   now?: () => number;
   activeTraceId?: () => string | null;
+  contentCaptureAllowed?: boolean;
 }
 
 export type DispatchRunner = (input: DispatchInput) => Promise<DispatchResult>;
@@ -93,15 +94,6 @@ const defaultGenerate: GenerateApi = {
   generateObject: (options) =>
     generateObject(options as Parameters<typeof generateObject>[0]) as Promise<{ object: unknown; usage: unknown }>,
 };
-
-function defaultActiveTraceId(): string | null {
-  const span = trace.getActiveSpan();
-  if (span === undefined) {
-    return null;
-  }
-  const spanContext = span.spanContext();
-  return isSpanContextValid(spanContext) ? spanContext.traceId : null;
-}
 
 function extractTokens(usage: unknown): DispatchTokens {
   const raw = (usage ?? {}) as RawUsage;
@@ -133,7 +125,7 @@ function resolveModelRef(registry: Registry, input: DispatchInput): ModelRef {
 export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRunner {
   const generate = options.generate ?? defaultGenerate;
   const now = options.now ?? Date.now;
-  const activeTraceId = options.activeTraceId ?? defaultActiveTraceId;
+  const activeTraceId = options.activeTraceId ?? sharedActiveTraceId;
   const { db } = options;
   const unpricedWarned = new Set<string>();
 
@@ -157,7 +149,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
         inputTokens: row.tokensIn,
         outputTokens: row.tokensOut,
         cachedTokens: row.tokensCached,
-        reasoningTokens: 0,
+        reasoningTokens: row.tokensReasoning,
       },
       latencyMs: row.latencyMs,
       langfuseTraceId: row.langfuseTraceId,
@@ -198,6 +190,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
         tokensIn: tokens.inputTokens,
         tokensOut: tokens.outputTokens,
         tokensCached: tokens.cachedTokens,
+        tokensReasoning: tokens.reasoningTokens,
         latencyMs,
         costUsd: estimateCostUsd(modelRef.model, tokens),
         retries: 0,
@@ -219,7 +212,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
       }
     }
 
-    const recordContent = readSetting<boolean>(db, 'telemetry') === true;
+    const recordContent = options.contentCaptureAllowed === true && readSetting<boolean>(db, 'langfuse_content') === true;
     const callOptions: GenerateCallOptions = {
       model: modelRef.languageModel,
       maxRetries: input.maxRetries ?? 2,

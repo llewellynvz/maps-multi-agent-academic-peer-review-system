@@ -5,6 +5,7 @@ export interface GrobidClientOptions {
 }
 
 export interface GrobidClient {
+  readonly baseUrl: string;
   isAlive: () => Promise<boolean>;
   processFulltext: (pdf: Uint8Array) => Promise<string>;
 }
@@ -53,5 +54,5 @@ export function createGrobidClient(options: GrobidClientOptions): GrobidClient {
     }
   };
 
-  return { isAlive, processFulltext };
+  return { baseUrl, isAlive, processFulltext };
 }

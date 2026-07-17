@@ -1,3 +1,5 @@
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { LangfuseSpanProcessor } from '@langfuse/otel';
 import { LangfuseVercelAiSdkIntegration } from '@langfuse/vercel-ai-sdk';
 import { setGlobalErrorHandler } from '@opentelemetry/core';
@@ -32,6 +34,44 @@ const disabledHandle: TracingHandle = {
 
 let active: { provider: NodeTracerProvider; handle: TracingHandle } | null = null;
 let integrationRegistered = false;
+
+function addressIsLoopback(address: string): boolean {
+  const family = isIP(address);
+  if (family === 4) {
+    return address.startsWith('127.');
+  }
+  if (family === 6) {
+    return address === '::1' || address === '0:0:0:0:0:0:0:1';
+  }
+  return false;
+}
+
+export async function isLoopbackHost(host: string): Promise<boolean> {
+  let hostname: string;
+  try {
+    hostname = new URL(host).hostname;
+  } catch {
+    return false;
+  }
+  const literal = hostname.replace(/^\[|\]$/g, '');
+  if (isIP(literal) !== 0) {
+    return addressIsLoopback(literal);
+  }
+  try {
+    const resolved = await lookup(hostname, { all: true });
+    return resolved.length > 0 && resolved.every((entry) => addressIsLoopback(entry.address));
+  } catch {
+    return false;
+  }
+}
+
+export async function contentCaptureAllowed(env: EnvSource): Promise<boolean> {
+  const host = getEnv(env, 'LANGFUSE_HOST');
+  if (host === undefined) {
+    return false;
+  }
+  return isLoopbackHost(host);
+}
 
 export function readLangfuseConfig(env: EnvSource): LangfuseConfig | null {
   const publicKey = getEnv(env, 'LANGFUSE_PUBLIC_KEY');

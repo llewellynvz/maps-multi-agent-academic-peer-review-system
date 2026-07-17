@@ -44,7 +44,7 @@ Both are anonymous: signed "The Reviewer", no reviewer identity anywhere, unless
 8. `# 6. What would change my recommendation`: a numbered minimum-revision package, each item naming the category the outcome could advance to.
 9. `# 7. Closing`: the decision-hinge consolidation per knowledge/04, then `# References` (APA 7).
 
-The recommendation taxonomy and confidence come from knowledge/03 and the meta-synthesis. The developmental stance and banned-phrasing rules (knowledge/04) and the writing craft, humanize pass, and natural-language register (knowledge/06) bind every sentence (no em dashes, no prose semicolons, South African English, first person, anonymous). The shipped report body carries no finding ids: grounding travels in the structured evidence map returned alongside the body, one entry per 4A point and 4B subsection, each entry naming the section, the unit's heading or bold label verbatim (copied from the body, not paraphrased), the manuscript anchor, and the supporting finding ids. The gate derives the cited-id union from the map and deterministically repairs trivial label near-misses (punctuation variants, a trailing full stop, a label carried by the section heading); a label it cannot bind to the body routes back as a fix cycle. The narrative target for the shipped report is 2500 to 4000 words excluding the rubric table and references, enforced by the final critic.
+The recommendation taxonomy and confidence come from knowledge/03 and the meta-synthesis. The developmental stance and banned-phrasing rules (knowledge/04) and the writing craft, humanize pass, and natural-language register (knowledge/06) bind every sentence (no em dashes, no prose semicolons, South African English, first person, anonymous). The shipped report body carries no finding ids: grounding travels in the structured evidence map returned alongside the body, one entry per 4A point and 4B subsection, each entry naming the section, the unit's heading or bold label verbatim (copied from the body, not paraphrased), the manuscript anchor, and the supporting finding ids. The gate derives the cited-id union from the map and deterministically repairs trivial label near-misses (punctuation variants, a trailing full stop, a label carried by the section heading); a label it cannot bind to the body routes back as a fix cycle. The narrative target for the shipped report is 4000 to 6000 words excluding the rubric table and references, enforced deterministically at the release gate and by the final critic.
 
 **Production and verification:** the platform generator renders both documents at Phase 8 from the shipped envelope and the private notes, and the release gate has already validated the content by then. Agents never produce or verify docx files. What agents control is the markdown: GFM only, no raw HTML, literal hierarchical numbering in headings, tables well-formed, and the writing-craft rules applied, so the generator renders cleanly.
 
@@ -126,7 +126,7 @@ rebuilding, confirm resubmission is welcome with a point-by-point response.>
 
 ## TEMPLATE 2: Shipped peer-review report (the mode B body, produced as output/author-letter.docx)
 
-Author-facing. Written in full compliance with the developmental voice spec in knowledge/04. Target 2500 to 4000 words of narrative, excluding the rubric table and references. Omits everything in the report's Section 8 and any integrity signal.
+Author-facing. Written in full compliance with the developmental voice spec in knowledge/04. Target 4000 to 6000 words of narrative, excluding the rubric table and references. Omits everything in the report's Section 8 and any integrity signal.
 
 ```markdown
 # Review of <manuscript short title>: feedback to the authors
@@ -342,7 +342,7 @@ The mechanical and completeness gate before production. Every unchecked box is a
 - [ ] Reads in ninety seconds as the editor: decision, anchor concerns, and fixes findable at a glance.
 
 ## Word count
-- [ ] Shipped report narrative is 2500 to 4000 words excluding the rubric table and
+- [ ] Shipped report narrative is 4000 to 6000 words excluding the rubric table and
       references. The final critic enforces the band. The internal report has no cap.
 ```
 

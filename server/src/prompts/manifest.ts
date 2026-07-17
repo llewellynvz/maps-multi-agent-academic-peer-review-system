@@ -11,6 +11,7 @@ export const manifestSchema = z.object({
   phase: z.array(z.number().int()),
   role: z.union([roleValueSchema, z.record(z.string(), roleValueSchema)]),
   knowledge: z.array(z.string()),
+  exemplars: z.boolean().optional(),
   modes: z.array(z.string()).optional(),
   lenses: z.array(z.string()).optional(),
 });

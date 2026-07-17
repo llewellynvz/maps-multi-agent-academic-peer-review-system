@@ -6,6 +6,7 @@ import { COST_CEILING_SETTING_KEY, positiveUsd, readSetting, writeSetting } from
 
 export interface PublicSettings {
   telemetry: boolean;
+  langfuseContent: boolean;
   presetDefault: string;
   providerProfile: string;
   costCeilingUsd: number | null;
@@ -16,6 +17,7 @@ export interface PublicSettings {
 export function getSettings(db: MaraDatabase): PublicSettings {
   return {
     telemetry: readSetting<boolean>(db, 'telemetry') === true,
+    langfuseContent: readSetting<boolean>(db, 'langfuse_content') === true,
     presetDefault: readSetting<string>(db, 'preset_default') ?? 'balanced',
     providerProfile: readSetting<string>(db, 'provider_profile') ?? 'default',
     costCeilingUsd: positiveUsd(readSetting<unknown>(db, COST_CEILING_SETTING_KEY)) ?? null,
@@ -26,6 +28,7 @@ export function getSettings(db: MaraDatabase): PublicSettings {
 
 export interface SettingsPatch {
   telemetry?: boolean;
+  langfuseContent?: boolean;
   presetDefault?: string;
   providerProfile?: string;
   costCeilingUsd?: number | null;
@@ -38,6 +41,12 @@ export function putSettings(db: MaraDatabase, patch: SettingsPatch): PublicSetti
       throw new ApiError('unprocessable', 'telemetry must be a boolean.', { field: 'telemetry' });
     }
     writeSetting(db, 'telemetry', patch.telemetry);
+  }
+  if (patch.langfuseContent !== undefined) {
+    if (typeof patch.langfuseContent !== 'boolean') {
+      throw new ApiError('unprocessable', 'langfuseContent must be a boolean.', { field: 'langfuseContent' });
+    }
+    writeSetting(db, 'langfuse_content', patch.langfuseContent);
   }
   if (patch.presetDefault !== undefined) {
     if (!['fast', 'balanced', 'thorough'].includes(patch.presetDefault)) {

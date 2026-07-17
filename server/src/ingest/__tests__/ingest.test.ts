@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Document, HeadingLevel, Packer, Paragraph } from 'docx';
 import { describe, expect, it, vi } from 'vitest';
 import { assembleSectionMap } from '../assemble';
 import { docxSectionMap } from '../docx';
-import { ingestManuscript } from '../index';
+import { ingestManuscript, ParseHaltError } from '../index';
 import { sectionMapFromPlainText } from '../plaintext';
 import { parseTei } from '../tei';
 
@@ -54,6 +55,35 @@ describe('docxSectionMap', () => {
     expect(map.title).toMatch(/Digital Wellbeing/);
     expect(map.abstract).toMatch(/mobile wellbeing intervention/);
     expect(map.sections.map((section) => section.heading)).toContain('Methods');
+  });
+
+  it('extracts the references section instead of dropping it', async () => {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: 'A Trial of Compassion Training', heading: HeadingLevel.TITLE }),
+            new Paragraph({ text: 'Introduction', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Compassion interventions improve wellbeing.'),
+            new Paragraph({ text: 'References', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Neff, K. D. (2003). Self-compassion. Self and Identity, 2(2), 85-101. https://doi.org/10.1080/15298860309032'),
+            new Paragraph('Gilbert, P. (2014). The origins of compassion. British Journal of Clinical Psychology, 53(1), 6-41.'),
+            new Paragraph({ text: 'Appendix A', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Supplementary measures are listed here.'),
+          ],
+        },
+      ],
+    });
+    const bytes = new Uint8Array(await Packer.toBuffer(doc));
+    const map = await docxSectionMap(bytes);
+
+    expect(map.references.length).toBe(2);
+    expect(map.references[0]?.doi).toBe('10.1080/15298860309032');
+    expect(map.references[1]?.year).toBe(2014);
+    const headings = map.sections.map((section) => section.heading);
+    expect(headings).toContain('Appendix A');
+    expect(headings).not.toContain('References');
+    expect(map.sections.some((section) => section.text.includes('Neff'))).toBe(false);
   });
 });
 
@@ -121,11 +151,49 @@ describe('ingestManuscript', () => {
     expect(persistTei).toHaveBeenCalledOnce();
   });
 
-  it('falls back to unpdf with a degraded flag and recorded reason when GROBID errors', async () => {
+  it('hard-halts a PDF when GROBID errors and fallback is not allowed', async () => {
+    await expect(
+      ingestManuscript(
+        { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
+        {
+          grobidExtract: async () => {
+            throw new Error('GROBID returned HTTP 503');
+          },
+        },
+      ),
+    ).rejects.toThrow(ParseHaltError);
+  });
+
+  it('names the real cause when it hard-halts a PDF', async () => {
+    let caught: unknown;
+    try {
+      await ingestManuscript(
+        { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
+        {
+          grobidExtract: async () => {
+            throw new Error('GROBID returned HTTP 503');
+          },
+        },
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ParseHaltError);
+    expect((caught as ParseHaltError).reason).toBe('GROBID returned HTTP 503');
+  });
+
+  it('hard-halts a PDF when no GROBID extractor is configured', async () => {
+    await expect(
+      ingestManuscript({ bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' }, {}),
+    ).rejects.toThrow(ParseHaltError);
+  });
+
+  it('still falls back to unpdf with a degraded flag when fallback is explicitly allowed', async () => {
     const decisions: string[] = [];
     const result = await ingestManuscript(
       { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
       {
+        allowPdfFallback: true,
         grobidExtract: async () => {
           throw new Error('GROBID returned HTTP 503');
         },
@@ -143,13 +211,9 @@ describe('ingestManuscript', () => {
     expect(decisions).toEqual(['unpdf']);
   });
 
-  it('falls back to unpdf when no GROBID extractor is configured', async () => {
-    const result = await ingestManuscript(
-      { bytes: new TextEncoder().encode('%PDF-1.4 fake'), kind: 'pdf' },
-      { pdfTextExtract: async () => ['Title', '', 'Body without grobid.'].join('\n') },
-    );
-
-    expect(result.decision.parser).toBe('unpdf');
-    expect(result.decision.fallbackReason).toMatch(/not configured/);
+  it('leaves DOCX unaffected by the PDF hard-halt policy', async () => {
+    const result = await ingestManuscript({ bytes: docxBytes, kind: 'docx' }, {});
+    expect(result.decision.parser).toBe('mammoth');
+    expect(result.decision.parseQuality).toBe('good');
   });
 });

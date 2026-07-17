@@ -1,5 +1,16 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { assemble, buildStaticFrame, CONSTITUTION_FRAME, readManifest, readPrompt } from '../index';
+import {
+  assemble,
+  buildStaticFrame,
+  CONSTITUTION_FRAME,
+  exemplarFrame,
+  readExemplarsFrom,
+  readManifest,
+  readPrompt,
+} from '../index';
 import { readKnowledgeModules } from '../knowledge';
 
 describe('prompt assembler', () => {
@@ -75,5 +86,52 @@ describe('prompt assembler', () => {
   it('shares a prefix longer than 1024 tokens so hosted prompt caching hits', () => {
     const frame = buildStaticFrame('specialist-reviewer');
     expect(frame.length / 4).toBeGreaterThan(1024);
+  });
+});
+
+describe('voice exemplar corpus', () => {
+  it('reads the letters in a corpus directory, sorted, skipping the README and empty files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mara-exemplars-'));
+    try {
+      writeFileSync(join(dir, 'b-second.md'), 'SECOND_LETTER');
+      writeFileSync(join(dir, 'a-first.md'), 'FIRST_LETTER');
+      writeFileSync(join(dir, 'README.md'), 'INSTRUCTIONS_NOT_A_LETTER');
+      writeFileSync(join(dir, 'notes.txt'), 'NOT_MARKDOWN');
+      writeFileSync(join(dir, 'empty.md'), '   \n');
+      expect(readExemplarsFrom(dir)).toEqual(['FIRST_LETTER', 'SECOND_LETTER']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('degrades to the default voice when the corpus directory is absent', () => {
+    expect(readExemplarsFrom(join(tmpdir(), 'mara-exemplars-absent-by-design'))).toEqual([]);
+  });
+
+  it('frames the letters in order and forbids carrying their content across manuscripts', () => {
+    const framed = exemplarFrame(['LETTER_ALPHA', 'LETTER_BETA']);
+    expect(framed).toHaveLength(1);
+    const block = framed[0] ?? '';
+    expect(block).toContain('LETTER_ALPHA');
+    expect(block).toContain('LETTER_BETA');
+    expect(block.indexOf('LETTER_ALPHA')).toBeLessThan(block.indexOf('LETTER_BETA'));
+    expect(block).toContain('## Voice exemplars');
+    expect(block).toContain('Never carry over their content');
+  });
+
+  it('adds nothing to the frame when no letters are supplied', () => {
+    expect(exemplarFrame([])).toEqual([]);
+  });
+
+  it('opts the report writer in, and assembles its frame whether or not letters are present', () => {
+    expect(readManifest('review-report-writer').exemplars).toBe(true);
+    const frame = buildStaticFrame('review-report-writer');
+    expect(frame).toContain(readPrompt('review-report-writer'));
+    expect(frame).toContain(CONSTITUTION_FRAME);
+  });
+
+  it('leaves agents that never write author-facing prose out of the corpus', () => {
+    expect(readManifest('specialist-reviewer').exemplars).toBeUndefined();
+    expect(buildStaticFrame('specialist-reviewer')).not.toContain('## Voice exemplars');
   });
 });

@@ -40,10 +40,17 @@ export interface PhaseCheckpointView {
   fixCycleCount: number;
 }
 
+export interface RubricScoreView {
+  criterion: string;
+  criterionIndex: number;
+  score: number;
+}
+
 export interface ReviewDetail extends Review {
   severityCounts: Record<string, number>;
   checkpoints: PhaseCheckpointView[];
   rubricAverage: number | null;
+  rubricScores: RubricScoreView[];
 }
 
 export interface ReviewOptions {
