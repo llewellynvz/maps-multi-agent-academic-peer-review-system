@@ -2,9 +2,19 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fixturesDir, repoRoot } from '../src/paths';
 import { artefactExists, readArtefact } from '../src/engine/artefacts';
-import { labelAppearsInBody, scanMachineTokens } from '../src/engine/grounding';
+import {
+  humanizePairFailures,
+  labelAppearsInBody,
+  narrativeWordCount,
+  NARRATIVE_WORD_BAND,
+  scanMachineTokens,
+} from '../src/engine/grounding';
 
 const BASE = `http://127.0.0.1:${process.env.MARA_PORT ?? '3500'}`;
+const VOICE_SAMPLES = (process.env.I1_VOICE ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter((entry) => entry.length > 0);
 const PRESET = process.env.I1_PRESET ?? 'balanced';
 const USER_PRIOR = process.env.I1_PRIOR ?? 'accept';
 const REVIEW_TITLE = process.env.I1_TITLE ?? 'Workplace ACT and Wellbeing: A Full Review';
@@ -61,6 +71,21 @@ async function main(): Promise<void> {
   const created = await api<{ id: string }>('POST', '/api/reviews', { title: `I1 ${PRESET} verification` });
   const reviewId = created.json.id;
   check('create', created.status === 200 || created.status === 201, `review ${reviewId}`);
+
+  for (const [index, path] of VOICE_SAMPLES.entries()) {
+    const sampleBytes = readFileSync(path);
+    const sampleForm = new FormData();
+    const name = path.split(/[\\/]/).pop() ?? `voice-${index + 1}.pdf`;
+    const mimeType = name.toLowerCase().endsWith('.pdf')
+      ? 'application/pdf'
+      : name.toLowerCase().endsWith('.docx')
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'text/plain';
+    sampleForm.append('file', new Blob([sampleBytes], { type: mimeType }), name);
+    const voiceRes = await fetch(`${BASE}/api/reviews/${reviewId}/voice`, { method: 'POST', body: sampleForm });
+    const voiceBody = await voiceRes.text();
+    check(`voiceUpload.${index + 1}`, voiceRes.status === 201, `HTTP ${voiceRes.status} ${voiceBody.slice(0, 120)}`);
+  }
 
   const bytes = readFileSync(PDF_FIXTURE);
   const form = new FormData();
@@ -158,12 +183,12 @@ async function watchAndVerify(reviewId: string): Promise<void> {
   check('idFreeProse', inlineIds.length === 0, inlineIds.length === 0 ? 'zero REV tokens' : inlineIds.slice(0, 5).join(','));
   const tokens = scanMachineTokens(body);
   check('machineTokens', tokens.length === 0, tokens.length === 0 ? 'clean' : tokens.slice(0, 5).join(';'));
-  const narrative = body
-    .replace(/# 5\. Rubric scores[\s\S]*?(?=# 6\.)/, '')
-    .replace(/# References[\s\S]*/, '')
-    .replace(/\|[^\n]*\|/g, '');
-  const words = narrative.split(/\s+/).filter(Boolean).length;
-  check('wordBudget', words >= 4000 && words <= 6000, `${words} narrative words (band 4000-6000, gate-enforced)`);
+  const words = narrativeWordCount(body);
+  check(
+    'wordBudget',
+    words >= NARRATIVE_WORD_BAND.min && words <= NARRATIVE_WORD_BAND.max,
+    `${words} narrative words (band ${NARRATIVE_WORD_BAND.min}-${NARRATIVE_WORD_BAND.max}, gate-enforced)`,
+  );
   check('fourA', body.includes('4A'), body.includes('4A') ? '4A present' : 'missing 4A');
   check('fourB', body.includes('4B'), body.includes('4B') ? '4B present' : 'missing 4B');
   check('discussion', /###?\s*.*Discussion/i.test(body), 'Discussion subsection');
@@ -171,7 +196,26 @@ async function watchAndVerify(reviewId: string): Promise<void> {
   const labelsOk = shipped.evidenceMap.every((e) => labelAppearsInBody(body, e.label));
   check('mapLabels', labelsOk, labelsOk ? 'every label present as bold or heading' : 'label missing from body');
   check('humanizePairs', shipped.humanizePairs.length >= 3, `${shipped.humanizePairs.length} pairs`);
+  const pairFailures = humanizePairFailures(body, shipped.humanizePairs);
+  check(
+    'humanizePairsVerbatim',
+    pairFailures.length === 0,
+    pairFailures.length === 0
+      ? `all ${shipped.humanizePairs.length} pairs verified against the shipped body`
+      : `${pairFailures.length}/${shipped.humanizePairs.length} unproven: ${pairFailures.slice(0, 2).join(' | ')}`,
+  );
   check('references', shipped.references.length > 0, `${shipped.references.length} references`);
+
+  if (VOICE_SAMPLES.length > 0) {
+    check('voiceProfile', artefactExists(reviewId, 'voice-profile'), 'voice-profile artefact derived');
+    if (artefactExists(reviewId, 'voice-profile')) {
+      const profile = readArtefact<Record<string, unknown>>(reviewId, 'voice-profile');
+      const serialised = JSON.stringify(profile);
+      const leaks = serialised.match(/\b(?:p\s*[<>=]+\s*\.?\d|n\s*=\s*\d|\d+\s*%|(?:19|20)\d{2})\b/gi) ?? [];
+      check('voiceProfileScrub', leaks.length === 0, leaks.length === 0 ? 'no statistical residue' : leaks.slice(0, 5).join(','));
+      writeFileSync(resolve(OUT_DIR, 'voice-profile.json'), JSON.stringify(profile, null, 2));
+    }
+  }
 
   if (artefactExists(reviewId, 'p2-context')) {
     const dossier = readArtefact<{ keyPapers?: Array<{ citation: string }> }>(reviewId, 'p2-context');
