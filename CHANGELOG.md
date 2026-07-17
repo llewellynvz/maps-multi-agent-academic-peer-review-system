@@ -4,6 +4,35 @@ All notable changes to Collegia are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-17
+
+### Added
+- Reported statistics are recomputed deterministically during integrity
+  screening. APA-style t, F, r, chi-square, and z results are re-derived from
+  their test statistic and degrees of freedom, an inconsistent p value becomes a
+  ledger signal, and a result whose recomputed p crosses the .05 boundary
+  becomes an editor-only signal. Reported means are also checked for
+  whole-number plausibility at the stated sample size. The pass is pure
+  arithmetic on the full manuscript text and costs nothing to run.
+- A delete-all control in settings that removes every review, its files, and
+  stale ingest snapshots behind a stronger typed confirmation, and sweeps
+  directories left behind by earlier deletions. Cached citation lookups are
+  kept.
+- The results page now shows the full 15-criterion rubric table, a severity
+  breakdown, and a clearly banded editor-only signals panel on the private
+  notes tab. Editor-only findings still never enter the letter or any exported
+  document.
+- Reviews can be cancelled and deleted directly from the library cards.
+- DOCX manuscripts now receive the full reference audit: the reference list is
+  extracted from the document instead of being discarded.
+- The thorough preset reads twice as much manuscript text per agent, so long
+  papers lose less context exactly when depth was requested.
+- A corpus staging script and dataset survey for the planned rating-calibration
+  fine-tune, drawing on openly licensed peer-review corpora.
+
+### Fixed
+- The upload copy now states the true 50 MB limit.
+
 ## [1.2.0] - 2026-07-17
 
 ### Added

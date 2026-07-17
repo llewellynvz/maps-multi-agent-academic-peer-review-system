@@ -74,7 +74,7 @@ flowchart TD
     P1[Phase 1 Structured analysis<br/>manuscript-analyst]
     P2[Phase 2 Field context and citations<br/>field-context-scout and citation-auditor]
     P3[Phase 3 Specialist review and challenge<br/>specialist-reviewer per active lens]
-    P4[Phase 4 Integrity screen<br/>integrity-screener and ai-content-analyst]
+    P4[Phase 4 Integrity screen<br/>deterministic stats verifier, integrity-screener, ai-content-analyst]
     P5[Phase 5 Swarm stress-test<br/>swarm-simulator]
     P6[Phase 6 Internal report<br/>review-report-writer]
     P8[Phase 8 Deliverables<br/>quality-metrics, journal-scope, calibrator]
