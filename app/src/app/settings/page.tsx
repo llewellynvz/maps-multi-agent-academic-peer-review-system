@@ -16,6 +16,8 @@ export default function SettingsPage(): ReactNode {
   const [toast, setToast] = useState<string | null>(null);
   const [dangerReview, setDangerReview] = useState<ReviewSummary | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [dangerAll, setDangerAll] = useState(false);
+  const [confirmAllText, setConfirmAllText] = useState('');
 
   const load = async (): Promise<void> => {
     setSettings(await api.getSettings().catch(() => null));
@@ -60,6 +62,18 @@ export default function SettingsPage(): ReactNode {
     setDangerReview(null);
     setConfirmText('');
     flash('Review deleted');
+    await load();
+  };
+
+  const purgeEverything = async (): Promise<void> => {
+    try {
+      const result = await api.deleteAllReviews();
+      setDangerAll(false);
+      setConfirmAllText('');
+      flash(`Deleted ${result.purged} review${result.purged === 1 ? '' : 's'}`);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not delete all reviews');
+    }
     await load();
   };
 
@@ -160,6 +174,13 @@ export default function SettingsPage(): ReactNode {
             </tbody>
           </table>
         </div>
+        {reviews.length > 0 ? (
+          <div style={{ marginTop: 16 }}>
+            <button className="btn btn-danger" onClick={() => setDangerAll(true)}>
+              <Icon name="trash" /> Delete all reviews
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <SideDrawer open={dangerReview !== null} title="Confirm deletion" onClose={() => { setDangerReview(null); setConfirmText(''); }}>
@@ -169,6 +190,15 @@ export default function SettingsPage(): ReactNode {
           <input value={confirmText} onChange={(event) => setConfirmText(event.target.value)} />
         </div>
         <button className="btn btn-danger" onClick={purge} disabled={confirmText !== 'delete'}><Icon name="trash" /> Delete review</button>
+      </SideDrawer>
+
+      <SideDrawer open={dangerAll} title="Delete every review" onClose={() => { setDangerAll(false); setConfirmAllText(''); }}>
+        <p className="sub" style={{ marginBottom: 16 }}>This permanently removes <strong>all {reviews.length} review{reviews.length === 1 ? '' : 's'}</strong>, every manuscript, finding, and deliverable on disk. Cached citation lookups are kept. This cannot be undone. Type <span className="mono">delete everything</span> to confirm.</p>
+        <div className="field">
+          <label>Confirmation</label>
+          <input value={confirmAllText} onChange={(event) => setConfirmAllText(event.target.value)} />
+        </div>
+        <button className="btn btn-danger" onClick={() => void purgeEverything()} disabled={confirmAllText !== 'delete everything'}><Icon name="trash" /> Delete all reviews</button>
       </SideDrawer>
 
       {toast !== null ? <div className="toast-wrap"><div className="toast toast-info"><Icon name="check" /> {toast}</div></div> : null}

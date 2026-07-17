@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+import DatabaseConstructor from 'better-sqlite3';
 import { desc, eq, sql } from 'drizzle-orm';
 import type { MaraClient, MaraDatabase } from '../db/client';
 import { phaseCheckpoints, reviews } from '../db/schema';
-import { blobDir, dataDir } from '../paths';
+import { blobDir, dataDir, mastraDbPath } from '../paths';
 import { nowIso } from './db';
 import { ApiError } from './errors';
 import type { Review, ReviewDetail, ReviewOptions, ReviewSummary } from './types';
@@ -183,4 +184,80 @@ function removeReviewDirectories(id: string): void {
       throw new ApiError('internal', `Purge could not remove ${directory}. Close any open file handles and retry.`);
     }
   }
+}
+
+const ACTIVE_STATUSES = new Set(['queued', 'sanitizing', 'running']);
+
+export interface PurgeAllRoots {
+  blobsRoot: string;
+  deliverablesRoot: string;
+  mastraPath: string;
+}
+
+export interface PurgeAllResult {
+  purged: number;
+  orphansRemoved: number;
+  snapshotsCleared: number;
+}
+
+function sweepOrphans(root: string, keep: Set<string>): number {
+  if (!existsSync(root)) {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of readdirSync(root)) {
+    if (keep.has(name) || !REVIEW_ID_PATTERN.test(name)) {
+      continue;
+    }
+    const directory = resolve(root, name);
+    rmSync(directory, { recursive: true, force: true });
+    if (existsSync(directory)) {
+      throw new ApiError('internal', `Purge could not remove ${directory}. Close any open file handles and retry.`);
+    }
+    removed += 1;
+  }
+  return removed;
+}
+
+function clearIngestSnapshots(mastraPath: string): number {
+  if (!existsSync(mastraPath)) {
+    return 0;
+  }
+  const mastra = new DatabaseConstructor(mastraPath);
+  try {
+    mastra.pragma('busy_timeout = 5000');
+    const table = mastra
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mastra_workflow_snapshot'")
+      .get();
+    if (table === undefined) {
+      return 0;
+    }
+    const result = mastra.prepare('DELETE FROM mastra_workflow_snapshot').run();
+    return result.changes;
+  } finally {
+    mastra.close();
+  }
+}
+
+export function purgeAll(client: MaraClient, roots?: Partial<PurgeAllRoots>): PurgeAllResult {
+  const { db } = client;
+  const rows = db.select({ id: reviews.id, status: reviews.status }).from(reviews).all();
+  const active = rows.filter((row) => ACTIVE_STATUSES.has(row.status));
+  if (active.length > 0) {
+    throw new ApiError('conflict', 'A review is still queued or running. Cancel it before deleting everything.', {
+      active: active.length,
+    });
+  }
+
+  for (const row of rows) {
+    purgeReview(client, row.id);
+  }
+
+  const keep = new Set<string>();
+  const blobsRoot = roots?.blobsRoot ?? resolve(dataDir(), 'blobs');
+  const deliverablesRoot = roots?.deliverablesRoot ?? resolve(dataDir(), 'deliverables');
+  const orphansRemoved = sweepOrphans(blobsRoot, keep) + sweepOrphans(deliverablesRoot, keep);
+  const snapshotsCleared = clearIngestSnapshots(roots?.mastraPath ?? mastraDbPath());
+
+  return { purged: rows.length, orphansRemoved, snapshotsCleared };
 }

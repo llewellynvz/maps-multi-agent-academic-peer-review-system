@@ -17,6 +17,8 @@ export {
   getReviewDetail,
   getReviewRow,
   listReviews,
+  purgeAll,
+  type PurgeAllResult,
   purgeReview,
   requireReview,
 } from './reviews';

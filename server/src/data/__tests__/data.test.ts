@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
@@ -10,7 +11,7 @@ import { writeManuscriptBlob } from '../../workflow/storage';
 import { clearPassphrase, issueToken, passphraseIsSet, setPassphrase, verifyPassphrase, verifyToken } from '../auth';
 import { openKey, sealKey } from '../crypto';
 import { submitAnswers } from '../answers';
-import { createReview, purgeReview } from '../reviews';
+import { createReview, purgeAll, purgeReview } from '../reviews';
 
 let tempDir: string;
 let client: MaraClient;
@@ -158,5 +159,55 @@ describe('guarded purge (DATA-19..21)', () => {
       code = (error as { code?: string }).code;
     }
     expect(code).toBe('bad_request');
+  });
+});
+
+describe('purgeAll', () => {
+  it('purges every review, sweeps orphan directories, and clears ingest snapshots', () => {
+    createReview(client.db, { title: 'First' });
+    createReview(client.db, { title: 'Second' });
+
+    const blobsRoot = join(tempDir, 'blobs');
+    const deliverablesRoot = join(tempDir, 'deliverables');
+    mkdirSync(join(blobsRoot, 'orphan-review-id'), { recursive: true });
+    mkdirSync(join(deliverablesRoot, 'another-orphan'), { recursive: true });
+    mkdirSync(join(blobsRoot, 'not_a.review.id'), { recursive: true });
+
+    const mastraPath = join(tempDir, 'mastra.db');
+    const mastra = new Database(mastraPath);
+    mastra.exec('CREATE TABLE mastra_workflow_snapshot (workflow_name TEXT, run_id TEXT, snapshot TEXT)');
+    mastra.prepare('INSERT INTO mastra_workflow_snapshot VALUES (?, ?, ?)').run('ingest', 'run-1', '{}');
+    mastra.close();
+
+    const result = purgeAll(client, { blobsRoot, deliverablesRoot, mastraPath });
+
+    expect(result.purged).toBe(2);
+    expect(result.orphansRemoved).toBe(2);
+    expect(result.snapshotsCleared).toBe(1);
+    const rows = client.sqlite.prepare('SELECT count(*) AS n FROM reviews').get() as { n: number };
+    expect(rows.n).toBe(0);
+    expect(existsSync(join(blobsRoot, 'orphan-review-id'))).toBe(false);
+    expect(existsSync(join(deliverablesRoot, 'another-orphan'))).toBe(false);
+    expect(existsSync(join(blobsRoot, 'not_a.review.id'))).toBe(true);
+
+    const reopened = new Database(mastraPath, { readonly: true });
+    const snapshots = reopened.prepare('SELECT count(*) AS n FROM mastra_workflow_snapshot').get() as { n: number };
+    reopened.close();
+    expect(snapshots.n).toBe(0);
+  });
+
+  it('refuses while any review is queued, sanitizing, or running', () => {
+    const review = createReview(client.db, { title: 'Active' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'running' WHERE id = ?").run(review.id);
+
+    let code: string | undefined;
+    try {
+      purgeAll(client, { blobsRoot: join(tempDir, 'blobs'), deliverablesRoot: join(tempDir, 'deliverables'), mastraPath: join(tempDir, 'mastra.db') });
+    } catch (error) {
+      code = (error as { code?: string }).code;
+    }
+    expect(code).toBe('conflict');
+    const rows = client.sqlite.prepare('SELECT count(*) AS n FROM reviews').get() as { n: number };
+    expect(rows.n).toBe(1);
   });
 });
