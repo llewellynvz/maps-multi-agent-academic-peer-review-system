@@ -42,6 +42,25 @@ describe('extractNhstTests', () => {
     expect(tests).toHaveLength(1);
     expect(tests[0]?.statistic).toBeCloseTo(-2.11, 10);
   });
+
+  it('recognises the ASCII chi-square notations PDF extraction produces', () => {
+    for (const text of ['chi2(1) = 4.68, p < .05', 'x2(1) = 4.68, p < .05', 'X2(1) = 4.68, p < .05']) {
+      expect(extractNhstTests(text)).toHaveLength(1);
+    }
+    expect(extractNhstTests('the box2(1) = 4.68, p < .05 design')).toHaveLength(0);
+  });
+
+  it('stays linear on adversarial whitespace and digit runs after a test prefix', () => {
+    const hostile = [
+      `t(1)=${' '.repeat(200000)}no digits here.`,
+      `z=${' '.repeat(200000)}also none.`,
+      `z =${'9'.repeat(200000)} trailing prose without a p clause.`,
+      `t(1)=${'9'.repeat(200000)}.`,
+    ].join(' ');
+    const start = performance.now();
+    extractNhstTests(hostile);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });
 
 describe('checkNhstTest', () => {

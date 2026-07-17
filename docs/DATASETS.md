@@ -16,6 +16,8 @@ Research summary for the planned fine-tuning phase: which public corpora carry p
 
 ## What the staging script fetches
 
+Knobs: `CORPUS_F1000_QUERY` overrides the search (default `psychology OR wellbeing OR "mental health"`) and `CORPUS_F1000_PAGES` sets how many 100-result pages to walk (default 3).
+
 1. **Reviewer2 PGE cleaned splits** (train, validation, test parquet). The instruction-shaped pairs (paper plus aspect prompt to review with score) are the right shape for supervised fine-tuning of a rating head.
 2. **F1000Research psychology and wellbeing subset.** One JATS XML per article version. Reviewer reports are `sub-article` nodes with `article-type="reviewer-report"` carrying the decision, author responses carry `article-type="response"`. Verified live: research articles in the subset embed 3 to 5 reports each.
 

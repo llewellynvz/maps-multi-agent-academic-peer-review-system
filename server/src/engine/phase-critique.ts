@@ -126,7 +126,8 @@ async function redispatchSpecialist(
   lens: LensDef,
   fixInstruction: string,
 ): Promise<void> {
-  const digest = manuscriptDigest(loadEngineContext(deps.db, reviewId).sectionMap);
+  const critiqueCtx = loadEngineContext(deps.db, reviewId);
+  const digest = manuscriptDigest(critiqueCtx.sectionMap, critiqueCtx.preset);
   const mine = getCurrentFindings(deps.db, reviewId).filter((finding) => finding.id.startsWith(`REV-${lens.prefix}-`));
   const result = await runAgent<SpecialistReviewerOutput>(deps, {
     reviewId,

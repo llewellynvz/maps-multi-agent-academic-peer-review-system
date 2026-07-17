@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ReviewSummary } from '@/lib/api';
 import { formatDate, formatRelative, phaseLabel, RECOMMENDATION_LABEL, statusTone } from '@/lib/format';
 import { Icon, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 import { Section } from '@/components/Section';
 import { EmptyState } from '@/components/EmptyState';
-import { SideDrawer } from '@/components/SideDrawer';
+import { ConfirmDrawer } from '@/components/ConfirmDrawer';
 
 function isRunning(status: string): boolean {
   return status === 'running' || status === 'sanitizing' || status === 'awaiting_input' || status === 'queued';
@@ -141,11 +141,14 @@ export default function LibraryPage(): ReactNode {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<ReviewSummary | null>(null);
-  const [confirmText, setConfirmText] = useState('');
+  const requestSeq = useRef(0);
 
   const refresh = async (): Promise<void> => {
+    const seq = ++requestSeq.current;
     const result = await api.listReviews();
-    setReviews(result.reviews);
+    if (seq === requestSeq.current) {
+      setReviews(result.reviews);
+    }
   };
 
   const cancelReview = async (review: ReviewSummary): Promise<void> => {
@@ -164,7 +167,6 @@ export default function LibraryPage(): ReactNode {
     try {
       await api.deleteReview(deleteTarget.id);
       setDeleteTarget(null);
-      setConfirmText('');
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the review.');
@@ -174,9 +176,10 @@ export default function LibraryPage(): ReactNode {
   useEffect(() => {
     let active = true;
     const load = async (): Promise<void> => {
+      const seq = ++requestSeq.current;
       try {
         const result = await api.listReviews();
-        if (active) {
+        if (active && seq === requestSeq.current) {
           setReviews(result.reviews);
           setError(null);
         }
@@ -300,14 +303,15 @@ export default function LibraryPage(): ReactNode {
         </Section>
       ) : null}
 
-      <SideDrawer open={deleteTarget !== null} title="Confirm deletion" onClose={() => { setDeleteTarget(null); setConfirmText(''); }}>
-        <p className="sub" style={{ marginBottom: 16 }}>This permanently removes <strong>{deleteTarget?.title ?? 'this review'}</strong> and every artefact on disk. Type <span className="mono">delete</span> to confirm.</p>
-        <div className="field">
-          <label>Confirmation</label>
-          <input value={confirmText} onChange={(event) => setConfirmText(event.target.value)} />
-        </div>
-        <button className="btn btn-danger" onClick={() => void deleteReview()} disabled={confirmText !== 'delete'}><Icon name="trash" /> Delete review</button>
-      </SideDrawer>
+      <ConfirmDrawer
+        open={deleteTarget !== null}
+        title="Confirm deletion"
+        warning={<>This permanently removes <strong>{deleteTarget?.title ?? 'this review'}</strong> and every artefact on disk.</>}
+        phrase="delete"
+        actionLabel="Delete review"
+        onConfirm={() => void deleteReview()}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

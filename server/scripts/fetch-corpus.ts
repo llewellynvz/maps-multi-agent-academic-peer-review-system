@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -39,11 +39,13 @@ async function download(url: string, target: string): Promise<boolean> {
   if (existsSync(target)) {
     return false;
   }
+  const partial = `${target}.part`;
   const response = await fetch(url, { redirect: 'follow' });
   if (!response.ok || response.body === null) {
     throw new Error(`GET ${url} returned HTTP ${response.status}`);
   }
-  await pipeline(Readable.fromWeb(response.body as import('node:stream/web').ReadableStream), createWriteStream(target));
+  await pipeline(Readable.fromWeb(response.body as import('node:stream/web').ReadableStream), createWriteStream(partial));
+  renameSync(partial, target);
   return true;
 }
 

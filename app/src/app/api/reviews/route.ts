@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createReview, getClient, listReviews, purgeAll, type ReviewOptions } from 'server/src/data';
+import { ApiError, createReview, getClient, listReviews, purgeAll, type ReviewOptions } from 'server/src/data';
 import { guarded } from '@/lib/server';
 
 export const runtime = 'nodejs';
@@ -30,7 +30,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 export async function DELETE(req: NextRequest): Promise<NextResponse> {
-  return guarded(req, () => {
+  return guarded(req, async () => {
+    const body = (await req.json().catch(() => ({}))) as { confirm?: string };
+    if (body.confirm !== 'delete everything') {
+      throw new ApiError('bad_request', 'Send { "confirm": "delete everything" } to delete every review.', {
+        field: 'confirm',
+      });
+    }
     const client = getClient();
     const result = purgeAll(client);
     return NextResponse.json(result);

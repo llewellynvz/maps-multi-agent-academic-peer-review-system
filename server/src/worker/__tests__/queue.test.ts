@@ -65,6 +65,31 @@ afterEach(() => {
 });
 
 describe('WorkerRunner single-slot queue (NFR-06)', () => {
+  it('drops a picked-up review whose row was purged instead of processing a ghost', async () => {
+    insertReview('rev-gone', '2026-07-14T00:00:00.000Z');
+    client.sqlite.prepare("DELETE FROM reviews WHERE id = 'rev-gone'").run();
+
+    let touched = 0;
+    const processors: WorkerProcessors = {
+      startIngest: async () => {
+        touched += 1;
+        return 'ingested';
+      },
+      resumeIngest: async () => {
+        touched += 1;
+        return 'ingested';
+      },
+      runEngine: async () => {
+        touched += 1;
+        return 'completed';
+      },
+    };
+    const runner = new WorkerRunner({ client, processors });
+
+    await expect(runner.processReview('rev-gone')).resolves.toBeUndefined();
+    expect(touched).toBe(0);
+  });
+
   it('runs one review at a time and dequeues the oldest queued review next', async () => {
     insertReview('rev-A', '2026-07-14T00:00:00.000Z');
     insertReview('rev-B', '2026-07-14T00:00:01.000Z');

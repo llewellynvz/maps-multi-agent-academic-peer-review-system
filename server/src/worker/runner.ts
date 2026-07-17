@@ -381,6 +381,13 @@ export class WorkerRunner {
   }
 
   async processReview(reviewId: string): Promise<void> {
+    const row = this.db.select({ id: reviews.id }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all();
+    if (row.length === 0) {
+      this.intents.delete(reviewId);
+      this.cancelRequested.delete(reviewId);
+      this.log(`review ${reviewId} no longer exists; dropping its queued command`);
+      return;
+    }
     const intent = this.intents.get(reviewId) ?? { kind: 'run', args: {}, createdAt: new Date().toISOString() };
     this.intents.delete(reviewId);
     this.activeReviewId = reviewId;
@@ -501,6 +508,11 @@ export class WorkerRunner {
   }
 
   private emitTerminal(reviewId: string, outcome: string, extra: Record<string, unknown>, sinceSeq?: number): void {
+    const exists = this.db.select({ id: reviews.id }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all();
+    if (exists.length === 0) {
+      this.log(`review ${reviewId} was deleted while it was being processed; suppressing its terminal event`);
+      return;
+    }
     if (sinceSeq !== undefined) {
       // Suppress only when a terminal already landed during this run, so an intervening event cannot trigger a second contradictory terminal.
       const termThisRun = this.client.sqlite
@@ -605,9 +617,13 @@ export class WorkerRunner {
     if (this.activeReviewId === null && this.processing === null) {
       const next = this.pickNext();
       if (next !== null) {
-        this.processing = this.processReview(next).finally(() => {
-          this.processing = null;
-        });
+        this.processing = this.processReview(next)
+          .catch((error) => {
+            this.log(`review ${next} escaped its error handling: ${error instanceof Error ? error.message : String(error)}`);
+          })
+          .finally(() => {
+            this.processing = null;
+          });
       }
     }
   }

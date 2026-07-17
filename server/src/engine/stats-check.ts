@@ -166,8 +166,8 @@ export interface NhstTest {
   source: string;
 }
 
-const NUMBER = String.raw`[-−–]?\s*\d*\.?\d+`;
-const P_CLAUSE = String.raw`p\s*([=<>])\s*(\d*\.?\d+)`;
+const NUMBER = String.raw`[-−–]?\d{0,7}\.?\d{1,10}`;
+const P_CLAUSE = String.raw`p\s*([=<>])\s*(\d{0,4}\.?\d{1,10})`;
 
 const TEST_PATTERNS: Array<{ kind: TestKind; pattern: RegExp; dfCount: 0 | 1 | 2 }> = [
   {
@@ -191,7 +191,7 @@ const TEST_PATTERNS: Array<{ kind: TestKind; pattern: RegExp; dfCount: 0 | 1 | 2
   {
     kind: 'chi2',
     pattern: new RegExp(
-      String.raw`(?:χ2|χ²|chi[- ]?squared?|X2|x²)\s*\(\s*(\d+(?:\.\d+)?)\s*(?:,\s*N\s*=\s*[\d,\s]+)?\)\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`,
+      String.raw`(?<![A-Za-z])(?:χ2|χ²|chi[- ]?squared?|chi\s?2|[Xx]2|x²)\s*\(\s*(\d+(?:\.\d+)?)\s*(?:,\s*N\s*=\s*[\d,\s]+)?\)\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`,
       'g',
     ),
     dfCount: 1,
@@ -368,6 +368,9 @@ function sectionAnchors(sectionMap: SectionMap): Array<{ label: string; text: st
 }
 
 function formatP(value: number): string {
+  if (value < 0.0001) {
+    return 'below .0001';
+  }
   if (value < 0.001) {
     return value.toExponential(2);
   }

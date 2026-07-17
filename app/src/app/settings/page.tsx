@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { api, type ProviderKeyView, type PublicSettings, type ReviewSummary } from '@/lib/api';
 import { Icon, Pill, Spinner } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
-import { SideDrawer } from '@/components/SideDrawer';
+import { ConfirmDrawer } from '@/components/ConfirmDrawer';
 
 export default function SettingsPage(): ReactNode {
   const [settings, setSettings] = useState<PublicSettings | null>(null);
@@ -15,9 +15,7 @@ export default function SettingsPage(): ReactNode {
   const [passphrase, setPassphrase] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [dangerReview, setDangerReview] = useState<ReviewSummary | null>(null);
-  const [confirmText, setConfirmText] = useState('');
   const [dangerAll, setDangerAll] = useState(false);
-  const [confirmAllText, setConfirmAllText] = useState('');
 
   const load = async (): Promise<void> => {
     setSettings(await api.getSettings().catch(() => null));
@@ -60,7 +58,6 @@ export default function SettingsPage(): ReactNode {
     }
     await api.deleteReview(dangerReview.id).catch(() => null);
     setDangerReview(null);
-    setConfirmText('');
     flash('Review deleted');
     await load();
   };
@@ -69,7 +66,6 @@ export default function SettingsPage(): ReactNode {
     try {
       const result = await api.deleteAllReviews();
       setDangerAll(false);
-      setConfirmAllText('');
       flash(`Deleted ${result.purged} review${result.purged === 1 ? '' : 's'}`);
     } catch (err) {
       flash(err instanceof Error ? err.message : 'Could not delete all reviews');
@@ -183,23 +179,25 @@ export default function SettingsPage(): ReactNode {
         ) : null}
       </div>
 
-      <SideDrawer open={dangerReview !== null} title="Confirm deletion" onClose={() => { setDangerReview(null); setConfirmText(''); }}>
-        <p className="sub" style={{ marginBottom: 16 }}>This permanently removes <strong>{dangerReview?.title ?? 'this review'}</strong> and every artefact on disk. Type <span className="mono">delete</span> to confirm.</p>
-        <div className="field">
-          <label>Confirmation</label>
-          <input value={confirmText} onChange={(event) => setConfirmText(event.target.value)} />
-        </div>
-        <button className="btn btn-danger" onClick={purge} disabled={confirmText !== 'delete'}><Icon name="trash" /> Delete review</button>
-      </SideDrawer>
+      <ConfirmDrawer
+        open={dangerReview !== null}
+        title="Confirm deletion"
+        warning={<>This permanently removes <strong>{dangerReview?.title ?? 'this review'}</strong> and every artefact on disk.</>}
+        phrase="delete"
+        actionLabel="Delete review"
+        onConfirm={() => void purge()}
+        onClose={() => setDangerReview(null)}
+      />
 
-      <SideDrawer open={dangerAll} title="Delete every review" onClose={() => { setDangerAll(false); setConfirmAllText(''); }}>
-        <p className="sub" style={{ marginBottom: 16 }}>This permanently removes <strong>all {reviews.length} review{reviews.length === 1 ? '' : 's'}</strong>, every manuscript, finding, and deliverable on disk. Cached citation lookups are kept. This cannot be undone. Type <span className="mono">delete everything</span> to confirm.</p>
-        <div className="field">
-          <label>Confirmation</label>
-          <input value={confirmAllText} onChange={(event) => setConfirmAllText(event.target.value)} />
-        </div>
-        <button className="btn btn-danger" onClick={() => void purgeEverything()} disabled={confirmAllText !== 'delete everything'}><Icon name="trash" /> Delete all reviews</button>
-      </SideDrawer>
+      <ConfirmDrawer
+        open={dangerAll}
+        title="Delete every review"
+        warning={<>This permanently removes <strong>all {reviews.length} review{reviews.length === 1 ? '' : 's'}</strong>, every manuscript, finding, and deliverable on disk. Cached citation lookups are kept. This cannot be undone.</>}
+        phrase="delete everything"
+        actionLabel="Delete all reviews"
+        onConfirm={() => void purgeEverything()}
+        onClose={() => setDangerAll(false)}
+      />
 
       {toast !== null ? <div className="toast-wrap"><div className="toast toast-info"><Icon name="check" /> {toast}</div></div> : null}
     </div>

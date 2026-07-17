@@ -196,7 +196,9 @@ export const api = {
   getReview: (id: string) => request<ReviewDetail>('GET', `/api/reviews/${id}`),
   deleteReview: (id: string) => request<{ purged: boolean }>('DELETE', `/api/reviews/${id}`),
   deleteAllReviews: () =>
-    request<{ purged: number; orphansRemoved: number; snapshotsCleared: number }>('DELETE', '/api/reviews'),
+    request<{ purged: number; orphansRemoved: number; snapshotsCleared: number }>('DELETE', '/api/reviews', {
+      confirm: 'delete everything',
+    }),
 
   uploadManuscript: async (id: string, file: File): Promise<{ manuscriptId: string; sha256: string; byteSize: number }> => {
     const form = new FormData();
