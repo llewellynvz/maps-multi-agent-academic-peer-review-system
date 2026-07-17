@@ -245,3 +245,11 @@ any report that was produced before the stop all remain in the review's blob sto
 section 3 a retry: the engine reads the completed work back from cache and resumes rather
 than starting over. It also means a failed review can be inspected in full before you
 decide whether to retry it.
+
+Deletion is always explicit. A single review can be removed from settings or its library
+card behind a typed confirmation, which purges its database rows, blob directory, and
+deliverables. Settings also offers a delete-all behind a stronger typed confirmation. It
+refuses while any review is queued or running, then removes every review in one
+transaction, sweeps directories left behind by earlier deletions, and clears stale ingest
+snapshots. Cached citation lookups and instance settings are kept. There is no undo for
+either path, so export the run archive first if the audit trail matters.

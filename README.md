@@ -43,6 +43,7 @@ Collegia runs entirely on one machine. The manuscript text, the author identitie
 | Confidential by design | Manuscript text and author identities never enter a public query. Only construct and method terms reach the literature search, behind an allowlisted, signed, n-gram-guarded egress. |
 | Expert literature engagement | The review argues against named comparator works retrieved into a field dossier, calibrating the manuscript's claims against the field benchmark. |
 | Integrity signals, never verdicts | Similarity, AI-content, figure, and reproducibility checks are surfaced as editor-only signals with mandatory caveats, never as accusations. |
+| Deterministic statistics verification | Reported t, F, r, chi-square, and z results are recomputed from their test statistic and degrees of freedom, and reported means are checked for whole-number plausibility. Pure arithmetic on the full manuscript text, at no model cost. |
 | Branded deliverables | The author letter and editor summary render as Psynalytics-branded Word documents through a deterministic generator. |
 
 ## How it works
@@ -54,7 +55,7 @@ Phase 0   Sanitisation        Screen the manuscript for hidden instructions and 
 Phase 1   Structured analysis Convert the manuscript into a structured review object
 Phase 2   Field context       Retrieve comparator literature and audit every reference
 Phase 3   Specialist review   Run each active lens as an independent first pass, then challenge
-Phase 4   Integrity screen    Reporting, similarity, AI-content, figure, and reproducibility signals
+Phase 4   Integrity screen    Recomputed statistics, reporting, similarity, AI-content, and reproducibility signals
 Phase 5   Swarm stress-test   Test which findings are consensus-robust and force dissent to surface
 Phase 6   Internal report     Assemble the full internal review report from the ledger
 Phase 7   Release gate        Score the rubric, set the recommendation, write the letter, gate release
@@ -178,7 +179,7 @@ GROBID needs roughly 4 GB of RAM on top of Collegia. On a machine with 8 GB or l
 
 ### Tracing (optional)
 
-If you run Langfuse on the host, set `LANGFUSE_HOST` (default `http://host.docker.internal:3000`), `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. When these are absent, Collegia runs on its local statistics panel alone and tracing is skipped. A missing Langfuse is never an error.
+If you run Langfuse on the host, set `LANGFUSE_HOST` (the example configuration uses `http://127.0.0.1:4000`), `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. When these are absent, Collegia runs on its local statistics panel alone and tracing is skipped. A missing Langfuse is never an error. Prompt and completion capture is a separate opt-in setting and is permitted only when the trace host resolves to this machine.
 
 ## Development
 
@@ -197,7 +198,8 @@ The test suite is fully offline. It mocks every model dispatch, so it neither sp
 Confidentiality is a design constraint, not a setting.
 
 - **The manuscript never leaves the host.** Author identities and unpublished results are never placed in a public query. The literature search sends construct and method terms only, behind an allowlisted, HMAC-signed egress with an eight-gram guard that blocks any query overlapping the manuscript.
-- **Editor-only content stays editor-only.** Integrity signals, confidential synthesis, and the preliminary-assessment stress test never reach the author-facing letter or the read-only evidence endpoint.
+- **Editor-only content stays editor-only.** Integrity signals, confidential synthesis, and the preliminary-assessment stress test never reach the author-facing letter, the evidence map, or any exported document. The results screen shows them to the operator in a clearly banded editor-only panel, and nowhere else.
+- **Stored reviews can be removed completely.** Each review can be deleted individually, and settings offers a delete-all behind a typed confirmation that also sweeps orphaned files and stale ingest snapshots. Cached citation lookups are kept.
 - **Provider keys are protected.** Session keys are held in memory. Persisted keys are sealed with AES-256-GCM under a master key that is never committed.
 - **The ledger is append-only.** Corrections supersede by new rows. History is preserved for audit.
 - **The container runs unprivileged.** It starts as root only long enough to take ownership of its data volume, then drops to a non-root user with no ability to regain privileges, and exposes a single application port.
