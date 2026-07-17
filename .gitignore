@@ -16,3 +16,5 @@ REVIEW.md
 .claude/
 /docs/*
 !/docs/OPERATIONS.md
+!/docs/LIMITATIONS.md
+!/docs/DATASETS.md
