@@ -133,7 +133,7 @@ export default function NewReviewPage(): ReactNode {
           >
             <Icon name="upload" className="ico-teal" />
             <h2 className="h3" style={{ marginTop: 12 }}>Drop a manuscript here</h2>
-            <p className="sub muted" style={{ margin: '4px auto 0' }}>PDF or DOCX, up to 40 MB</p>
+            <p className="sub muted" style={{ margin: '4px auto 0' }}>PDF or DOCX, up to 50 MB</p>
             <input ref={inputRef} type="file" accept=".pdf,.docx" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file !== undefined) void accept(file); }} />
             {working ? (
               <div className="stack-12" style={{ marginTop: 20, alignItems: 'stretch', textAlign: 'left' }}>

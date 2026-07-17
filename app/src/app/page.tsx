@@ -8,6 +8,7 @@ import { Icon, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 import { Section } from '@/components/Section';
 import { EmptyState } from '@/components/EmptyState';
+import { SideDrawer } from '@/components/SideDrawer';
 
 function isRunning(status: string): boolean {
   return status === 'running' || status === 'sanitizing' || status === 'awaiting_input' || status === 'queued';
@@ -83,9 +84,19 @@ function CardBody({ review }: { review: ReviewSummary }): ReactNode {
   );
 }
 
-function ReviewCard({ review, index }: { review: ReviewSummary; index: number }): ReactNode {
+function ReviewCard({
+  review,
+  index,
+  onCancel,
+  onDelete,
+}: {
+  review: ReviewSummary;
+  index: number;
+  onCancel: (review: ReviewSummary) => void;
+  onDelete: (review: ReviewSummary) => void;
+}): ReactNode {
   const style = { ...CARD_STYLE, '--i': index } as CSSProperties;
-  if (review.status === 'failed') {
+  if (review.status === 'failed' || review.status === 'cancelled') {
     return (
       <article className="card card-enter" style={style}>
         <CardTop review={review} />
@@ -93,6 +104,24 @@ function ReviewCard({ review, index }: { review: ReviewSummary; index: number })
         <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
           <Link href={`/reviews/${review.id}/run`} className="btn btn-secondary">Resume</Link>
           <Link href={`/reviews/${review.id}/results`} className="btn btn-ghost">View partial results</Link>
+          <button className="btn btn-ghost" aria-label={`Delete ${review.title ?? 'review'}`} onClick={() => onDelete(review)}>
+            <Icon name="trash" /> Delete
+          </button>
+        </div>
+      </article>
+    );
+  }
+
+  if (isRunning(review.status) && review.status !== 'awaiting_input') {
+    return (
+      <article className="card card-enter" style={style}>
+        <CardTop review={review} />
+        <CardBody review={review} />
+        <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
+          <Link href={reviewHref(review)} className="btn btn-secondary">Open</Link>
+          <button className="btn btn-ghost" aria-label={`Cancel ${review.title ?? 'review'}`} onClick={() => onCancel(review)}>
+            Cancel
+          </button>
         </div>
       </article>
     );
@@ -111,6 +140,36 @@ export default function LibraryPage(): ReactNode {
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<ReviewSummary | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+
+  const refresh = async (): Promise<void> => {
+    const result = await api.listReviews();
+    setReviews(result.reviews);
+  };
+
+  const cancelReview = async (review: ReviewSummary): Promise<void> => {
+    try {
+      await api.cancel(review.id);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel the review.');
+    }
+  };
+
+  const deleteReview = async (): Promise<void> => {
+    if (deleteTarget === null) {
+      return;
+    }
+    try {
+      await api.deleteReview(deleteTarget.id);
+      setDeleteTarget(null);
+      setConfirmText('');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the review.');
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -226,7 +285,13 @@ export default function LibraryPage(): ReactNode {
           {sorted.length > 0 ? (
             <div className="grid-auto" style={{ marginTop: 'var(--space-4)' }}>
               {sorted.map((review, index) => (
-                <ReviewCard key={review.id} review={review} index={index} />
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  index={index}
+                  onCancel={(target) => void cancelReview(target)}
+                  onDelete={(target) => setDeleteTarget(target)}
+                />
               ))}
             </div>
           ) : (
@@ -234,6 +299,15 @@ export default function LibraryPage(): ReactNode {
           )}
         </Section>
       ) : null}
+
+      <SideDrawer open={deleteTarget !== null} title="Confirm deletion" onClose={() => { setDeleteTarget(null); setConfirmText(''); }}>
+        <p className="sub" style={{ marginBottom: 16 }}>This permanently removes <strong>{deleteTarget?.title ?? 'this review'}</strong> and every artefact on disk. Type <span className="mono">delete</span> to confirm.</p>
+        <div className="field">
+          <label>Confirmation</label>
+          <input value={confirmText} onChange={(event) => setConfirmText(event.target.value)} />
+        </div>
+        <button className="btn btn-danger" onClick={() => void deleteReview()} disabled={confirmText !== 'delete'}><Icon name="trash" /> Delete review</button>
+      </SideDrawer>
     </div>
   );
 }
