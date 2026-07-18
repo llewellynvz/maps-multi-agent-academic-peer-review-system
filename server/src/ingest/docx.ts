@@ -1,14 +1,26 @@
 import mammoth from 'mammoth';
-import type { SectionMap } from '@mara/shared';
+import type { ParseQuality, SectionMap } from '@mara/shared';
 import { assembleSectionMap, type RawSection } from './assemble';
 import { splitReferences } from './plaintext';
-import { normalizeInline } from './text';
+import { looksLikeStrongHeading, normalizeInline } from './text';
 
 const REFERENCES_HEADING = /^(references|bibliography|works cited)\b/i;
 
 interface HtmlBlock {
   heading: boolean;
   text: string;
+}
+
+function isBoldOnly(rawInner: string, text: string): boolean {
+  if (text.length === 0 || text.length > 120 || /[.!?]$/.test(text)) {
+    return false;
+  }
+  const boldSpans = rawInner.match(/<(strong|b)\b[^>]*>[\s\S]*?<\/\1>/gi);
+  if (boldSpans === null) {
+    return false;
+  }
+  const bold = normalizeInline(decodeEntities(boldSpans.map((span) => span.replace(/<[^>]+>/g, ' ')).join(' ')));
+  return bold === text;
 }
 
 function decodeEntities(value: string): string {
@@ -27,9 +39,11 @@ function toBlocks(html: string): HtmlBlock[] {
   let match: RegExpExecArray | null = blockPattern.exec(html);
   while (match !== null) {
     const tag = (match[1] ?? '').toLowerCase();
-    const inner = normalizeInline(decodeEntities((match[2] ?? '').replace(/<[^>]+>/g, ' ')));
+    const rawInner = match[2] ?? '';
+    const inner = normalizeInline(decodeEntities(rawInner.replace(/<[^>]+>/g, ' ')));
     if (inner.length > 0) {
-      blocks.push({ heading: tag.startsWith('h'), text: inner });
+      const heading = tag.startsWith('h') || isBoldOnly(rawInner, inner) || looksLikeStrongHeading(inner);
+      blocks.push({ heading, text: inner });
     }
     match = blockPattern.exec(html);
   }
@@ -84,5 +98,7 @@ export async function docxSectionMap(docx: Uint8Array): Promise<SectionMap> {
   }
 
   const references = referenceLines.length > 0 ? splitReferences(referenceLines.join('\n')) : [];
-  return assembleSectionMap({ title, abstract, sections, references, parser: 'mammoth', parseQuality: 'good' });
+  const structured = abstract !== null || sections.some((section) => section.heading !== null) || sections.length > 1;
+  const parseQuality: ParseQuality = structured ? 'good' : 'degraded';
+  return assembleSectionMap({ title, abstract, sections, references, parser: 'mammoth', parseQuality });
 }

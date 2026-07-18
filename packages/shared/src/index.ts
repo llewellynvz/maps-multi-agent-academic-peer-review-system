@@ -11,6 +11,7 @@ export {
   sectionMapSchema,
 } from './section-map';
 
+export * from './rubric-criteria';
 export * from './agents/finding';
 export * from './agents/recommendation';
 export * from './agents/self-critique';

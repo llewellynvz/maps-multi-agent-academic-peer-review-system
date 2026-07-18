@@ -10,11 +10,18 @@ import { normalisePreset, type Preset } from './lenses';
 const SECTION_MAP_BLOB = 'parse/section-map.json';
 const SANITIZED_SECTION_MAP_BLOB = 'parse/section-map.sanitized.json';
 
-const DIGEST_LIMITS: Record<Preset, { digestChars: number; sectionChars: number }> = {
-  fast: { digestChars: 16000, sectionChars: 2400 },
-  balanced: { digestChars: 16000, sectionChars: 2400 },
-  thorough: { digestChars: 32000, sectionChars: 4800 },
+const DIGEST_LIMITS: Record<Preset, { digestChars: number }> = {
+  fast: { digestChars: 24000 },
+  balanced: { digestChars: 64000 },
+  thorough: { digestChars: 150000 },
 };
+const SECTION_FLOOR_CHARS = 200;
+const TRUNCATION_MARKER = ' [section truncated]';
+
+// Cap for dispatches that carry the digest ON TOP OF the full ledger, report, and swarm
+// (the Phase 7 synthesis agents). Those agents work from the findings, not the raw text, so a
+// bounded excerpt keeps the largest prompt well inside the model context window.
+export const SYNTHESIS_DIGEST_CHARS = 48000;
 const REFERENCE_CAP = 20;
 
 export interface EngineContext {
@@ -39,21 +46,61 @@ export function loadEngineContext(db: MaraDatabase, reviewId: string): EngineCon
   };
 }
 
-export function manuscriptDigest(sectionMap: SectionMap, preset: Preset = 'balanced'): string {
-  const limits = DIGEST_LIMITS[preset];
-  const parts: string[] = [];
+function allocateSectionBudgets(lengths: number[], budget: number): number[] {
+  if (lengths.length === 0) {
+    return [];
+  }
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  if (total <= budget) {
+    return lengths.slice();
+  }
+  const floor = Math.min(SECTION_FLOOR_CHARS, Math.floor(budget / lengths.length));
+  const overflow = lengths.reduce((sum, length) => sum + Math.max(0, length - floor), 0);
+  const remaining = Math.max(0, budget - floor * lengths.length);
+  return lengths.map((length) => {
+    const base = Math.min(length, floor);
+    const share = overflow > 0 ? Math.floor((remaining * Math.max(0, length - floor)) / overflow) : 0;
+    return Math.min(length, base + share);
+  });
+}
+
+export function manuscriptDigest(sectionMap: SectionMap, preset: Preset = 'balanced', maxChars?: number): string {
+  const budgetTotal =
+    maxChars !== undefined ? Math.min(DIGEST_LIMITS[preset].digestChars, maxChars) : DIGEST_LIMITS[preset].digestChars;
+  const header: string[] = [];
   if (sectionMap.title !== null) {
-    parts.push(`Title: ${sectionMap.title}`);
+    header.push(`Title: ${sectionMap.title}`);
   }
   if (sectionMap.abstract !== null) {
-    parts.push(`Abstract: ${sectionMap.abstract}`);
+    header.push(`Abstract: ${sectionMap.abstract}`);
   }
-  for (const section of sectionMap.sections) {
+
+  const rendered = sectionMap.sections.map((section) => {
     const heading = section.heading ?? `Section ${section.index}`;
-    const anchor = `lines ${section.lineStart}-${section.lineEnd}`;
-    parts.push(`## ${heading} (${anchor})\n${section.text.slice(0, limits.sectionChars)}`);
-  }
-  return parts.join('\n\n').slice(0, limits.digestChars);
+    const label = `## ${heading} (lines ${section.lineStart}-${section.lineEnd})`;
+    return { label, text: section.text };
+  });
+
+  const headerText = header.join('\n\n');
+  // Each rendered part is `label\nbody`, and parts join with `\n\n`, so the non-body cost per part
+  // is label.length + 3. Undercounting it lets the final hard clamp trim a real section's tail.
+  const overhead = rendered.reduce((sum, part) => sum + part.label.length + 3, 0);
+  const budget = Math.max(0, budgetTotal - headerText.length - overhead);
+  const allocations = allocateSectionBudgets(
+    rendered.map((part) => part.text.length),
+    budget,
+  );
+
+  const bodyParts = rendered.map((part, index) => {
+    const limit = allocations[index] ?? 0;
+    const body =
+      part.text.length <= limit
+        ? part.text
+        : `${part.text.slice(0, Math.max(0, limit - TRUNCATION_MARKER.length)).trimEnd()}${TRUNCATION_MARKER}`;
+    return `${part.label}\n${body}`;
+  });
+
+  return [...header, ...bodyParts].join('\n\n').slice(0, budgetTotal);
 }
 
 export function referenceMetadataList(sectionMap: SectionMap): string {

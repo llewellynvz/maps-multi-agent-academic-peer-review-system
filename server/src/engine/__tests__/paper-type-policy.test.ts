@@ -113,9 +113,9 @@ describe('applyPaperTypeLensPolicy', () => {
     expect(prefixes(null, false)).toEqual([...empiricalActive.map((l) => l.prefix)].sort());
   });
 
-  it('drops empirical lenses for a theoretical paper with no data', () => {
+  it('drops empirical and qualitative lenses for a theoretical paper with no data', () => {
     const result = prefixes('theoretical', false);
-    for (const dropped of ['METH', 'STAT', 'MEAS', 'CAUS']) {
+    for (const dropped of ['METH', 'STAT', 'MEAS', 'CAUS', 'QUAL']) {
       expect(result).not.toContain(dropped);
     }
     expect(result).toContain('ARG');
@@ -128,10 +128,11 @@ describe('applyPaperTypeLensPolicy', () => {
     expect(result).toContain('STAT');
   });
 
-  it('drops the empirical lenses for a perspective piece with no data', () => {
+  it('drops the empirical and qualitative lenses for a perspective piece with no data', () => {
     const result = prefixes('perspective-or-opinion', false);
     expect(result).not.toContain('METH');
     expect(result).not.toContain('CAUS');
+    expect(result).not.toContain('QUAL');
   });
 
   it('forces ARG, NOV, THEO and keeps METH for a review even from a bare core set', () => {

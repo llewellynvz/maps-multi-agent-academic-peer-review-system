@@ -74,13 +74,13 @@ describe('voice sample intake', () => {
     expect(hasSchema('voice-profiler')).toBe(true);
     const parsed = schemaFor('voice-profiler').safeParse({
       register: 'Direct and analytic.',
-      openingMove: 'Thanks, summary, decision by sentence three.',
+      openingMove: 'Thanks, summary, the considered recommendation after the basis.',
       concernPattern: 'Bold label, mechanism, then the fix.',
       severitySignalling: 'Consequence, not adjective.',
       strengthsHandling: 'Two or three, caveated.',
       closePattern: 'What is worth saving, then the path.',
       distinctiveTics: ['bracketed severity flag'],
-      voiceRules: ['Open the decision by sentence three', 'Head each concern with a bold label', 'Name the mechanism before the number', 'Give the leanest fix then the ideal', 'Judge the argument not the author', 'Carry one strength into the close', 'Cite literature with its function', 'End on the revised version'],
+      voiceRules: ['Open warm, then the considered recommendation', 'Head each concern with a bold label', 'Name the mechanism before the number', 'Give the leanest fix then the ideal', 'Judge the argument not the author', 'Carry one strength into the close', 'Cite literature with its function', 'End on the revised version'],
       carriesNoThirdPartyContent: true,
     });
     expect(parsed.success).toBe(true);
@@ -97,7 +97,7 @@ describe('scrubVoiceProfile', () => {
       strengthsHandling: 'Two or three, caveated.',
       closePattern: 'What is worth saving, then the path.',
       distinctiveTics: ['bracketed severity flag'],
-      voiceRules: ['Open the decision by sentence three', 'Keep sentences under 35 words', 'Cite in APA 7', 'Name the mechanism first', 'Give the leanest fix then the ideal', 'Judge the argument not the author', 'Carry one strength into the close', 'End on the revised version'],
+      voiceRules: ['Open warm, then the considered recommendation', 'Keep sentences under 35 words', 'Cite in APA 7', 'Name the mechanism first', 'Give the leanest fix then the ideal', 'Judge the argument not the author', 'Carry one strength into the close', 'End on the revised version'],
       carriesNoThirdPartyContent: true,
       ...overrides,
     };

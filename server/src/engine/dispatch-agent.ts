@@ -24,6 +24,24 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// A prompt that exceeds the model context window cannot be rescued by retrying: the retry only
+// re-bills the same oversize input and, worse, grows it further with the appended defect note.
+// A schema/no-object error is always retryable, never an oversize signal, so short-circuit it.
+function isNonRetryableInputError(error: unknown): boolean {
+  if (NoObjectGeneratedError.isInstance(error)) {
+    return false;
+  }
+  const message = describeError(error).toLowerCase();
+  return (
+    message.includes('context_length_exceeded') ||
+    message.includes('maximum context length') ||
+    message.includes('context window') ||
+    message.includes('too many tokens') ||
+    message.includes('input is too long') ||
+    message.includes('prompt is too long')
+  );
+}
+
 function bandFor(confidence: number): 'Green' | 'Yellow' | 'Red' {
   if (confidence >= 0.98) {
     return 'Green';
@@ -145,6 +163,11 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
       return parsed.data as T;
     } catch (error) {
       lastError = error;
+      if (isNonRetryableInputError(error)) {
+        throw new Error(
+          `Agent ${params.agent} (${params.phase}) failed: the assembled prompt exceeds the model context window. ${describeError(error)}`,
+        );
+      }
       let defect = describeError(error);
       const rescue = salvageObject(error, schema);
       if (rescue.value !== undefined) {

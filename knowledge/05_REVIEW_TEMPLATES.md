@@ -33,7 +33,7 @@ Both are anonymous: signed "The Reviewer", no reviewer identity anywhere, unless
 
 **House section structure for the Peer Review Report** (author-and-editor facing, the seven parts, matching the benchmark reports):
 1. Title block and metadata table (rendered by the generator from the job config, not from body markdown).
-2. `Dear Editor and Authors,` salutation and a one-paragraph lead-in: thanks, what was read, where the comments concentrate, the recommendation stated early in natural prose.
+2. `Dear Editor and Authors,` salutation and a one-paragraph lead-in that opens with genuine warmth: thanks for the opportunity to read the work and a specific note of what is engaging about it, what was read, the basis for the view in brief, then the recommendation as a considered judgment in natural prose. It never opens cold with the bare verdict word.
 3. `# 1. Brief overview`: 4 to 7 lines, what the manuscript does, constructs, design, claimed contribution, evidence types. Non-evaluative.
 4. `# 2. Overall recommendation`: the decision and its confidence written as reviewer prose per the knowledge/06 natural-language register (never a taxonomy token, never a key-value line, never a bare numeric confidence), then three bullets naming the concerns that anchor the decision.
 5. `# 3. Executive summary` with `## Strengths` (3 to 5, anchored), `## Major issues` (each a bold-labelled scannable unit per knowledge/06), and `## Top five imperative changes` (numbered).
@@ -134,8 +134,10 @@ Author-facing. Written in full compliance with the developmental voice spec in k
 <!-- Drafted under the developmental voice spec, knowledge/04. -->
 
 ## Opening paragraph
-<4 to 7 lines, addressed to "you": merit of the question and the effort visible
-in the submission, decision stated directly and early, developmental pathway frame.>
+<4 to 7 lines, addressed to "you": open with thanks for the opportunity to read
+the work and a specific note of what is engaging, the merit of the question and the
+effort visible in the submission, the basis in brief, then the decision as a
+considered judgment, developmental pathway frame. Never open with the bare verdict.>
 
 ## Brief overview of your submission
 <2 to 3 non-evaluative sentences showing the manuscript was read and understood.>
@@ -311,16 +313,16 @@ The mechanical and completeness gate before production. Every unchecked box is a
 - [ ] Every criterion score references at least one ledger ID.
 
 ## Structural completeness (the seven parts)
-- [ ] Salutation opens: merit acknowledged, what was read, recommendation stated early in natural prose.
+- [ ] Salutation opens warm: the authors are thanked for the opportunity and told specifically what is engaging, what was read, the basis in brief, then the recommendation as a considered judgment. It never opens with the bare verdict word.
 - [ ] Part 1 Brief overview present, non-evaluative.
 - [ ] Part 2 Overall recommendation: reviewer prose per the knowledge/06 natural-language register, plus three anchor bullets. No taxonomy tokens, key-value lines, or bare numeric confidence anywhere in the body.
 - [ ] Part 3 Executive summary: strengths (3 to 5, anchored), major issues, top five changes.
 - [ ] Part 4A Major issues in full: 6 to 12 for a major-class recommendation, or the depth rule applied and visible when fewer than 3 exist. Literature engaged by name where the field-context material supplies it.
 - [ ] Part 4B By-section review present, Discussion always covered as interpretation (causal inflation, overclaiming, unexamined alternatives), never restatement. Primer boxes where a foundational correction is needed. Structural upgrades and minor points listed separately.
 - [ ] No finding ids in the shipped report body. The evidence map covers every 4A point and 4B subsection with section, verbatim bold label, anchor, and finding ids.
-- [ ] Part 5 Rubric scores: table, average, three lowest as bottlenecks.
+- [ ] Part 5 Rubric scores: rendered as a markdown table (Criterion, Score, Justification) with real criterion names, never narrated as prose, plus the average and three lowest as bottlenecks.
 - [ ] Part 6 What would change my recommendation: numbered, each names a category.
-- [ ] Part 7 Closing identifies the defensible paper and states the decision hinge.
+- [ ] Part 7 Closing affirms a good paper is here or within reach, identifies the defensible paper, states the decision hinge, and ends warm and forward-looking.
 - [ ] Every major issue carries all five knowledge/02 components including the
       named validity threat and the decision hinge.
 - [ ] Imperative-changes list concrete, verifiable, proportional to the decision.

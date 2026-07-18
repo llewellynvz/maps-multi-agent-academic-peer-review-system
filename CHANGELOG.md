@@ -4,6 +4,38 @@ All notable changes to Collegia are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Reviews now read the whole manuscript. The DOCX parser recovers headings from
+  bold and manually styled titles, not only Word heading styles, so a paper no
+  longer collapses into one undifferentiated block, and the abstract and
+  reference list are extracted rather than lost. The per-agent context budget was
+  raised and the excerpt now allocates its budget across every section, so a
+  normal-length paper is reviewed end to end instead of only its opening pages. A
+  parse that still fails to separate a paper is honestly marked degraded, which
+  cautions the reviewers rather than hiding the gap.
+- Perspective, theoretical, and opinion papers are no longer assessed for
+  qualitative data they never claimed. The qualitative lens is now switched off
+  for these no-data article types, matching the other empirical lenses.
+- The recommendation is calibrated to fixability. When a manuscript's problems
+  can be addressed with the existing study, data, or argument, the outcome is a
+  revision rather than a rejection. Reject and reject-and-resubmit are reserved
+  for work that genuinely cannot be repaired in one cycle or is out of scope, and
+  a gap caused by material the reviewer could not read never drives the decision
+  down.
+- Issue severity is defined more precisely. A major issue is one that threatens
+  the validity or interpretability of a central claim, not merely anything worth
+  fixing, and a gap created by missing or unreadable material is recorded as an
+  editorial coverage note rather than a major fault the authors must answer.
+- The developmental letter opens with genuine thanks and what is engaging about
+  the work before stating the recommendation as a considered judgment, works
+  through each section as a colleague thinking alongside the authors, presents the
+  rubric scores as a clear table, and closes on an encouraging, forward-looking
+  note.
+- The results page labels every rubric criterion with its name and a one-line
+  description instead of a bare number.
+
 ## [1.3.0] - 2026-07-17
 
 ### Added

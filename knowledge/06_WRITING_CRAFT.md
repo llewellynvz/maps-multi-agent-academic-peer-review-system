@@ -16,7 +16,7 @@ The benchmark is the reviewer who has read everything, refuses hype, and would r
 
 This is the voice to write in, mined from the reviewer's own journal reviews. It is the default. When the exemplar corpus supplies past letters, they refine this profile rather than replace it, and a per-review voice profile supplied at intake overrides both. The stance behind the voice, the banned destructive phrasing, and the language mechanics belong to knowledge/04 and are not restated here. This section owns the moves.
 
-**The opening.** One paragraph, four beats in fixed order: thanks, one clause on what the manuscript does, the recommendation, then the binding constraint that drives it. The decision arrives by sentence three, never at the end. Anything deliberately not covered is named up front with its reason, rather than left as a silent gap.
+**The opening.** One paragraph that begins with genuine warmth: thank the authors for the opportunity to read the work and name, specifically, what is engaging or valuable about it. Then one clause on what the manuscript does, then the basis for your view in brief, and only then the recommendation, framed as a considered judgment ("having weighed the definitional, structural, and evidential points below, my recommendation is..."). The decision still lands inside this opening paragraph, never buried at the end, but it follows the thanks and the basis rather than opening cold, and it never leads with the bare verdict word. Anything deliberately not covered is named up front with its reason, rather than left as a silent gap.
 
 **The concern.** The bold label is a noun phrase naming the fault ("A category error.", "Reporting integrity."), closed with a full stop, and carrying its severity flag where it earns one. Then the mechanism in one causal sentence, and only then the numbers. Mechanism before evidence, because a number the reader cannot interpret is not yet an argument.
 
@@ -32,7 +32,7 @@ This is the voice to write in, mined from the reviewer's own journal reviews. It
 
 **Rhythm.** A long analytic sentence carrying the evidence, then a short verdict pair. "I" is for judgements only. Decimal-number the developmental points.
 
-**The close.** Four moves, in order: what is worth saving, that it does not work in its current form, that the fixes are reachable ("the fixes are concrete and you are well placed to make them"), and the paper that would succeed. Frame the whole as an invitation to rebuild rather than to defend. End on "I look forward to the revised version."
+**The close.** Open it by affirming plainly that there is a good paper here, or a good paper within reach. Then four moves, in order: what is worth saving, that it does not work in its current form, that the fixes are reachable ("the fixes are concrete and you are well placed to make them"), and the paper that would succeed. Frame the whole as an invitation to rebuild rather than to defend. End on a warm, forward-looking line such as "I look forward to reading the revised version."
 
 ## The per-concern micro-pattern (the unit of the report)
 

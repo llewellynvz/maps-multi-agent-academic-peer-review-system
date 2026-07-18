@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { rubricCriterionName } from '@mara/shared';
 import { and, eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { rubricScores } from '../db/schema';
@@ -36,7 +37,7 @@ function upsertRubricScoreWithState(
     .values({
       id: randomUUID(),
       reviewId,
-      criterion: `Criterion ${input.criterionIndex}`,
+      criterion: rubricCriterionName(input.criterionIndex),
       criterionIndex: input.criterionIndex,
       score: input.score,
       justifyingFindingIds,

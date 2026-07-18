@@ -10,7 +10,7 @@ This page records what the platform deliberately does not do yet, why each limit
 
 **Supplementary materials, code, and data repositories are not examined.** A single PDF or DOCX per review. Statistical scripts, OSF links, and datasets referenced by the manuscript are not fetched or audited.
 
-**Very long manuscripts are truncated for LLM context.** The manuscript digest and per-section excerpts are capped per preset. The thorough preset carries doubled caps, and the deterministic statistics verifier reads the full text unconditionally, but an extremely long appendix can still fall outside what the reasoning agents see. MARG (allenai/marg-reviewer) demonstrates chunk-distribution across communicating agents if full-text reasoning coverage becomes a requirement.
+**Only very long manuscripts exceed the LLM context budget.** The manuscript excerpt is budgeted per preset (fast, balanced, and thorough carry progressively larger budgets) and allocated across every section, so a normal-length paper is read end to end and no section is invisible. The deterministic statistics verifier reads the full text unconditionally. The Phase 7 synthesis agents, which already hold the full findings ledger and the draft report, receive a bounded excerpt to keep the largest prompt inside the model context window. Only a paper well beyond typical length has its later sections condensed, and a dispatch that would still exceed the model window fails fast rather than retrying. MARG (allenai/marg-reviewer) demonstrates chunk-distribution across communicating agents if full-text reasoning coverage of very long papers becomes a requirement.
 
 ## Review lifecycle
 

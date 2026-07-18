@@ -29,3 +29,18 @@ export function looksLikeHeading(line: string): boolean {
   const withoutTrailingColon = trimmed.replace(/:$/, '');
   return /^[A-Z0-9]/.test(withoutTrailingColon) && wordCount <= 8;
 }
+
+// Stricter than looksLikeHeading: only the reliable signals (a numbered heading, or a standard
+// section keyword). It drops the permissive "capital-start short line" branch, which misfires on
+// short body lines like a table caption. Used where a false heading would split a section wrongly.
+export function looksLikeStrongHeading(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.length === 0 || trimmed.length > 90 || /[.!?]$/.test(trimmed)) {
+    return false;
+  }
+  const wordCount = trimmed.split(/\s+/).length;
+  if (/^\d+(\.\d+)*\.?\s+\S/.test(trimmed) && wordCount <= 12) {
+    return true;
+  }
+  return HEADING_KEYWORDS.test(trimmed) && wordCount <= 8;
+}

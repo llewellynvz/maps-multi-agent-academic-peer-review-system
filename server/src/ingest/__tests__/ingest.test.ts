@@ -85,6 +85,43 @@ describe('docxSectionMap', () => {
     expect(headings).not.toContain('References');
     expect(map.sections.some((section) => section.text.includes('Neff'))).toBe(false);
   });
+
+  it('does not split a short capitalised body line into a spurious section', async () => {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: 'A Study of Descriptives', heading: HeadingLevel.TITLE }),
+            new Paragraph({ text: 'Introduction', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Prior work established the value of positive interventions.'),
+            new Paragraph('Table 2 Means and SDs'),
+            new Paragraph('The table reports descriptive statistics for each measure.'),
+          ],
+        },
+      ],
+    });
+    const bytes = new Uint8Array(await Packer.toBuffer(doc));
+    const map = await docxSectionMap(bytes);
+
+    expect(map.sections.map((section) => section.heading)).not.toContain('Table 2 Means and SDs');
+  });
+
+  it('marks a single unheaded blob with no abstract as a degraded parse', async () => {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: 'A Title Line', heading: HeadingLevel.TITLE }),
+            new Paragraph('One long run of body text with no headings at all and no abstract present here.'),
+          ],
+        },
+      ],
+    });
+    const bytes = new Uint8Array(await Packer.toBuffer(doc));
+    const map = await docxSectionMap(bytes);
+
+    expect(map.parseQuality).toBe('degraded');
+  });
 });
 
 describe('sectionMapFromPlainText', () => {

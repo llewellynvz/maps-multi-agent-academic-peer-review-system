@@ -41,9 +41,11 @@ The review-report-writer assigns provisional scores in the full report, each cri
 | 14 | Writing, scholarly tone, and COI | Clarity, structure, professional tone, conflict-of-interest disclosure |
 | 15 | Overall decision readiness | Proximity of the whole manuscript to a publishable state at this journal |
 
+The importable runtime copy of these criterion names lives in `packages/shared/src/rubric-criteria.ts`, used to label scores in the app and the stored rubric. It is kept in sync with this table and a test pins the names to it, so a rename here must be mirrored there.
+
 ### Averaging rule
 
-The rubric average is the unweighted mean of all 15 scores, to one decimal. No criterion is dropped or reweighted. The average feeds the thresholds below but never decides alone: severity and fixability can pull the recommendation down from what the average permits, never up.
+The rubric average is the unweighted mean of all 15 scores, to one decimal. No criterion is dropped or reweighted. The average feeds the thresholds below but never decides alone: severity and fixability can pull the recommendation down from what the average permits, never up. A downgrade below the band the average permits requires a genuinely fatal, unrepairable finding. A large volume of fixable work is never on its own a reason to drop below major revision.
 
 ### Bottleneck analysis
 
@@ -69,15 +71,17 @@ The source architecture's docs and its recommendation-engine prompt disagree on 
 |----------------|---------------------------|
 | **Accept** | Rubric average at or above 4.0 AND no open major or fatal findings AND recommendation confidence at or above 0.90. If any condition fails, downgrade to minor revision with an explicit list of what would restore accept. |
 | **Minor revision** | Average at or above 3.5, with 1 to 3 moderate concerns, all fixable without new data, nothing fatal. |
-| **Major revision** | Average 2.0 to 3.4, with 4 to 8 major concerns, none fatal. Redesigned analysis, added reporting, or substantial restructuring is required but achievable with existing data. |
-| **Reject and resubmit** | Average 1.0 to 1.9. The contribution is plausible and salvageable, but the required redesign of method or framework is so fundamental that a revision could not be verified against the current version. |
-| **Reject** | Average below 1.0, OR any fatal issue not fixable from current data, OR fundamental misrepresentation of evidence, OR an unresolved policy violation. Any one suffices. |
+| **Major revision** | The manuscript has substantive weaknesses that are addressable with the existing study, data, or argument. Redesigned analysis, added reporting or measurement detail, restructuring, or, for conceptual work, added definitions, worked examples, and tempered claims are required but achievable within one revision cycle. This is the default outcome for a fixable manuscript, whatever the number of major concerns. Rubric average typically 2.0 to 3.4, but fixability, not the average or the count of concerns, decides the category. |
+| **Reject and resubmit** | The contribution is sound enough to deserve a fresh submission, but the work required is so extensive that it is effectively a new study and no realistic revision of this version could be verified against it. Reserve this for genuinely not-repairable-in-one-cycle cases, never for a manuscript that merely needs substantial additions. Rubric average typically 1.0 to 1.9. |
+| **Reject** | A fundamental flaw that revision cannot repair (a design that cannot be redone, a misrepresentation of evidence, an unresolved policy violation), OR the work is out of scope for the journal. Any one suffices. Not warranted by the volume of fixable issues, nor by incomplete reporting or by material the reviewer could not read. |
 
 Standing decision rules:
 
+- Fixability decides the boundary between major revision and the reject classes, not the number of findings and not the tone of the review. If the authors could realistically address the concerns with the existing study, data, or argument, including adding definitions, examples, or analyses or tempering claims, the recommendation is major revision at its most severe. Reject and reject and resubmit require that the core problem is genuinely not repairable within one revision cycle. When the choice is between major revision and a reject class, choose major revision.
+- A recommendation is never driven below major revision by material the reviewer did not receive or could not read: a truncated extract, an omitted section, or a failed parse. Such gaps are coverage limitations recorded for the editor, and the correct response is to note that the complete manuscript is needed, not to downgrade the decision. Their finding-level severity is governed by module 02.
 - Never recommend accept while an unresolved major validity issue exists, whatever the average says.
 - Never recommend reject solely because reporting is incomplete when the gaps are readily fixable.
-- Reject and resubmit is the right category when an accept-or-reject binary would be unfair to the author and unhelpful to the journal: the contribution deserves a new cycle, not a patch.
+- Reject and resubmit is the right category only when the work required is so extensive that this version is effectively a new study, yet the contribution deserves a fresh cycle. It is not a softer reject and not a harsher major revision.
 - Unadjudicated serious integrity signals route to editor-only escalation in signal language (module 01), never to accusatory author-facing claims.
 
 ### Recommendation confidence

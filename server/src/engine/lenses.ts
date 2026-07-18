@@ -256,7 +256,7 @@ export function applyPaperTypeLensPolicy(
   }
   if (paperType === 'theoretical' || paperType === 'perspective-or-opinion') {
     if (!analystAffirmsData) {
-      for (const prefix of ['METH', 'STAT', 'MEAS', 'CAUS']) {
+      for (const prefix of ['METH', 'STAT', 'MEAS', 'CAUS', 'QUAL']) {
         prefixes.delete(prefix);
       }
     }

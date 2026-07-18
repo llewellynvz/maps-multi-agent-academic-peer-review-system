@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/collegia-hero.png" alt="Collegia: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
+<img src="assets/collegia-hero.svg" alt="Collegia: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
 
 <br>
 
@@ -24,6 +24,10 @@ A Psynalytics AI system. Proprietary and confidential.
 
 > **Proprietary software.** Copyright © 2026 Llewellyn van Zyl and Psynalytics B.V. All rights reserved. No licence to use, copy, modify, or distribute is granted. Commercial use is prohibited. See [LICENSE](LICENSE).
 
+## Contents
+
+[Overview](#overview) · [What it does](#what-it-does) · [How it works](#how-it-works) · [Architecture](#architecture) · [Quickstart](#quickstart) · [Configuration](#configuration) · [Development](#development) · [Security and confidentiality](#security-and-confidentiality) · [The reviewing voice](#the-reviewing-voice) · [Author](#author) · [Licence](#licence)
+
 ## Overview
 
 Collegia is a multi-agent academic peer-review architecture. It reviews psychology and wellbeing-science manuscripts the way a rigorous, developmental third reviewer would. A single instruction runs a fully orchestrated pipeline that reads the manuscript, establishes its field context, audits its references, examines it through a fleet of specialist lenses, stress-tests the findings, and produces a developmental author letter, a confidential editor summary, and a full evidence-grounded review report.
@@ -36,7 +40,7 @@ Collegia runs entirely on one machine. The manuscript text, the author identitie
 
 | Capability | Detail |
 |---|---|
-| Full developmental review | A nine-phase pipeline from intake to branded deliverables, coordinated across sixteen review agents. |
+| Full developmental review | A nine-phase pipeline from intake to branded deliverables, coordinated across seventeen review agents. |
 | Evidence-grounded findings | Every finding carries a manuscript anchor and enters an append-only ledger. Claims in the letter map to ledger identifiers through a structured evidence map. |
 | Deterministic release gate | A programmatic gate blocks release unless grounding, confidentiality, register, and structure invariants all hold. No agent certifies its own output. |
 | Adversarial self-review | An independent critic runs after each major phase and again at the release gate, with a bounded budget for forcing corrections. |
@@ -66,7 +70,7 @@ The release gate at Phase 7 is deterministic. It rejects any deliverable whose p
 
 ### Agent workflow
 
-Sixteen agents run across the nine phases. Specialist lenses fan out in parallel and take an independent first pass before a challenge round. The orchestrator is the only writer that merges finding fragments into the ledger, and the Phase 7 release gate is a closed loop: the writer drafts, a deterministic validator and an independent critic test the draft, and unresolved objections fall to a logged arbitration rather than a silent failure.
+Seventeen agent roles span the nine phases. Specialist lenses fan out in parallel and take an independent first pass before a challenge round. The orchestrator is the only writer that merges finding fragments into the ledger, and the Phase 7 release gate is a closed loop: the writer drafts, a deterministic validator and an independent critic test the draft, and unresolved objections fall to a logged arbitration rather than a silent failure.
 
 ```mermaid
 flowchart TD
@@ -75,15 +79,15 @@ flowchart TD
     P1[Phase 1 Structured analysis<br/>manuscript-analyst]
     P2[Phase 2 Field context and citations<br/>field-context-scout and citation-auditor]
     P3[Phase 3 Specialist review and challenge<br/>specialist-reviewer per active lens]
-    P4[Phase 4 Integrity screen<br/>deterministic stats verifier, integrity-screener, ai-content-analyst]
-    P5[Phase 5 Swarm stress-test<br/>swarm-simulator]
+    P4[Phase 4 Integrity screen<br/>stats verifier, integrity-screener, ai-content-analyst]
+    P5[Phase 5 Swarm stress-test<br/>swarm]
     P6[Phase 6 Internal report<br/>review-report-writer]
-    P8[Phase 8 Deliverables<br/>quality-metrics, journal-scope, calibrator]
+    P8[Phase 8 Deliverables<br/>quality-metrics-engine, journal-scope-scorer, review-calibrator]
     OUT([Author letter and editor summary])
 
     subgraph G [Phase 7 Release gate]
       direction LR
-      WR[review-report-writer] --> GV{Deterministic gate}
+      WR[review-meta-reviewer then review-report-writer] --> GV{Deterministic gate}
       GV -- revise --> WR
       GV -- pass --> FC{review-final-critic}
       FC -- revise --> WR
@@ -104,7 +108,40 @@ flowchart TD
 
 ## Architecture
 
-A TypeScript monorepo managed with pnpm.
+Collegia is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach out only to the services you configure. The diagram below shows how the parts interact and where the confidentiality boundary sits.
+
+```mermaid
+flowchart LR
+    U(["Reviewer and operator"])
+
+    subgraph C ["Single local container"]
+      direction TB
+      APP["Next.js app<br/>intake, live view, results, API"]
+      WK["Review worker<br/>nine-phase engine, 17 agents, release gate"]
+      DB[("SQLite mara.db<br/>reviews, events, append-only ledger")]
+      VLT[["Encrypted key vault<br/>AES-256-GCM"]]
+    end
+
+    GRB["GROBID sidecar<br/>PDF structure"]
+    PRV["Model provider<br/>Azure, OpenAI, Anthropic, Google, Ollama"]
+    LIT["Literature APIs<br/>Crossref, OpenAlex, Semantic Scholar"]
+    LF["Langfuse<br/>optional local tracing"]
+    OUT["Author letter and editor summary<br/>branded Word documents"]
+
+    U -->|"upload and answers"| APP
+    APP -->|"enqueue and read status"| DB
+    APP -.->|"live events"| U
+    WK <-->|"claim lease, run phases, merge ledger"| DB
+    WK -->|"parse PDF"| GRB
+    WK -->|"dispatch agents"| PRV
+    WK -->|"method terms only, guarded egress"| LIT
+    WK -->|"seal and read keys"| VLT
+    WK -->|"render"| OUT
+    APP -->|"download"| OUT
+    WK -.->|"traces, no manuscript text"| LF
+```
+
+The codebase is a TypeScript monorepo managed with pnpm.
 
 ```
 app/               Next.js web application (intake, live run view, results, downloads)
@@ -115,7 +152,7 @@ server/            Review engine, worker, data layer, citation retrieval, securi
   src/worker/        Single-lease worker, queue, recovery
   src/data/          SQLite access, event stream, deliverables
 packages/shared/   Zod schemas shared by the app, server, and agents
-agents/            Sixteen agent definitions (method prompts and manifests)
+agents/            Seventeen agent definitions (method prompts and manifests)
 knowledge/         The deduplicated knowledge base (governance, lenses, decision, voice, craft)
 docker/            Container build and entrypoint
 ```

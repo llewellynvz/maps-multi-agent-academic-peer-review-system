@@ -6,13 +6,15 @@ This module owns the shared finding format, the lens activation map, the eleven 
 
 Every finding from every specialist and integrity dispatch carries all of these fields. A finding missing any field does not enter the ledger (ledger rules: module 01).
 
-**Severity** (one value):
+**Severity** (one value). The test that separates the levels is one question: does this threaten the validity or interpretability of a central claim? Not every flaw is major. When a finding could sit in two levels, choose the milder one unless it clearly meets the higher bar.
 
 - **none**: a completed check found no defect, logged only when the run record needs it.
-- **minor**: polish or reporting detail that affects no conclusion.
-- **moderate**: a real weakness that lowers confidence in a claim but is repairable within the current study.
-- **major**: threatens the validity of a primary claim or the contribution, must be resolved before publication.
-- **fatal**: the flaw sits under the central claim and the current study cannot repair it.
+- **minor**: presentation, clarity, or completeness that affects no conclusion. Examples: ambiguous wording, a typo, a missing or excess citation, a mislabelled table.
+- **moderate**: a real weakness that lowers confidence in a claim but leaves the central conclusions standing once addressed, repairable within the current study. Examples: an under-specified analysis, a missing robustness check, a literature section too narrow to situate the contribution, an over-stated inference that needs hedging.
+- **major**: threatens the validity or interpretability of a primary claim or the stated contribution, so the conclusion does not stand until it is resolved. Examples: a design or measurement flaw that makes a key result uninterpretable, a central claim that outruns its evidence, an unaddressed integrity or ethics concern bearing on a conclusion. A finding is not major merely because it is important to fix, because several like it exist, or because it touches presentation or a scope preference.
+- **fatal**: the flaw sits under the central claim and the current study cannot repair it, needing new data or a different design.
+
+A gap created by material the reviewer did not receive or could not read, such as a truncated extract, a section the packet omitted, or a failed parse, is never a major or fatal author-facing finding. Record it as a coverage limitation for the editor and, where needed, note that the complete manuscript is required. Material that is genuinely absent from the manuscript itself keeps its true severity: only a truncation, a non-delivery, or a parse failure is a coverage limitation, never a real omission the authors must fix.
 
 **Fixability**: **easy** (wording or reporting), **moderate** (reanalysis or restructuring from existing material), **hard** (substantial new work still within reach of the current study), **not-fixable-from-current-study** (needs new data or a different design), **unclear** (cannot be judged without missing material or an author response).
 

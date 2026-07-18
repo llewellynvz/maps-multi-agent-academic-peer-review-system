@@ -133,6 +133,28 @@ describe('runAgent schema salvage', () => {
     expect(prompts[1]).toContain('findings.0.id');
   });
 
+  it('does not retry a context-length error and fails fast', async () => {
+    let dispatches = 0;
+    await expect(
+      runAgent(
+        {
+          runDispatch: async () => {
+            dispatches += 1;
+            throw new Error("This model's maximum context length is 128000 tokens (context_length_exceeded)");
+          },
+        },
+        {
+          reviewId: freshReviewId(),
+          phase: 'phase_3',
+          agent: 'specialist-reviewer',
+          artefactName: 'p3-METH-first',
+          assembleInput: { lens: 'Methods and design' },
+        },
+      ),
+    ).rejects.toThrow('exceeds the model context window');
+    expect(dispatches).toBe(1);
+  });
+
   it('still fails after exhausting attempts on unrepairable output', async () => {
     const bad = specialistPayload([finding({ id: 'nope' })]);
     let dispatches = 0;

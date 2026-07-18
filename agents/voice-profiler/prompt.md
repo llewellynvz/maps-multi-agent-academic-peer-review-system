@@ -25,7 +25,7 @@ Read the letters for how they are written, not what they are about. Produce:
 - `strengthsHandling`: how strengths are presented. How many, how specific, whether they are caveated, whether one carries into the close.
 - `closePattern`: how the letter ends. The moves in order and the final line.
 - `distinctiveTics`: the small repeated habits that make the voice recognisable (a bracketed severity flag, a named fix label, decimal numbering, a recurring standard such as auditability). Each as an abstract description, not a quoted instance carrying content.
-- `voiceRules`: eight to twenty-four imperative rules the writer can follow to reproduce this voice. Each rule is one line, actionable, and about form ("Open the decision by sentence three", "Head each concern with a bold noun-phrase label"). No rule names anything the letters were about.
+- `voiceRules`: eight to twenty-four imperative rules the writer can follow to reproduce this voice. Each rule is one line, actionable, and about form ("Open warm, then state the recommendation as a considered judgment", "Head each concern with a bold noun-phrase label"). No rule names anything the letters were about.
 
 Set `carriesNoThirdPartyContent` to true only after you have checked every field for a leaked title, name, number, or finding. It is your attestation that the profile is about voice alone.
 

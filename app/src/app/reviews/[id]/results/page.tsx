@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { rubricCriterion } from '@mara/shared';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { api, type DeliverableView, type EvidenceData, type ReviewDetail, type RunStats } from '@/lib/api';
 import {
@@ -160,17 +161,28 @@ export default function ResultsPage(): ReactNode {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="num">#</th>
                     <th>Criterion</th>
                     <th className="num">Score / 5</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(review.rubricScores ?? []).map((row) => (
-                    <tr key={row.criterionIndex}>
-                      <td>{row.criterion}</td>
-                      <td className="num mono">{row.score}</td>
-                    </tr>
-                  ))}
+                  {(review.rubricScores ?? []).map((row) => {
+                    const meta = rubricCriterion(row.criterionIndex);
+                    const name = meta?.name ?? row.criterion;
+                    return (
+                      <tr key={row.criterionIndex}>
+                        <td className="num mono muted">{row.criterionIndex}</td>
+                        <td>
+                          <strong>{name}</strong>
+                          {meta?.summary ? (
+                            <div className="sub" style={{ margin: '2px 0 0' }}>{meta.summary}</div>
+                          ) : null}
+                        </td>
+                        <td className="num mono">{row.score}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

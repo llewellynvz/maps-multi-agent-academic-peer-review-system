@@ -27,7 +27,7 @@ import {
 } from '../workflow/repo';
 import { DispatchPauseError, type EngineDeps } from './phases-shared';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
-import { loadEngineContext, manuscriptDigest } from './context';
+import { loadEngineContext, manuscriptDigest, SYNTHESIS_DIGEST_CHARS } from './context';
 import { runAgent } from './dispatch-agent';
 import { arbitrate, groundingKindsForceHalt, type ArbitrationRecord } from './arbitration';
 import {
@@ -180,7 +180,33 @@ function ledgerForReport(findings: CurrentFinding[]): Array<Record<string, unkno
   }));
 }
 
-function repairEvidenceLabels(shipped: ShippedReportEnvelope): ShippedReportEnvelope['evidenceMap'] {
+const LABEL_STOPWORDS = new Set([
+  'and', 'the', 'for', 'of', 'to', 'an', 'or', 'with', 'at', 'as', 'is', 'a',
+  'required', 'recommended', 'needed', 'suggested',
+]);
+
+function significantTokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length >= 3 && !LABEL_STOPWORDS.has(token)),
+  );
+}
+
+function isTokenSubset(inner: Set<string>, outer: Set<string>): boolean {
+  if (inner.size === 0) {
+    return false;
+  }
+  for (const token of inner) {
+    if (!outer.has(token)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function repairEvidenceLabels(shipped: ShippedReportEnvelope): ShippedReportEnvelope['evidenceMap'] {
   const headings = bodyHeadings(shipped.bodyMarkdown);
   const lower = headings.map((heading) => heading.toLowerCase());
   return shipped.evidenceMap.map((entry) => {
@@ -207,6 +233,22 @@ function repairEvidenceLabels(shipped: ShippedReportEnvelope): ShippedReportEnve
     });
     if (index >= 0) {
       return { ...entry, label: headings[index] as string };
+    }
+    // The section name is often a shorthand of the real heading ("Organising spine" vs "Organising
+    // spine: Psychology OF and FOR AI systems"). Bind only when the section's significant words are
+    // contained in exactly one heading: the heading fully covers the section, so nothing is masked.
+    const keyTokens = significantTokens(sectionKey);
+    if (keyTokens.size >= 2) {
+      const subsetMatches: number[] = [];
+      for (let i = 0; i < headings.length; i += 1) {
+        const headingTokens = significantTokens(headings[i] as string);
+        if (isTokenSubset(keyTokens, headingTokens)) {
+          subsetMatches.push(i);
+        }
+      }
+      if (subsetMatches.length === 1) {
+        return { ...entry, label: headings[subsetMatches[0] as number] as string };
+      }
     }
     let best = -1;
     let bestRatio = 0;
@@ -306,7 +348,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   }
 
   const ctx = loadEngineContext(db, reviewId);
-  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset);
+  const digest = manuscriptDigest(ctx.sectionMap, ctx.preset, SYNTHESIS_DIGEST_CHARS);
   const options = getReviewOptions(db, reviewId);
   const intake = readIntakeOptions(options);
   const typeNote = paperTypeNote(intake.paperType);

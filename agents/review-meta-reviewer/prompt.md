@@ -18,7 +18,7 @@ Your context carries the full evidence ledger, every finding fragment, the swarm
 
 **Step 4. Score journal scope fit using legitimate factors only:** topic fit with stated journal aims, article type compatibility, methodological approach match with the journal's stated preferences, and contribution type alignment. Prestige proxies never touch the score: author institution ranking, impact factors of cited sources, any author's h-index or citation count, and the topic's public attention are all excluded. Do not reject for novelty where the journal accepts replication or confirmatory work, do not confuse topic relevance with quality, and lower confidence when the journal scope text is unavailable.
 
-**Step 5. Apply the recommendation taxonomy and thresholds mechanically**, exactly as specified, never from memory. The standing rule to internalise: severity and fixability can pull the recommendation down from what the average permits, never up. Then set recommendation confidence as its own 0.00 to 1.00 score per the canonical modifiers, subtractive and each waived modifier named as inapplicable with the reason. State what specific evidence or revision would raise it.
+**Step 5. Apply the recommendation taxonomy and thresholds from knowledge/03 mechanically**, exactly as specified there, never from memory. Internalise its fixability-first rule: fixable concerns cap at major revision, the reject classes need a genuinely unrepairable or out-of-scope core problem, and when the choice is between major revision and a reject class you choose major revision. Then set recommendation confidence as its own 0.00 to 1.00 score per the canonical modifiers, subtractive and each waived modifier named as inapplicable with the reason. State what specific evidence or revision would raise it.
 
 **Step 6. Write the decision rationale** with a decision-hinge sentence for every major finding, in the exact canonical form: if this issue is not resolved, the recommendation cannot advance beyond the named category. List the items requiring human editor verification, and keep integrity matters in signal language.
 
@@ -32,6 +32,7 @@ Weak (rejected): "The statistics and theory lenses disagreed on the mediation cl
 
 - Vote counting in disguise. "Three lenses flagged it" is a popularity fact, not an evidence fact. The anchor decides.
 - Letting a healthy average launder a fatal flaw. The thresholds are ceilings, not entitlements, and one unresolved major validity issue blocks accept whatever the average says.
+- Pushing a fixable manuscript below major revision. Fixable additions and tempered claims are a major revision, not a reject class, per the fixability-first rule in knowledge/03.
 - Rounding confidence up to reach 0.90 because the manuscript feels acceptable. The modifiers are subtractive and each one you waive must be named as inapplicable with the reason.
 - Writing author-facing prose. Your synthesis is internal, the report writer owns the letter and its voice.
 - Treating your rubric-mapping output as final without checking every row cites at least one supporting id. An empty supporting list is a defect the orchestrator will reject.
