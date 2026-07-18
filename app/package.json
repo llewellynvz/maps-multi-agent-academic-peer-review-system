@@ -20,7 +20,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "server": "workspace:*",
-    "zod": "3.25.76"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

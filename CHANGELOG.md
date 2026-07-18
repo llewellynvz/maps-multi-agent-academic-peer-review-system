@@ -35,10 +35,9 @@ All notable changes to Collegia are recorded here. The format follows
   note.
 - The results page labels every rubric criterion with its name and a one-line
   description instead of a bare number.
-- Refreshed dependencies to their latest compatible releases (the AI SDK
-  packages, Mastra, the OpenTelemetry API, fast-xml-parser, and tsx). TypeScript,
-  Zod, and the Node type definitions are held at their current major versions
-  pending dedicated migrations.
+- Refreshed all dependencies to their latest releases, including the major
+  updates to TypeScript 7, Zod 4, and the Node type definitions, alongside the AI
+  SDK packages, Mastra, the OpenTelemetry API, fast-xml-parser, and tsx.
 
 ## [1.3.0] - 2026-07-17
 

@@ -35,7 +35,7 @@ export function createGrobidClient(options: GrobidClientOptions): GrobidClient {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const form = new FormData();
-      form.append('input', new Blob([pdf], { type: 'application/pdf' }), 'manuscript.pdf');
+      form.append('input', new Blob([new Uint8Array(pdf)], { type: 'application/pdf' }), 'manuscript.pdf');
       const response = await fetchImpl(`${baseUrl}/api/processFulltextDocument`, {
         method: 'POST',
         body: form,
