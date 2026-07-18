@@ -10,7 +10,7 @@ A Psynalytics AI system. Proprietary and confidential.
 
 <p align="center">
   <img src="https://img.shields.io/badge/licence-proprietary-006D7C?style=flat-square" alt="Licence: proprietary">
-  <img src="https://img.shields.io/badge/version-1.0.0-008DA1?style=flat-square" alt="Version 1.0.0">
+  <img src="https://img.shields.io/badge/version-1.3.0-008DA1?style=flat-square" alt="Version 1.3.0">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript strict">
   <img src="https://img.shields.io/badge/Node-22.13%2B-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node 22.13 or newer">
   <img src="https://img.shields.io/badge/tests-passing-A7D12B?style=flat-square" alt="Tests passing">
