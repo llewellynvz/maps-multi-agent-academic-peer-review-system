@@ -114,7 +114,7 @@ Collegia is a single deployable unit. The web application and the review worker 
 flowchart LR
     U(["Reviewer and operator"])
 
-    subgraph C ["Single local container"]
+    subgraph C [Single local container]
       direction TB
       APP["Next.js app<br/>intake, live view, results, API"]
       WK["Review worker<br/>nine-phase engine, 17 agents, release gate"]
