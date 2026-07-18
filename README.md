@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/collegia-hero.svg" alt="Collegia: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
+<img src="assets/collegia-hero.jpg" alt="Collegia: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
 
-<br>
+<h1>Collegia</h1>
 
 **Autonomous, evidence-grounded peer review for psychological and wellbeing science.**
 
@@ -108,38 +108,11 @@ flowchart TD
 
 ## Architecture
 
-Collegia is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach out only to the services you configure. The diagram below shows how the parts interact and where the confidentiality boundary sits.
+Collegia is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach out only to the services you configure. The diagram below shows the whole system: the nine-phase pipeline, the seventeen agents, the runtime components, and the confidentiality boundary.
 
-```mermaid
-flowchart LR
-    U(["Reviewer and operator"])
-
-    subgraph C [Single local container]
-      direction TB
-      APP["Next.js app<br/>intake, live view, results, API"]
-      WK["Review worker<br/>nine-phase engine, 17 agents, release gate"]
-      DB[("SQLite mara.db<br/>reviews, events, append-only ledger")]
-      VLT[["Encrypted key vault<br/>AES-256-GCM"]]
-    end
-
-    GRB["GROBID sidecar<br/>PDF structure"]
-    PRV["Model provider<br/>Azure, OpenAI, Anthropic, Google, Ollama"]
-    LIT["Literature APIs<br/>Crossref, OpenAlex, Semantic Scholar"]
-    LF["Langfuse<br/>optional local tracing"]
-    OUT["Author letter and editor summary<br/>branded Word documents"]
-
-    U -->|"upload and answers"| APP
-    APP -->|"enqueue and read status"| DB
-    APP -.->|"live events"| U
-    WK <-->|"claim lease, run phases, merge ledger"| DB
-    WK -->|"parse PDF"| GRB
-    WK -->|"dispatch agents"| PRV
-    WK -->|"method terms only, guarded egress"| LIT
-    WK -->|"seal and read keys"| VLT
-    WK -->|"render"| OUT
-    APP -->|"download"| OUT
-    WK -.->|"traces, no manuscript text"| LF
-```
+<div align="center">
+<img src="assets/collegia-architecture.png" alt="Collegia architecture: the nine-phase review pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
+</div>
 
 The codebase is a TypeScript monorepo managed with pnpm.
 
