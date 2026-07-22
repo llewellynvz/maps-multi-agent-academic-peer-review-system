@@ -254,6 +254,75 @@ describe('dispatch runner', () => {
     expect(captured?.temperature).toBe(0.5);
   });
 
+  it('defaults reasoning effort to high for a reasoning model but leaves a non-reasoning model untouched', async () => {
+    let captured: { providerOptions?: Record<string, Record<string, unknown>> } | undefined;
+    const generate: GenerateApi = {
+      generateText: async (options) => {
+        captured = options;
+        return { text: 'x', usage: {} };
+      },
+      generateObject: async (options) => {
+        captured = options;
+        return { object: {}, usage: {} };
+      },
+    };
+    const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
+
+    await run(baseInput());
+    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'high' });
+
+    const nonReasoning: ModelRef = {
+      providerName: 'openai',
+      model: 'gpt-4o-mini',
+      languageModel: {} as LanguageModel,
+      isReasoning: false,
+    };
+    await run({ ...baseInput(), model: nonReasoning });
+    expect(captured?.providerOptions).toBeUndefined();
+  });
+
+  it('lets a caller-supplied reasoning effort override the default', async () => {
+    let captured: { providerOptions?: Record<string, Record<string, unknown>> } | undefined;
+    const generate: GenerateApi = {
+      generateText: async (options) => {
+        captured = options;
+        return { text: 'x', usage: {} };
+      },
+      generateObject: async () => ({ object: {}, usage: {} }),
+    };
+    const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
+
+    await run({
+      ...baseInput(),
+      parts: { ...baseInput().parts, providerOptions: { openai: { reasoningEffort: 'low' } } },
+    });
+    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'low' });
+  });
+
+  it('preserves a sibling provider namespace and other openai keys when adding the reasoning default', async () => {
+    let captured: { providerOptions?: Record<string, Record<string, unknown>> } | undefined;
+    const generate: GenerateApi = {
+      generateText: async (options) => {
+        captured = options;
+        return { text: 'x', usage: {} };
+      },
+      generateObject: async () => ({ object: {}, usage: {} }),
+    };
+    const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
+
+    await run({
+      ...baseInput(),
+      parts: { ...baseInput().parts, providerOptions: { azure: { foo: 1 } } },
+    });
+    expect(captured?.providerOptions).toEqual({ azure: { foo: 1 }, openai: { reasoningEffort: 'high' } });
+
+    await run({
+      ...baseInput(),
+      parts: { ...baseInput().parts, providerOptions: { openai: { store: true } } },
+    });
+    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'high', store: true });
+  });
+
   it('measures latency from the injected clock', async () => {
     const { generate } = countingGenerate();
     let clock = 100;

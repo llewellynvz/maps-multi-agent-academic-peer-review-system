@@ -238,6 +238,13 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
     if (input.temperature !== undefined && !modelRef.isReasoning) {
       callOptions.temperature = input.temperature;
     }
+    if (modelRef.isReasoning) {
+      const openaiOptions = callOptions.providerOptions?.openai ?? {};
+      callOptions.providerOptions = {
+        ...callOptions.providerOptions,
+        openai: { reasoningEffort: 'high', ...openaiOptions },
+      };
+    }
 
     const started = now();
     try {

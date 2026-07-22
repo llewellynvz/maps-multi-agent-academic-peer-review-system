@@ -12,6 +12,7 @@ const PRICING_TABLE: Record<string, ModelPricing> = {
   'gpt-5-mini': { inputPerMillion: 0.25, cachedPerMillion: 0.025, outputPerMillion: 2.0 },
   'gpt-4.1-mini': { inputPerMillion: 0.4, cachedPerMillion: 0.1, outputPerMillion: 1.6 },
   'gpt-4o': { inputPerMillion: 2.5, cachedPerMillion: 1.25, outputPerMillion: 10.0 },
+  'gpt-5.6-sol': { inputPerMillion: 5.0, cachedPerMillion: 0.5, outputPerMillion: 30.0 },
 };
 
 function pricingFor(model: string): ModelPricing | undefined {

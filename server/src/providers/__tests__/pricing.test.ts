@@ -59,4 +59,16 @@ describe('dispatch cost estimation', () => {
     expect(hasPricing('gpt-5.1')).toBe(true);
     expect(hasPricing('qwen2:7b')).toBe(false);
   });
+
+  it('prices a gpt-5.6-sol dispatch at its own input/cached/output rates', () => {
+    expect(hasPricing('gpt-5.6-sol')).toBe(true);
+    const cost = estimateCostUsd('gpt-5.6-sol', {
+      inputTokens: 2000,
+      outputTokens: 100,
+      cachedTokens: 1900,
+      reasoningTokens: 0,
+    });
+    const raw = (100 * 5.0 + 1900 * 0.5 + 100 * 30.0) / 1_000_000;
+    expect(cost).toBe(Math.round(raw * 1_000_000) / 1_000_000);
+  });
 });
