@@ -254,7 +254,7 @@ describe('dispatch runner', () => {
     expect(captured?.temperature).toBe(0.5);
   });
 
-  it('defaults reasoning effort to high for a reasoning model but leaves a non-reasoning model untouched', async () => {
+  it('defaults reasoning effort to xhigh for a reasoning model but leaves a non-reasoning model untouched', async () => {
     let captured: { providerOptions?: Record<string, Record<string, unknown>> } | undefined;
     const generate: GenerateApi = {
       generateText: async (options) => {
@@ -269,7 +269,7 @@ describe('dispatch runner', () => {
     const run = createDispatchRunner({ db, registry: stubRegistry, generate, now: () => 0 });
 
     await run(baseInput());
-    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'high' });
+    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'xhigh' });
 
     const nonReasoning: ModelRef = {
       providerName: 'openai',
@@ -314,13 +314,13 @@ describe('dispatch runner', () => {
       ...baseInput(),
       parts: { ...baseInput().parts, providerOptions: { azure: { foo: 1 } } },
     });
-    expect(captured?.providerOptions).toEqual({ azure: { foo: 1 }, openai: { reasoningEffort: 'high' } });
+    expect(captured?.providerOptions).toEqual({ azure: { foo: 1 }, openai: { reasoningEffort: 'xhigh' } });
 
     await run({
       ...baseInput(),
       parts: { ...baseInput().parts, providerOptions: { openai: { store: true } } },
     });
-    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'high', store: true });
+    expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'xhigh', store: true });
   });
 
   it('measures latency from the injected clock', async () => {

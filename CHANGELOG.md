@@ -9,9 +9,9 @@ All notable changes to Collegia are recorded here. The format follows
 ### Changed
 - The default frontier deployment example moved to GPT-5.6 Sol, replacing GPT-5.1,
   with a matching cost entry so spend on it is tracked. Every reasoning-class
-  dispatch now defaults to high reasoning effort rather than the provider default,
-  so the model spends more effort per review unless a caller explicitly asks for
-  less.
+  dispatch now defaults to the highest reasoning effort each model actually
+  supports (xhigh) rather than the provider default, so the model spends as
+  much effort as it can per review unless a caller explicitly asks for less.
 - Reviews now read the whole manuscript. The DOCX parser recovers headings from
   bold and manually styled titles, not only Word heading styles, so a paper no
   longer collapses into one undifferentiated block, and the abstract and

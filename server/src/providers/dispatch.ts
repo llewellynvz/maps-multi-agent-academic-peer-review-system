@@ -242,7 +242,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
       const openaiOptions = callOptions.providerOptions?.openai ?? {};
       callOptions.providerOptions = {
         ...callOptions.providerOptions,
-        openai: { reasoningEffort: 'high', ...openaiOptions },
+        openai: { reasoningEffort: 'xhigh', ...openaiOptions },
       };
     }
 
