@@ -54,6 +54,8 @@ export function openKey(sealed: SealedKey): string {
 }
 
 export function maskKey(plaintext: string): string {
-  const tail = plaintext.slice(-4);
-  return `****${tail}`;
+  if (plaintext.length <= 8) {
+    return '****';
+  }
+  return `****${plaintext.slice(-4)}`;
 }

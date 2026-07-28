@@ -19,6 +19,7 @@ import { type LensDef, matchLens, normalisePreset } from './lenses';
 import { mergeFindingsOnce } from './merge';
 import { readIntakeOptions } from './options';
 import { DispatchPauseError, type EngineDeps } from './phases-shared';
+import { sanitiseSupersedes } from './supersedes';
 
 export interface PhaseCritiqueInput {
   label: string;
@@ -48,12 +49,6 @@ function routeIntegrityPrefix(lens: string, allowed: string[]): string {
     }
   }
   return allowed[0] ?? 'CON';
-}
-
-function sanitiseSupersedes(findings: Finding[], knownIds: Set<string>): Finding[] {
-  return findings.map((finding) =>
-    finding.supersedes !== null && !knownIds.has(finding.supersedes) ? { ...finding, supersedes: null } : finding,
-  );
 }
 
 function priorRedispatchCount(deps: EngineDeps, reviewId: string): number {

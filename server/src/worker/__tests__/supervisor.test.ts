@@ -36,6 +36,21 @@ describe('superviseDispatch', () => {
     await expect(wrapped(input)).rejects.toMatchObject({ reason: 'timeout' });
   });
 
+  it('aborts the in-flight provider call on timeout so it cannot finish and bill', async () => {
+    let seen: AbortSignal | undefined;
+    const wrapped = superviseDispatch(
+      (received) =>
+        new Promise<DispatchResult>(() => {
+          seen = received.abortSignal;
+        }),
+      { timeoutMs: 15 },
+    );
+
+    await expect(wrapped(input)).rejects.toBeInstanceOf(StaleDispatchError);
+    expect(seen).toBeDefined();
+    expect(seen?.aborted).toBe(true);
+  });
+
   it('raises StaleDispatchError on a backwards clock jump while a dispatch is in flight', async () => {
     let clockValue = 100_000;
     const wrapped = superviseDispatch(

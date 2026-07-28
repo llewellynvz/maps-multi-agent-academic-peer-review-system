@@ -1,15 +1,7 @@
-import { DispatchPauseError } from '../engine/phases-shared';
+import { DispatchPauseError, StaleDispatchError } from '../engine/phases-shared';
 import type { DispatchRunner } from '../providers';
 
-export class StaleDispatchError extends Error {
-  readonly reason: string;
-
-  constructor(reason: string) {
-    super(`stale dispatch: ${reason}`);
-    this.name = 'StaleDispatchError';
-    this.reason = reason;
-  }
-}
+export { StaleDispatchError };
 
 export interface SuperviseOptions {
   timeoutMs: number;
@@ -25,20 +17,27 @@ export function superviseDispatch(inner: DispatchRunner, options: SuperviseOptio
     let lastClock = clock();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let poller: ReturnType<typeof setInterval> | undefined;
+    // Racing alone only abandons the call: the provider request keeps running to completion and
+    // persists its own row and cost, so a timed-out phase bills every abandoned attempt as well.
+    const controller = new AbortController();
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new StaleDispatchError('timeout')), Math.max(1, options.timeoutMs));
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new StaleDispatchError('timeout'));
+      }, Math.max(1, options.timeoutMs));
     });
     const jump = new Promise<never>((_, reject) => {
       poller = setInterval(() => {
         const current = clock();
         if (current < lastClock) {
+          controller.abort();
           reject(new StaleDispatchError('clock_jump'));
         }
         lastClock = current;
       }, jumpPollMs);
     });
     try {
-      return await Promise.race([inner(input), timeout, jump]);
+      return await Promise.race([inner({ ...input, abortSignal: controller.signal }), timeout, jump]);
     } catch (error) {
       if (error instanceof StaleDispatchError) {
         options.onStale?.(error.reason);

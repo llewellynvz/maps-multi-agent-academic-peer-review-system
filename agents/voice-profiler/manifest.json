@@ -1,6 +1,6 @@
 {
   "name": "voice-profiler",
-  "promptVersion": "1.0.0",
+  "promptVersion": "1.0.1",
   "phase": [7],
   "role": "cheap",
   "knowledge": [

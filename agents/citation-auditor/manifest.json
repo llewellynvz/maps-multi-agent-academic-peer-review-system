@@ -3,5 +3,6 @@
   "promptVersion": "1.2.0",
   "phase": [2],
   "role": "cheap",
+  "modes": ["default", "claims"],
   "knowledge": ["01_REVIEW_GOVERNANCE.md", "05_REVIEW_TEMPLATES.md", "02_REVIEW_LENSES.md"]
 }

@@ -15,11 +15,11 @@ import type {
 import { randomBytes } from 'node:crypto';
 import type { MaraDatabase } from '../db/client';
 import {
-  createRateLimiter,
   type FetchLike,
   OPENALEX_HOST,
   reconstructAbstract,
   searchTopics,
+  sharedRateLimiter,
   type TopicSearchResult,
 } from '../citations';
 import { getCurrentFindings } from '../ledger';
@@ -47,6 +47,7 @@ import {
   swarmProfile,
 } from './lenses';
 import { readIntakeOptions } from './options';
+import { sanitiseSupersedes } from './supersedes';
 import { runAgent } from './dispatch-agent';
 import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
 import { upsertRubricScore } from './rubric';
@@ -368,7 +369,7 @@ export async function runPhase2(deps: EngineDeps, reviewId: string): Promise<voi
           });
         }
       }
-      const retrievalLimiter = createRateLimiter();
+      const retrievalLimiter = sharedRateLimiter();
       if (executedQueries.length > 0 && deps.egress !== undefined) {
         topicResults = await searchTopics(executedQueries, deps.egress.fetch, {
           maxQueries: topicCap ?? executedQueries.length,
@@ -556,12 +557,6 @@ function anonymiseFindings(findings: ReturnType<typeof getCurrentFindings>): Arr
   }));
 }
 
-function sanitiseSupersedes(findings: Finding[], knownIds: Set<string>): Finding[] {
-  return findings.map((finding) =>
-    finding.supersedes !== null && !knownIds.has(finding.supersedes) ? { ...finding, supersedes: null } : finding,
-  );
-}
-
 export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<void> {
   const { db } = deps;
   if (phaseDone(db, reviewId, 'phase_3')) {
@@ -626,7 +621,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
         lensPrefix: lens.prefix,
         phase: 'phase_3',
         agent: 'specialist-reviewer',
-        fragments: result.findings,
+        fragments: sanitiseSupersedes(result.findings, new Set(getCurrentFindings(db, reviewId).map((finding) => finding.id))),
         marker: `p3-${lens.prefix}-first`,
       });
       severitiesByPrefix.set(

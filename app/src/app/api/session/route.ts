@@ -59,6 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     failedAttempts.delete(key);
+    globalFailures.count = 0;
     const issued = issueToken(db);
     const response = NextResponse.json(issued);
     const secure = req.headers.get('x-forwarded-proto') === 'https' || new URL(req.url).protocol === 'https:';

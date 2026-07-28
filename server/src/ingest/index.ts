@@ -59,8 +59,17 @@ export async function ingestManuscript(input: IngestInput, deps: IngestDeps = {}
   const docxToSectionMap = deps.docxToSectionMap ?? docxSectionMap;
 
   if (input.kind === 'docx') {
-    const sectionMap = await docxToSectionMap(input.bytes);
-    const decision: ParseDecision = { parser: 'mammoth', parseQuality: 'good', fallbackReason: null };
+    let sectionMap: SectionMap;
+    try {
+      sectionMap = await docxToSectionMap(input.bytes);
+    } catch (error) {
+      throw new ParseHaltError(error instanceof Error ? error.message : String(error));
+    }
+    const decision: ParseDecision = {
+      parser: 'mammoth',
+      parseQuality: sectionMap.parseQuality,
+      fallbackReason: null,
+    };
     deps.onDecision?.(decision);
     return { sectionMap, teiPath: null, decision };
   }

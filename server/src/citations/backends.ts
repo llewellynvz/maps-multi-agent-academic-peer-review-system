@@ -35,9 +35,29 @@ function collectCandidates(
   return candidates;
 }
 
+export class CitationBackendOutage extends Error {
+  readonly status: number;
+
+  constructor(host: string, status: number) {
+    super(`citation backend unavailable: ${host} returned ${status}`);
+    this.name = 'CitationBackendOutage';
+    this.status = status;
+  }
+}
+
+// A rate-limited or erroring backend is not evidence that a reference does not exist. Collapsing both
+// into "no candidates" is what lets a throttling window cache as not_found, and phase 4 reads a
+// not_found as a possible fabrication. Only an authoritative answer may be treated as absence.
+function isOutageStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
 async function readJson(fetchImpl: FetchLike, url: string, headers?: Record<string, string>): Promise<unknown> {
   const response = await fetchImpl(url, headers ? { headers } : undefined);
   if (!response.ok) {
+    if (isOutageStatus(response.status)) {
+      throw new CitationBackendOutage(new URL(url).host, response.status);
+    }
     return undefined;
   }
   try {
@@ -79,7 +99,9 @@ export function createCrossrefBackend(config: { contactEmail?: string } = {}): C
         }
         const message = asRecord(asRecord(await readJson(fetchImpl, url.toString()))?.message);
         const candidate = message ? crossrefCandidate(message) : undefined;
-        return candidate ? [candidate] : [];
+        if (candidate !== undefined) {
+          return [candidate];
+        }
       }
       const url = new URL(`https://${CROSSREF_HOST}/works`);
       url.searchParams.set('query.bibliographic', reference.title);
@@ -118,15 +140,22 @@ export function createOpenAlexBackend(config: { contactEmail?: string; apiKey?: 
     source: 'openalex',
     host: OPENALEX_HOST,
     lookup: async (reference: Reference, fetchImpl: FetchLike): Promise<CitationCandidate[]> => {
-      const url = new URL(`https://${OPENALEX_HOST}/works`);
       if (reference.doi !== undefined) {
-        url.searchParams.set('filter', `doi:${reference.doi}`);
-        url.searchParams.set('per-page', '1');
-      } else {
-        const query = [reference.title, ...reference.authors].join(' ');
-        url.searchParams.set('search', query);
-        url.searchParams.set('per-page', '5');
+        const byDoi = new URL(`https://${OPENALEX_HOST}/works`);
+        byDoi.searchParams.set('filter', `doi:${reference.doi}`);
+        byDoi.searchParams.set('per-page', '1');
+        decorate(byDoi);
+        const found = collectCandidates(
+          asArray(asRecord(await readJson(fetchImpl, byDoi.toString()))?.results),
+          openAlexCandidate,
+        );
+        if (found.length > 0) {
+          return found;
+        }
       }
+      const url = new URL(`https://${OPENALEX_HOST}/works`);
+      url.searchParams.set('search', [reference.title, ...reference.authors].join(' '));
+      url.searchParams.set('per-page', '5');
       decorate(url);
       const results = asArray(asRecord(await readJson(fetchImpl, url.toString()))?.results);
       return collectCandidates(results, openAlexCandidate);
@@ -156,7 +185,9 @@ export function createSemanticScholarBackend(config: { apiKey?: string } = {}): 
         url.searchParams.set('fields', 'title,year,externalIds');
         const paper = asRecord(await readJson(fetchImpl, url.toString(), headers));
         const candidate = paper ? semanticScholarCandidate(paper) : undefined;
-        return candidate ? [candidate] : [];
+        if (candidate !== undefined) {
+          return [candidate];
+        }
       }
       const url = new URL(`https://${SEMANTIC_SCHOLAR_HOST}/graph/v1/paper/search`);
       url.searchParams.set('query', reference.title);

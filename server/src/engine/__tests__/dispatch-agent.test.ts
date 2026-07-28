@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { blobDir } from '../../paths';
 import type { DispatchResult } from '../../providers';
 import { runAgent } from '../dispatch-agent';
+import { StaleDispatchError } from '../phases-shared';
 
 const reviewIds: string[] = [];
 
@@ -176,5 +177,27 @@ describe('runAgent schema salvage', () => {
       ),
     ).rejects.toThrow('failed after 3 attempts');
     expect(dispatches).toBe(3);
+  });
+
+  it('propagates a stale dispatch without retrying so the phase can restart from its checkpoint', async () => {
+    let dispatches = 0;
+    await expect(
+      runAgent(
+        {
+          runDispatch: async () => {
+            dispatches += 1;
+            throw new StaleDispatchError('timeout');
+          },
+        },
+        {
+          reviewId: freshReviewId(),
+          phase: 'phase_3',
+          agent: 'specialist-reviewer',
+          artefactName: 'p3-METH-first',
+          assembleInput: { lens: 'Methods and design' },
+        },
+      ),
+    ).rejects.toBeInstanceOf(StaleDispatchError);
+    expect(dispatches).toBe(1);
   });
 });

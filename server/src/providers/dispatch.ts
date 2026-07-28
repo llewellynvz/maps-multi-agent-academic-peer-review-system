@@ -50,6 +50,7 @@ export interface DispatchInput {
   temperature?: number;
   maxRetries?: number;
   telemetry?: boolean;
+  abortSignal?: AbortSignal;
 }
 
 interface GenerateCallOptions {
@@ -62,6 +63,7 @@ interface GenerateCallOptions {
   providerOptions?: Record<string, Record<string, unknown>>;
   experimental_telemetry: { isEnabled: boolean; functionId: string; recordInputs: boolean; recordOutputs: boolean };
   schema?: z.ZodType;
+  abortSignal?: AbortSignal;
 }
 
 interface RawUsage {
@@ -235,6 +237,9 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
     if (input.parts.providerOptions !== undefined) {
       callOptions.providerOptions = input.parts.providerOptions;
     }
+    if (input.abortSignal !== undefined) {
+      callOptions.abortSignal = input.abortSignal;
+    }
     if (input.temperature !== undefined && !modelRef.isReasoning) {
       callOptions.temperature = input.temperature;
     }
@@ -284,7 +289,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
         randomUUID(),
         input,
         modelRef,
-        { inputTokens: 0, outputTokens: 0, cachedTokens: 0, reasoningTokens: 0 },
+        extractTokens((error as { usage?: unknown }).usage),
         latencyMs,
         'error',
         classifyError(error),

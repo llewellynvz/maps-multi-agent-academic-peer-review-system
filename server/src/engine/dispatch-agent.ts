@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import type { DispatchRunner } from '../providers';
 import { assemble, type AssembleInput, readManifest, roleFor, schemaFor } from '../prompts';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
-import { DispatchPauseError, type PreDispatchGate } from './phases-shared';
+import { DispatchPauseError, type PreDispatchGate, StaleDispatchError } from './phases-shared';
 
 export interface RunAgentDeps {
   runDispatch: DispatchRunner;
@@ -163,6 +163,9 @@ export async function runAgent<T = unknown>(deps: RunAgentDeps, params: RunAgent
       return parsed.data as T;
     } catch (error) {
       lastError = error;
+      if (error instanceof StaleDispatchError) {
+        throw error;
+      }
       if (isNonRetryableInputError(error)) {
         throw new Error(
           `Agent ${params.agent} (${params.phase}) failed: the assembled prompt exceeds the model context window. ${describeError(error)}`,

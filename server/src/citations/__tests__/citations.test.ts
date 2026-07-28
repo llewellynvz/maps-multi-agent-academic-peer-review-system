@@ -135,6 +135,57 @@ describe('verifyReference', () => {
     cache.close();
   });
 
+  it('does not cache a not_found produced by rate-limited backends that answered with 429', async () => {
+    let mode: 'throttled' | 'ok' = 'throttled';
+    const throttled: HttpResponse = { ok: false, status: 429, json: async (): Promise<unknown> => ({}) };
+    const fetchImpl: FetchLike = async (url) => {
+      if (mode === 'throttled') {
+        return throttled;
+      }
+      if (url.includes('api.crossref.org/works/')) {
+        return json(crossrefWork('Positive psychology: An introduction', '10.1037/0003-066X.55.1.5', 2000));
+      }
+      return empty;
+    };
+    const cache = openCitationCache({ path: ':memory:' });
+    const client = createCitationClient({ fetchImpl, cache, rateLimiter: fastLimiter });
+
+    const during = await client.verifyReference(seligman);
+    expect(during.status).toBe('not_found');
+
+    mode = 'ok';
+    const afterRecovery = await client.verifyReference(seligman);
+    expect(afterRecovery.status).toBe('verified');
+    cache.close();
+  });
+
+  it('falls back to a title search when a damaged DOI resolves to nothing', async () => {
+    const damaged: Reference = { ...seligman, doi: '10.1037/0003-066X.55.1.6' };
+    const urls: string[] = [];
+    const fetchImpl: FetchLike = async (url) => {
+      urls.push(url);
+      if (url.includes('api.crossref.org/works/')) {
+        return { ok: false, status: 404, json: async (): Promise<unknown> => ({}) };
+      }
+      if (url.includes('api.crossref.org/works?')) {
+        return json({
+          message: {
+            items: [
+              { title: ['Positive psychology: An introduction'], DOI: '10.1037/0003-066X.55.1.5', published: { 'date-parts': [[2000]] } },
+            ],
+          },
+        });
+      }
+      return empty;
+    };
+    const client = createCitationClient({ fetchImpl, cache: null, rateLimiter: fastLimiter });
+
+    const result = await client.verifyReference(damaged);
+
+    expect(urls.some((url) => url.includes('query.bibliographic'))).toBe(true);
+    expect(result.status).not.toBe('not_found');
+  });
+
   it('purges rows older than the TTL when the cache is opened', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mara-cache-'));
     const path = join(dir, 'cache.db');
@@ -252,5 +303,23 @@ describe('rate limiter', () => {
     await limiter.acquire('api.openalex.org');
 
     expect(sleeps).toEqual([]);
+  });
+});
+
+describe('scoreCandidate corroboration', () => {
+  it('does not confirm a sibling paper when the reference year is unknown', () => {
+    const scored = scoreCandidate(
+      { title: 'Deep learning for medical image segmentation: Part I', authors: ['Ng'], year: 0 },
+      { title: 'Deep learning for medical image segmentation: Part II', doi: '10.1000/partII', year: 2021 },
+    );
+    expect(scored.status).toBe('mismatch');
+  });
+
+  it('still confirms an exact title match when neither side carries a year', () => {
+    const scored = scoreCandidate(
+      { title: 'Positive psychology: An introduction', authors: ['Seligman'], year: 0 },
+      { title: 'Positive psychology: An introduction' },
+    );
+    expect(scored.status).toBe('verified');
   });
 });

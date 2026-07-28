@@ -323,6 +323,31 @@ describe('dispatch runner', () => {
     expect(captured?.providerOptions?.openai).toEqual({ reasoningEffort: 'xhigh', store: true });
   });
 
+  it('records the tokens a failed dispatch actually burned so the cost ceiling can see them', async () => {
+    const failing: GenerateApi = {
+      generateText: async () => {
+        const error = new Error('no object generated') as Error & { usage?: unknown };
+        error.usage = { inputTokens: 120000, outputTokens: 60000, outputTokenDetails: { reasoningTokens: 55000 } };
+        throw error;
+      },
+      generateObject: async () => ({ object: {}, usage: {} }),
+    };
+    const run = createDispatchRunner({ db, registry: stubRegistry, generate: failing, now: () => 0 });
+
+    await expect(run(baseInput())).rejects.toThrow('no object generated');
+
+    const row = sqlite.prepare('SELECT tokens_in, tokens_out, tokens_reasoning, cost_usd FROM dispatches').get() as {
+      tokens_in: number;
+      tokens_out: number;
+      tokens_reasoning: number;
+      cost_usd: number;
+    };
+    expect(row.tokens_in).toBe(120000);
+    expect(row.tokens_out).toBe(60000);
+    expect(row.tokens_reasoning).toBe(55000);
+    expect(row.cost_usd).toBeGreaterThan(0);
+  });
+
   it('measures latency from the injected clock', async () => {
     const { generate } = countingGenerate();
     let clock = 100;

@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assemble,
@@ -8,10 +8,14 @@ import {
   CONSTITUTION_FRAME,
   exemplarFrame,
   readExemplarsFrom,
+  hasSchema,
   readManifest,
   readPrompt,
+  roleFor,
+  schemaFor,
 } from '../index';
 import { readKnowledgeModules } from '../knowledge';
+import { repoRoot } from '../../paths';
 
 describe('prompt assembler', () => {
   it('produces a byte-identical system frame for the same agent across dispatches', () => {
@@ -133,5 +137,37 @@ describe('voice exemplar corpus', () => {
   it('leaves agents that never write author-facing prose out of the corpus', () => {
     expect(readManifest('specialist-reviewer').exemplars).toBeUndefined();
     expect(buildStaticFrame('specialist-reviewer')).not.toContain('## Voice exemplars');
+  });
+});
+
+describe('agent manifest integrity', () => {
+  const agentNames = readdirSync(resolve(repoRoot, 'agents'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  it('finds a manifest, a prompt, and a bound schema for every agent directory', () => {
+    expect(agentNames.length).toBeGreaterThan(0);
+    for (const name of agentNames) {
+      expect(() => readManifest(name)).not.toThrow();
+      expect(readPrompt(name).length).toBeGreaterThan(0);
+      expect(hasSchema(name)).toBe(true);
+    }
+  });
+
+  it('resolves every knowledge module a manifest names to a real file', () => {
+    for (const name of agentNames) {
+      const modules = readKnowledgeModules(readManifest(name).knowledge);
+      expect(modules.every((module) => module.length > 0)).toBe(true);
+    }
+  });
+
+  it('binds a schema and a role to every mode a manifest declares', () => {
+    for (const name of agentNames) {
+      const manifest = readManifest(name);
+      for (const mode of manifest.modes ?? []) {
+        expect(() => schemaFor(name, mode)).not.toThrow();
+        expect(() => roleFor(manifest, mode)).not.toThrow();
+      }
+    }
   });
 });

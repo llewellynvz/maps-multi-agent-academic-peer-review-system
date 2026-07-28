@@ -83,7 +83,7 @@ export function updateReviewTitle(db: MaraDatabase, id: string, title: string): 
 export function requireReview(db: MaraDatabase, id: string): Review {
   const row = getReviewRow(db, id);
   if (row === undefined) {
-    throw new ApiError('not_found', `No review with id ${id}.`);
+    throw new ApiError('not_found', 'No review with that id.');
   }
   return toReview(row);
 }

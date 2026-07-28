@@ -5,14 +5,62 @@ import { normalizeInline } from './text';
 
 type XmlNode = string | number | boolean | null | undefined | XmlNode[] | { [key: string]: XmlNode };
 
+// Inline <ref>/<hi> elements sit mid-sentence in GROBID output. Parsing unordered collapses every
+// text run under one '#text' key and hoists inline elements out of the prose, so paragraphs come out
+// reordered and words fuse across element boundaries. Ordered parsing with whitespace preserved is
+// the only shape that keeps a sentence intact.
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   textNodeName: '#text',
-  trimValues: true,
+  trimValues: false,
   parseTagValue: false,
   parseAttributeValue: false,
+  preserveOrder: true,
 });
+
+const ATTRIBUTE_GROUP = ':@';
+
+type OrderedEntry = { [key: string]: unknown };
+
+function toLegacy(children: unknown): { [key: string]: XmlNode } {
+  const node: { [key: string]: XmlNode } = {};
+  const textParts: string[] = [];
+  if (!Array.isArray(children)) {
+    return node;
+  }
+  for (const entry of children as OrderedEntry[]) {
+    if (entry === null || typeof entry !== 'object') {
+      continue;
+    }
+    const tag = Object.keys(entry).find((key) => key !== ATTRIBUTE_GROUP);
+    if (tag === undefined) {
+      continue;
+    }
+    if (tag === '#text') {
+      textParts.push(String(entry['#text'] ?? ''));
+      continue;
+    }
+    const child = toLegacy(entry[tag]);
+    const attributes = entry[ATTRIBUTE_GROUP];
+    if (attributes !== null && typeof attributes === 'object') {
+      for (const [name, value] of Object.entries(attributes as Record<string, unknown>)) {
+        child[name] = value as XmlNode;
+      }
+    }
+    textParts.push(String(child['#text'] ?? ''));
+    const existing = node[tag];
+    if (existing === undefined) {
+      node[tag] = child;
+    } else if (Array.isArray(existing)) {
+      existing.push(child);
+    } else {
+      node[tag] = [existing, child];
+    }
+  }
+  node['#text'] = textParts.join('');
+  return node;
+}
 
 function asArray(value: XmlNode): XmlNode[] {
   if (value === undefined || value === null) {
@@ -35,14 +83,7 @@ function textOf(node: XmlNode): string {
   if (Array.isArray(node)) {
     return node.map(textOf).join(' ');
   }
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(node)) {
-    if (key.startsWith('@_')) {
-      continue;
-    }
-    parts.push(textOf(value));
-  }
-  return parts.join(' ');
+  return String(node['#text'] ?? '');
 }
 
 function findFirst(node: XmlNode, target: string): XmlNode {
@@ -175,7 +216,7 @@ function collectSections(div: XmlNode, out: RawSection[]): void {
 }
 
 export function parseTei(teiXml: string): SectionMap {
-  const root = parser.parse(teiXml) as XmlNode;
+  const root = toLegacy(parser.parse(teiXml)) as XmlNode;
 
   const titleStmt = findFirst(findFirst(root, 'teiHeader'), 'titleStmt');
   const title = pickMainTitle(findFirst(titleStmt, 'title'));
@@ -198,6 +239,6 @@ export function parseTei(teiXml: string): SectionMap {
     sections,
     references,
     parser: 'grobid',
-    parseQuality: 'good',
+    parseQuality: sections.length === 0 && abstract === null ? 'degraded' : 'good',
   });
 }

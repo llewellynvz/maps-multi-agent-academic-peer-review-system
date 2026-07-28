@@ -22,7 +22,7 @@ import {
 } from '../workflow/repo';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext } from './context';
-import { persistDeliverable } from './deliverables';
+import { persistDeliverable, releaseDeliverables } from './deliverables';
 import { runAgent } from './dispatch-agent';
 import { buildNotesJob, buildReportJob } from './deliverable-jobs';
 import { renderDeliverableDocx } from './docx';
@@ -214,7 +214,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         format: 'docx',
         relativePath: 'output/author-letter.docx',
         bytes: reportDocx,
-        released: true,
+        released: false,
       });
       persistDeliverable(db, {
         reviewId,
@@ -222,7 +222,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         format: 'md',
         relativePath: 'output/author-letter.md',
         bytes: Buffer.from(shipped.bodyMarkdown, 'utf8'),
-        released: true,
+        released: false,
       });
       persistDeliverable(db, {
         reviewId,
@@ -230,7 +230,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         format: 'docx',
         relativePath: 'output/reviewer-private-notes.docx',
         bytes: notesDocx,
-        released: true,
+        released: false,
       });
       persistDeliverable(db, {
         reviewId,
@@ -238,7 +238,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         format: 'md',
         relativePath: 'output/reviewer-private-notes.md',
         bytes: Buffer.from(privateNotesBody, 'utf8'),
-        released: true,
+        released: false,
       });
 
       const ledgerSnapshot = ledgerSnapshotMarkdown(reviewId, findings);
@@ -248,17 +248,11 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
         format: 'md',
         relativePath: 'output/ledger-snapshot.md',
         bytes: Buffer.from(ledgerSnapshot, 'utf8'),
-        released: true,
+        released: false,
       });
 
       writeManuscriptBlob(reviewId, 'report/full-report.md', fullReport.bodyMarkdown);
 
-      insertEvent(db, {
-        reviewId,
-        kind: 'deliverable_released',
-        phase: 'phase_8',
-        payload: { kinds: ['peer_review_report', 'reviewer_private_notes', 'ledger_export'] },
-      });
     }
 
     const ledgerForJudges = JSON.stringify(
@@ -370,6 +364,13 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
     ]);
 
     if (released) {
+      releaseDeliverables(db, reviewId);
+      insertEvent(db, {
+        reviewId,
+        kind: 'deliverable_released',
+        phase: 'phase_8',
+        payload: { kinds: ['peer_review_report', 'reviewer_private_notes', 'ledger_export'] },
+      });
       updateReview(db, reviewId, { status: 'completed', completedAt: new Date().toISOString() });
     }
 

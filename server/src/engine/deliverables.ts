@@ -63,3 +63,12 @@ export function persistDeliverable(db: MaraDatabase, input: PersistDeliverableIn
     .run();
   return repoPath;
 }
+
+// The download endpoint gates on the released flag alone, not on review status, so releasing before
+// the phase-8 judges have run makes an author letter downloadable from a review that then fails.
+export function releaseDeliverables(db: MaraDatabase, reviewId: string): void {
+  db.update(deliverables)
+    .set({ released: 1, releasedAt: new Date().toISOString() })
+    .where(eq(deliverables.reviewId, reviewId))
+    .run();
+}

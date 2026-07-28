@@ -30,6 +30,16 @@ export class DispatchPauseError extends Error {
   }
 }
 
+export class StaleDispatchError extends Error {
+  readonly reason: string;
+
+  constructor(reason: string) {
+    super(`stale dispatch: ${reason}`);
+    this.name = 'StaleDispatchError';
+    this.reason = reason;
+  }
+}
+
 export interface EngineDeps {
   db: MaraDatabase;
   runDispatch: DispatchRunner;

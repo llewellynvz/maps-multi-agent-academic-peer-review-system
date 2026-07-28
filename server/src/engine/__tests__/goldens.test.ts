@@ -24,7 +24,9 @@ import type {
   SpecialistReviewerOutput,
   SwarmEvaluation,
   SwarmReportCritique,
+  VoiceProfile,
 } from '@mara/shared';
+import { scrubVoiceProfile } from '@mara/shared';
 import {
   assemble,
   CONSTITUTION_FRAME,
@@ -285,6 +287,18 @@ const bindings: GoldenBinding[] = [
         true,
       );
       expect(value.strongestGap.length).toBeGreaterThan(0);
+    },
+  },
+  {
+    label: 'voice profiler returns style rules only and survives the confidentiality scrub unchanged',
+    agent: 'voice-profiler',
+    file: 'voice-profiler.json',
+    assert: (output) => {
+      const value = output as VoiceProfile;
+      expect(value.carriesNoThirdPartyContent).toBe(true);
+      expect(value.voiceRules.length).toBeGreaterThanOrEqual(8);
+      expect(value.distinctiveTics.length).toBeGreaterThanOrEqual(1);
+      expect(scrubVoiceProfile(value)).toEqual(value);
     },
   },
   {

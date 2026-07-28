@@ -5,6 +5,12 @@ import { splitReferences } from './plaintext';
 import { looksLikeStrongHeading, normalizeInline } from './text';
 
 const REFERENCES_HEADING = /^(references|bibliography|works cited)\b/i;
+// A numbered Vancouver reference line satisfies looksLikeStrongHeading, so leaving references mode on
+// any heading-shaped block re-reads the reference list as body. Only a named trailing section ends it.
+// These are stems followed by \w* rather than \b: a trailing \b after a stem can never match its own
+// inflection, because the next character is a word character ("acknowledg" against "Acknowledgements").
+const POST_REFERENCES_HEADING =
+  /^(appendix|appendices|supplement|acknowledg|author biograph|author contribution|funding|conflict|competing interest|declaration|ethic|data availability|footnote|endnote|note|table|figure)\w*/i;
 
 interface HtmlBlock {
   heading: boolean;
@@ -50,7 +56,14 @@ function toBlocks(html: string): HtmlBlock[] {
   return blocks;
 }
 
+// A manuscript is prose. Anything past this is a corpus, an embedded media dump, or a decompression
+// bomb, and mammoth would hold the whole conversion in memory before anything could reject it.
+const MAX_DOCX_BYTES = 64 * 1024 * 1024;
+
 export async function docxSectionMap(docx: Uint8Array): Promise<SectionMap> {
+  if (docx.byteLength > MAX_DOCX_BYTES) {
+    throw new Error(`DOCX manuscript is ${docx.byteLength} bytes, over the ${MAX_DOCX_BYTES} byte limit`);
+  }
   const { value: html } = await mammoth.convertToHtml({ buffer: Buffer.from(docx) });
   const blocks = toBlocks(html);
 
@@ -80,12 +93,16 @@ export async function docxSectionMap(docx: Uint8Array): Promise<SectionMap> {
       continue;
     }
     if (block.heading) {
-      if (!inReferences) {
-        flush();
-      }
-      inReferences = REFERENCES_HEADING.test(block.text);
-      if (!inReferences) {
-        heading = block.text;
+      if (inReferences && !POST_REFERENCES_HEADING.test(block.text)) {
+        referenceLines.push(block.text);
+      } else {
+        if (!inReferences) {
+          flush();
+        }
+        inReferences = REFERENCES_HEADING.test(block.text);
+        if (!inReferences) {
+          heading = block.text;
+        }
       }
     } else if (inReferences) {
       referenceLines.push(block.text);

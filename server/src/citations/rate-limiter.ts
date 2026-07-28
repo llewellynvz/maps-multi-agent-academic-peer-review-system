@@ -12,6 +12,19 @@ const DEFAULT_MIN_INTERVAL_MS = 1000;
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Reference verification and topic retrieval both call api.openalex.org. A limiter only paces the hosts
+// it has seen itself, so two independent instances double the real request rate against the same host
+// and provoke the throttling both paths then have to absorb. Callers that do not need their own timing
+// share this one.
+let shared: RateLimiter | undefined;
+
+export function sharedRateLimiter(): RateLimiter {
+  if (shared === undefined) {
+    shared = createRateLimiter();
+  }
+  return shared;
+}
+
 export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
   const minIntervalMs = options.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS;
   const now = options.now ?? Date.now;

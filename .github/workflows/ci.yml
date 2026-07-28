@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r --if-present typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm -r --if-present test
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+
+  changelog:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Require a changelog entry
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          code=$(printf '%s\n' "$changed" | grep -E '^(agents|app|packages|server)/' | grep -vE '__tests__/|\.test\.' || true)
+          if [ -n "$code" ] && ! printf '%s\n' "$changed" | grep -qxF 'CHANGELOG.md'; then
+            echo "These files changed without a CHANGELOG.md entry:"
+            printf '%s\n' "$code"
+            echo
+            echo "Add an entry under [Unreleased], or label this pull request skip-changelog."
+            exit 1
+          fi

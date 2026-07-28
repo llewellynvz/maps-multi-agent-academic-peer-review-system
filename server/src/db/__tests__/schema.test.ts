@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe('migration', () => {
-  it('creates all eleven tables and the current-findings view', () => {
+  it('creates all thirteen tables and the current-findings view', () => {
     const sqlite = migratedConnection();
 
     const objects = sqlite
@@ -82,9 +82,11 @@ describe('migration', () => {
     const expectedTables = [
       'reviews',
       'manuscripts',
+      'voice_samples',
       'findings',
       'phase_checkpoints',
       'review_events',
+      'merge_markers',
       'dispatches',
       'rubric_scores',
       'deliverables',

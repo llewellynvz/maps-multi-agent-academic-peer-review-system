@@ -48,7 +48,7 @@ export {
   listDeliverables,
 } from './deliverables';
 export { getSettings, type PublicSettings, putSettings, type SettingsPatch } from './settings';
-export { addKey, type AddKeyInput, deleteKey, listKeys } from './keys';
+export { addKey, type AddKeyInput, deleteKey, listKeys, mergeProviderKeyEnv, providerKeyEnv } from './keys';
 export { getInstanceStats, getRunStats } from './stats';
 export {
   deriveEphemeral,

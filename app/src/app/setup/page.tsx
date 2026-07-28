@@ -30,7 +30,7 @@ export default function SetupPage(): ReactNode {
   const verifyKey = async (): Promise<void> => {
     setKeyState('checking');
     try {
-      await api.addKey({ provider, apiKey, persist: 'session' });
+      await api.addKey({ provider, apiKey, persist: 'disk' });
       setKeyState('verified');
     } catch (err) {
       setKeyState('failed');

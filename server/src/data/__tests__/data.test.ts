@@ -10,6 +10,7 @@ import { blobDir } from '../../paths';
 import { writeManuscriptBlob } from '../../workflow/storage';
 import { clearPassphrase, issueToken, passphraseIsSet, setPassphrase, verifyPassphrase, verifyToken } from '../auth';
 import { openKey, sealKey } from '../crypto';
+import { addKey, mergeProviderKeyEnv, providerKeyEnv } from '../keys';
 import { submitAnswers } from '../answers';
 import { createReview, getReviewDetail, purgeAll, purgeReview } from '../reviews';
 
@@ -76,6 +77,29 @@ describe('provider key envelope encryption (SEC-13/17)', () => {
     const sealed = sealKey('sk-secret');
     process.env.MARA_MASTER_KEY = '1'.repeat(64);
     expect(() => openKey(sealed)).toThrow();
+  });
+
+  it('surfaces a stored key to the provider environment so an added key is actually used', () => {
+    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-STOREDKEY', persist: 'disk' });
+
+    expect(providerKeyEnv(client.db).OPENAI_API_KEY).toBe('sk-disk-STOREDKEY');
+  });
+
+  it('lets an explicit environment variable win over a stored key', () => {
+    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    addKey(client.db, { provider: 'anthropic', apiKey: 'sk-disk-STOREDKEY', persist: 'disk' });
+
+    const merged = mergeProviderKeyEnv({ ANTHROPIC_API_KEY: 'sk-env-WINS' }, providerKeyEnv(client.db));
+    expect(merged.ANTHROPIC_API_KEY).toBe('sk-env-WINS');
+  });
+
+  it('does not let the blank placeholder from a copied .env shadow a stored key', () => {
+    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-STOREDKEY', persist: 'disk' });
+
+    const merged = mergeProviderKeyEnv({ OPENAI_API_KEY: '' }, providerKeyEnv(client.db));
+    expect(merged.OPENAI_API_KEY).toBe('sk-disk-STOREDKEY');
   });
 });
 

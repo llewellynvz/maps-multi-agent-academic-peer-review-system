@@ -6,12 +6,50 @@ All notable changes to Collegia are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Reviewers now read the manuscript in its real word order. The GROBID parser
+  collapsed every inline citation to the head of its paragraph and fused the
+  words either side of it, so each paragraph reached the reviewers rearranged.
+  It is parsed in document order now, and a scanned PDF that yields no sections
+  is honestly marked degraded instead of reported as a good parse.
+- A reference list written in numbered style stays a reference list. Each entry
+  looked enough like a heading to end the reference section early, so the
+  remaining entries were read back as body sections of the paper.
+- A rate-limited citation service no longer looks like a missing citation. A
+  throttled lookup was cached as "not found" for thirty days, which is what the
+  reference audit reads as a possible fabrication, so a real paper could be
+  called fabricated. Lookups also fall back to a title search when a DOI is
+  damaged, and reference verification and topic retrieval now share one
+  rate limiter instead of racing each other into the throttle.
+- A specialist finding that cites an unknown earlier finding can no longer wedge
+  a review. Phase 3 was the one place that merged model output into the ledger
+  without checking the reference first, and the failure repeated on every retry.
+- A dispatch that times out now restarts its phase as designed and is actually
+  cancelled, rather than being retried as if the model had answered badly and
+  left running to bill in the background. Failed dispatches also record the
+  tokens they burned, so the cost ceiling can see that spend.
+- Prompt-injection screening covers the whole excerpt a reviewer receives. It
+  stopped at the shortest preset's budget, so on longer settings anything past
+  that point reached the reviewers unscreened.
+- An API key added in the settings screen is now used. Keys were sealed to disk
+  or held in memory and never read back, so a review still failed on a missing
+  environment variable. Environment values still take precedence.
+- Deliverables are released only once the closing quality judges have passed. An
+  author letter was downloadable from a review that had failed after release.
+- Changing or clearing the passphrase now invalidates tokens issued under the old
+  one, and a wrong-passphrase flood can no longer lock the owner out of their own
+  instance. Server errors return a fixed message rather than internal paths.
+
 ### Changed
 - The default frontier deployment example moved to GPT-5.6 Sol, replacing GPT-5.1,
   with a matching cost entry so spend on it is tracked. Every reasoning-class
   dispatch now defaults to the highest reasoning effort each model actually
   supports (xhigh) rather than the provider default, so the model spends as
   much effort as it can per review unless a caller explicitly asks for less.
+- Every push and pull request is now checked automatically: types, lint, the full
+  test suite, and a dependency audit that fails on a high-severity advisory. Lint
+  runs through Biome, and the agent schemas live in one place instead of being
+  re-exported from each agent directory.
 - Reviews now read the whole manuscript. The DOCX parser recovers headings from
   bold and manually styled titles, not only Word heading styles, so a paper no
   longer collapses into one undifferentiated block, and the abstract and

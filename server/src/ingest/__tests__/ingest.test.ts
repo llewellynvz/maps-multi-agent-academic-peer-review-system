@@ -32,6 +32,33 @@ describe('parseTei', () => {
     expect(map.references[0]?.year).not.toBeNull();
   });
 
+  it('keeps inline citations in place instead of hoisting them to the paragraph head', () => {
+    const inline = `<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader><fileDesc><titleStmt><title level="a" type="main">Agency and wellbeing</title></titleStmt></fileDesc></teiHeader>
+  <text><body><div><head>INTRODUCTION</head><p>Positive psychology studies flourishing <ref type="bibr" target="#b31">(Keyes, 2002;</ref><ref type="bibr" target="#b58">Ryff, 1989)</ref>. The field advanced since <ref type="bibr" target="#b61">Seligman (2000)</ref> published that paper.</p></div></body></text>
+</TEI>`;
+    const map = parseTei(inline);
+    const text = map.sections[0]?.text ?? '';
+
+    expect(text).toBe('Positive psychology studies flourishing (Keyes, 2002;Ryff, 1989). The field advanced since Seligman (2000) published that paper.');
+    expect(text.startsWith('Positive psychology')).toBe(true);
+    expect(text).not.toContain('sincepublished');
+  });
+
+  it('marks a header-only TEI degraded rather than reporting it as a good parse', () => {
+    const headerOnly = `<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader><fileDesc><titleStmt><title level="a" type="main">Scanned paper</title></titleStmt></fileDesc></teiHeader>
+  <text><body></body></text>
+</TEI>`;
+    const map = parseTei(headerOnly);
+
+    expect(map.sections.length).toBe(0);
+    expect(map.abstract).toBeNull();
+    expect(map.parseQuality).toBe('degraded');
+  });
+
   it('assigns monotonic, non-overlapping line anchors that index fullText', () => {
     const map = parseTei(teiXml);
     const totalLines = map.fullText.split('\n').length;
@@ -84,6 +111,62 @@ describe('docxSectionMap', () => {
     expect(headings).toContain('Appendix A');
     expect(headings).not.toContain('References');
     expect(map.sections.some((section) => section.text.includes('Neff'))).toBe(false);
+  });
+
+  it('keeps numbered Vancouver references in the reference list instead of reading them as sections', async () => {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: 'Cardiac Outcomes After Rehabilitation', heading: HeadingLevel.TITLE }),
+            new Paragraph({ text: 'Introduction', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Rehabilitation improves cardiac outcomes.'),
+            new Paragraph({ text: 'References', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('1. Smith J, Doe A. Cardiac outcomes. Lancet. 2019;393:1-10'),
+            new Paragraph('2. Brown K, Patel R. Rehabilitation trials. BMJ. 2020;368:55-62'),
+            new Paragraph('3. Osei L, Tan M. Long term follow up. JAMA. 2021;325:900-910'),
+            new Paragraph({ text: 'Appendix A', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Supplementary measures are listed here.'),
+          ],
+        },
+      ],
+    });
+    const bytes = new Uint8Array(await Packer.toBuffer(doc));
+    const map = await docxSectionMap(bytes);
+
+    expect(map.references.length).toBe(3);
+    const headings = map.sections.map((section) => section.heading);
+    expect(headings).toContain('Appendix A');
+    expect(headings).not.toContain('1. Smith J, Doe A. Cardiac outcomes. Lancet. 2019;393:1-10');
+    expect(map.sections.some((section) => section.text.includes('Smith J'))).toBe(false);
+  });
+
+  it('ends the reference list at an inflected trailing heading rather than swallowing the section', async () => {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ text: 'Agency Under Automated Systems', heading: HeadingLevel.TITLE }),
+            new Paragraph({ text: 'Introduction', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('Automation reshapes how agency is exercised.'),
+            new Paragraph({ text: 'References', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('1. Smith J, Doe A. Cardiac outcomes. Lancet. 2019;393:1-10'),
+            new Paragraph({ text: 'Acknowledgements', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('We thank the reviewers for their time.'),
+            new Paragraph({ text: 'Author biographies', heading: HeadingLevel.HEADING_1 }),
+            new Paragraph('The first author is a professor of work psychology.'),
+          ],
+        },
+      ],
+    });
+    const bytes = new Uint8Array(await Packer.toBuffer(doc));
+    const map = await docxSectionMap(bytes);
+
+    expect(map.references.length).toBe(1);
+    const headings = map.sections.map((section) => section.heading);
+    expect(headings).toContain('Acknowledgements');
+    expect(headings).toContain('Author biographies');
+    expect(map.references.some((reference) => (reference.raw ?? '').includes('professor'))).toBe(false);
   });
 
   it('does not split a short capitalised body line into a spurious section', async () => {

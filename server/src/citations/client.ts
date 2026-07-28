@@ -1,7 +1,7 @@
 import { createGuardedFetch } from './allowlist';
 import { createCrossrefBackend, createOpenAlexBackend, createSemanticScholarBackend } from './backends';
 import { type CitationCache, openCitationCache } from './cache';
-import { createRateLimiter, type RateLimiter } from './rate-limiter';
+import { type RateLimiter, sharedRateLimiter } from './rate-limiter';
 import { scoreCandidate } from './scoring';
 import type { CitationBackend, CitationCandidate, FetchLike, Reference, VerifyReferenceResult } from './types';
 
@@ -43,7 +43,7 @@ function buildResult(
 
 export function createCitationClient(options: CitationClientOptions = {}): CitationClient {
   const fetchImpl = options.fetchImpl ?? defaultFetch;
-  const rateLimiter = options.rateLimiter ?? createRateLimiter();
+  const rateLimiter = options.rateLimiter ?? sharedRateLimiter();
   const guardedFetch = createGuardedFetch(fetchImpl, rateLimiter);
   const backends =
     options.backends ??
@@ -67,15 +67,15 @@ export function createCitationClient(options: CitationClientOptions = {}): Citat
 
       let verified: VerifyReferenceResult | null = null;
       let bestMismatch: VerifyReferenceResult | null = null;
-      let anyBackendResponded = false;
+      let backendUnavailable = false;
 
       for (const backend of backends) {
         let candidates: CitationCandidate[];
         try {
           candidates = await backend.lookup(reference, guardedFetch);
-          anyBackendResponded = true;
         } catch {
           candidates = [];
+          backendUnavailable = true;
         }
         for (const candidate of candidates) {
           const scored = scoreCandidate(reference, candidate);
@@ -99,7 +99,7 @@ export function createCitationClient(options: CitationClientOptions = {}): Citat
       const result: VerifyReferenceResult =
         verified ?? bestMismatch ?? { status: 'not_found', source: null, confidence: 0 };
 
-      const cacheable = result.status !== 'not_found' || anyBackendResponded;
+      const cacheable = result.status !== 'not_found' || !backendUnavailable;
       if (cache !== null && cacheable) {
         cache.set(reference, result.source, result);
       }

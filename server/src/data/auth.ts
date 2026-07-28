@@ -31,14 +31,22 @@ export function passphraseIsSet(db: MaraDatabase): boolean {
   return passphraseRecord(db) !== null;
 }
 
+// Tokens are stateless HMACs over an expiry, so the signing secret is the only revocation lever.
+// Changing or clearing the passphrase must rotate it, or a leaked token outlives the credential it came from.
+function rotateSessionSecret(db: MaraDatabase): void {
+  writeSetting(db, 'session_secret', randomBytes(32).toString('hex'));
+}
+
 export function setPassphrase(db: MaraDatabase, passphrase: string): void {
   const salt = randomBytes(16);
   const hash = scryptSync(passphrase, salt, 64);
   writeSetting(db, 'passphrase', { salt: salt.toString('hex'), hash: hash.toString('hex') } satisfies PassphraseRecord);
+  rotateSessionSecret(db);
 }
 
 export function clearPassphrase(db: MaraDatabase): void {
   writeSetting(db, 'passphrase', null);
+  rotateSessionSecret(db);
 }
 
 export function verifyPassphrase(db: MaraDatabase, passphrase: string): boolean {

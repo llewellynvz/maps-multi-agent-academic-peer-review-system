@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { PREFIX_DISPLAY } from '../engine/lenses';
 import { getCurrentFindings } from '../ledger';
@@ -45,6 +46,26 @@ export function findingHeadline(finding: {
     lensDisplay,
     headline: `${lensDisplay} recorded a ${finding.severity} issue`,
   };
+}
+
+// A resume starts a fresh in-memory set, so without seeding it from what the review has already
+// emitted every prior finding is announced again and the client's headline stream shows duplicates.
+export function announcedFindingIds(db: MaraDatabase, reviewId: string): Set<string> {
+  const rows = db.all<{ payload_json: string }>(
+    sql`SELECT payload_json FROM review_events WHERE review_id = ${reviewId} AND kind = 'finding_recorded'`,
+  );
+  const ids = new Set<string>();
+  for (const row of rows) {
+    try {
+      const payload = JSON.parse(row.payload_json) as { findingId?: unknown };
+      if (typeof payload.findingId === 'string') {
+        ids.add(payload.findingId);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return ids;
 }
 
 export function announceFindings(db: MaraDatabase, reviewId: string, announced: Set<string>): void {

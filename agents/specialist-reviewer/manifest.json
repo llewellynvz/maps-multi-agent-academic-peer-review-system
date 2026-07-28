@@ -1,6 +1,6 @@
 {
   "name": "specialist-reviewer",
-  "promptVersion": "1.1.0",
+  "promptVersion": "1.1.1",
   "phase": [3],
   "role": "frontier",
   "knowledge": ["01_REVIEW_GOVERNANCE.md", "02_REVIEW_LENSES.md", "05_REVIEW_TEMPLATES.md", "04_DEVELOPMENTAL_VOICE.md"],

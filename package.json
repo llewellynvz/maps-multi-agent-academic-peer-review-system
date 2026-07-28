@@ -7,6 +7,8 @@
   },
   "scripts": {
     "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "test": "pnpm -r --if-present test",
     "db:generate": "pnpm --filter server db:generate",
     "db:migrate": "pnpm --filter server db:migrate",
@@ -20,6 +22,7 @@
     "worker": "pnpm --filter server worker"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
     "@types/node": "^26.1.1",
     "typescript": "^7.0.2"
   },
@@ -28,7 +31,10 @@
       "better-sqlite3"
     ],
     "overrides": {
-      "zod": "4.4.3"
+      "zod": "4.4.3",
+      "postcss": ">=8.5.18",
+      "fast-uri": "^3.1.4",
+      "sharp": ">=0.35.0"
     }
   }
 }

@@ -39,8 +39,10 @@ function neutralVerdict(rationale: string): DetectorOutcome {
   return { tier: 0, spans: [], rationale, degraded: true };
 }
 
+const LARGEST_REVIEWER_DIGEST_CHARS = 150000;
+
 export async function detectInjection(options: DetectInjectionOptions): Promise<DetectorOutcome> {
-  const excerpt = options.text.slice(0, options.maxChars ?? 24000);
+  const excerpt = options.text.slice(0, options.maxChars ?? LARGEST_REVIEWER_DIGEST_CHARS);
   try {
     const result = await options.runDispatch({
       reviewId: options.reviewId,

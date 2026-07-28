@@ -24,7 +24,8 @@ import { contentCaptureAllowed, initTracing, startRun } from './tracing';
 import { getManuscript, getReviewOptions, maxEventSeq, mergeReviewOptions, pauseReview, recordEngineFailure } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
 import { readSetting } from './data/settings-store';
-import { announceFindings } from './worker/announce';
+import { mergeProviderKeyEnv, providerKeyEnv } from './data/keys';
+import { announceFindings, announcedFindingIds } from './worker/announce';
 import { WorkerRunner, type EngineResult, type IngestOutcome } from './worker/runner';
 import { type EngineOutcome, type EnginePhaseStep, runEnginePhases, superviseDispatch } from './worker/supervisor';
 
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
   const { db, sqlite } = createDb(maraDbPath());
   runMigrations(db);
 
-  const registry = createRegistry({ env: process.env });
+  const registry = createRegistry({ env: mergeProviderKeyEnv(process.env, providerKeyEnv(db)) });
   const contentAllowed = await contentCaptureAllowed(process.env);
   log(
     contentAllowed
@@ -84,10 +85,14 @@ async function main(): Promise<void> {
   });
 
   const egress = createEgressController(defaultFetch);
+  const openAlexApiKey = getEnv(process.env, 'OPENALEX_API_KEY');
+  const semanticScholarApiKey = getEnv(process.env, 'SEMANTIC_SCHOLAR_API_KEY');
   const citationClient = createCitationClient({
     fetchImpl: egress.fetch,
     cachePath: citationCachePath(),
     ...(process.env.MARA_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MARA_CONTACT_EMAIL } : {}),
+    ...(openAlexApiKey !== undefined ? { openAlexApiKey } : {}),
+    ...(semanticScholarApiKey !== undefined ? { semanticScholarApiKey } : {}),
   });
   const engineDeps: EngineDeps = { db, runDispatch, citationClient, egress, preDispatch: createCostCeilingGate({ db }) };
 
@@ -157,7 +162,7 @@ async function main(): Promise<void> {
         const engineStartSeq = maxEventSeq(db, reviewId);
         try {
           let outcome: EngineOutcome = 'completed';
-          const announced = new Set<string>();
+          const announced = announcedFindingIds(db, reviewId);
           await startRun(reviewId, async () => {
             outcome = await runEnginePhases({
               deps: engineDeps,

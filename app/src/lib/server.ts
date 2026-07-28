@@ -9,8 +9,8 @@ export function jsonError(error: unknown): NextResponse {
   if (isApiError(error)) {
     return NextResponse.json(error.body(), { status: error.status });
   }
-  const message = error instanceof Error ? error.message : 'Unexpected error.';
-  return NextResponse.json({ error: { code: 'internal', message } }, { status: 500 });
+  console.error('[api] unhandled route error', error);
+  return NextResponse.json({ error: { code: 'internal', message: 'Unexpected error.' } }, { status: 500 });
 }
 
 export function tokenFrom(req: NextRequest): string | null {
