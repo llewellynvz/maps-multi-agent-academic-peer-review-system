@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/collegia-hero.jpg" alt="Collegia: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
+<img src="assets/Collegia-hero.jpg" alt="MARA: a multi-agent academic peer-review architecture, by Psynalytics" width="100%">
 
-<h1>Collegia</h1>
+<h1>MARA</h1>
 
 **Autonomous, evidence-grounded peer review for psychological and wellbeing science.**
 
@@ -30,11 +30,11 @@ A Psynalytics AI system. Proprietary and confidential.
 
 ## Overview
 
-Collegia is a multi-agent academic peer-review architecture. It reviews psychology and wellbeing-science manuscripts the way a rigorous, developmental third reviewer would. A single instruction runs a fully orchestrated pipeline that reads the manuscript, establishes its field context, audits its references, examines it through a fleet of specialist lenses, stress-tests the findings, and produces a developmental author letter, a confidential editor summary, and a full evidence-grounded review report.
+MARA is a multi-agent academic peer-review architecture. It reviews psychology and wellbeing-science manuscripts the way a rigorous, developmental third reviewer would. A single instruction runs a fully orchestrated pipeline that reads the manuscript, establishes its field context, audits its references, examines it through a fleet of specialist lenses, stress-tests the findings, and produces a developmental author letter, a confidential editor summary, and a full evidence-grounded review report.
 
 The architecture rests on one discipline. Every claim in every deliverable traces to a specific finding in an append-only evidence ledger, anchored to a location in the manuscript. A recommendation that cannot be grounded does not ship. The reviewing voice stays developmental even when the verdict is severe, because a review is meant to show the path forward, not to close the door.
 
-Collegia runs entirely on one machine. The manuscript text, the author identities, the reviewer's findings, and the model-provider keys never leave it.
+MARA runs entirely on one machine. The manuscript text, the author identities, the reviewer's findings, and the model-provider keys never leave it.
 
 ## What it does
 
@@ -108,10 +108,10 @@ flowchart TD
 
 ## Architecture
 
-Collegia is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach out only to the services you configure. The diagram below shows the whole system: the nine-phase pipeline, the seventeen agents, the runtime components, and the confidentiality boundary.
+MARA is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach out only to the services you configure. The diagram below shows the whole system: the nine-phase pipeline, the seventeen agents, the runtime components, and the confidentiality boundary.
 
 <div align="center">
-<img src="assets/collegia-architecture.png" alt="Collegia architecture: the nine-phase review pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
+<img src="assets/MARA-architecture.png" alt="MARA architecture: the nine-phase review pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
 </div>
 
 The codebase is a TypeScript monorepo managed with pnpm.
@@ -149,7 +149,7 @@ In `.env`, set:
 - `MARA_MASTER_KEY` to a 32-byte key. Generate one with `openssl rand -hex 32`.
 - Either the four `AZURE_*` values for Azure OpenAI, or a single provider key: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OLLAMA_BASE_URL`.
 
-**2. Start Collegia.**
+**2. Start MARA.**
 
 ```bash
 docker compose up -d
@@ -159,9 +159,9 @@ The first start builds the image, runs the database migrations, and starts the w
 
 **3. Open the application.**
 
-Open `http://localhost:3100`. Upload a PDF or DOCX manuscript, answer the short set-up questions, and Collegia runs the full review. Download the report and the editor summary from the results screen.
+Open `http://localhost:3100`. Upload a PDF or DOCX manuscript, answer the short set-up questions, and MARA runs the full review. Download the report and the editor summary from the results screen.
 
-Stop Collegia with `docker compose down`. Your data stays in `./data`.
+Stop MARA with `docker compose down`. Your data stays in `./data`.
 
 ## Configuration
 
@@ -185,11 +185,11 @@ The default image parses PDFs with a built-in fallback, so it works with no extr
 docker compose --profile grobid up -d
 ```
 
-GROBID needs roughly 4 GB of RAM on top of Collegia. On a machine with 8 GB or less, prefer the default fallback parser.
+GROBID needs roughly 4 GB of RAM on top of MARA. On a machine with 8 GB or less, prefer the default fallback parser.
 
 ### Tracing (optional)
 
-If you run Langfuse on the host, set `LANGFUSE_HOST` (the example configuration uses `http://127.0.0.1:4000`), `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. When these are absent, Collegia runs on its local statistics panel alone and tracing is skipped. A missing Langfuse is never an error. Prompt and completion capture is a separate opt-in setting and is permitted only when the trace host resolves to this machine.
+If you run Langfuse on the host, set `LANGFUSE_HOST` (the example configuration uses `http://127.0.0.1:4000`), `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. When these are absent, MARA runs on its local statistics panel alone and tracing is skipped. A missing Langfuse is never an error. Prompt and completion capture is a separate opt-in setting and is permitted only when the trace host resolves to this machine.
 
 ## Development
 
@@ -222,15 +222,15 @@ The pipeline is built so that no review is lost to a single failure. A non-criti
 
 ## The reviewing voice
 
-Collegia sits beside the author. Severity stays honest, and the wording stays developmental. A destructive letter fails the release gate no matter how correct its findings, and generic feedback that would fit any manuscript is treated as a defect. Integrity concerns are always framed as editorial signals for a handling editor to verify, never as determinations of misconduct.
+MARA sits beside the author. Severity stays honest, and the wording stays developmental. A destructive letter fails the release gate no matter how correct its findings, and generic feedback that would fit any manuscript is treated as a defect. Integrity concerns are always framed as editorial signals for a handling editor to verify, never as determinations of misconduct.
 
-The letter can be written in your own reviewing voice. At intake you may add one or two of your past review letters, and the report matches their register. Those letters stay on the local machine, and only the writing style is drawn from them, never their content. Without them, Collegia writes in a default reviewing voice.
+The letter can be written in your own reviewing voice. At intake you may add one or two of your past review letters, and the report matches their register. Those letters stay on the local machine, and only the writing style is drawn from them, never their content. Without them, MARA writes in a default reviewing voice.
 
 ## Author
 
 Prof. Llewellyn van Zyl, PhD, is the Founder and Chief AI Solutions Architect at Psynalytics, and works within Optentia at North-West University. His work sits at the intersection of data science, positive psychology, and the governance of artificial intelligence systems.
 
-Collegia is developed and maintained by Psynalytics.
+MARA is developed and maintained by Psynalytics.
 
 ## Licence
 
@@ -240,4 +240,4 @@ No right or licence to use, run, copy, modify, distribute, or exploit this softw
 
 ## Disclaimer
 
-Collegia produces developmental, pre-submission editorial feedback. It is not affiliated with any journal, it is not a certification of quality, and it is not a substitute for human peer review. Every output is advisory and must be verified by a qualified person before any reliance.
+MARA produces developmental, pre-submission editorial feedback. It is not affiliated with any journal, it is not a certification of quality, and it is not a substitute for human peer review. Every output is advisory and must be verified by a qualified person before any reliance.
