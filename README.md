@@ -49,6 +49,7 @@ MARA runs entirely on one machine. The manuscript text, the author identities, t
 | Integrity signals, never verdicts | Similarity, AI-content, figure, and reproducibility checks are surfaced as editor-only signals with mandatory caveats, never as accusations. |
 | Deterministic statistics verification | Reported t, F, r, chi-square, and z results are recomputed from their test statistic and degrees of freedom, and reported means are checked for whole-number plausibility. Pure arithmetic on the full manuscript text, at no model cost. |
 | Branded deliverables | The author letter and editor summary render as Psynalytics-branded Word documents through a deterministic generator. |
+| Live findings, inspectable mid-run | Each finding on the live run screen opens a detail drawer with its claim, manuscript anchor, severity, and suggested fix while the review is still in progress. Confidential editor-only signals get the same detail in a clearly labelled panel. |
 
 ## How it works
 
@@ -218,7 +219,7 @@ Secret scanning runs over the full history with a documented allowlist for synth
 
 ### Operational resilience
 
-The pipeline is built so that no review is lost to a single failure. A non-critical step that exhausts its retries is skipped and recorded as an explicit coverage gap rather than ending the run, and that gap is stated in the editor-only notes so the limitation is visible. A required step that cannot complete halts cleanly with a recorded reason and a retry path, never a frozen run. Every failure, degradation, and gate decision is written to a structured, queryable event trail that carries no manuscript or author text, so any run can be traced and recovered from a single command.
+The pipeline is built so that no review is lost to a single failure. A non-critical step that exhausts its retries is skipped and recorded as an explicit coverage gap rather than ending the run, and that gap is stated in the editor-only notes so the limitation is visible. A required step that cannot complete, or a release-gate block, retries itself in the background up to twice before parking as failed with a one-click manual retry still available, and the run screen shows the retry attempt and its reason as it happens. Every failure, degradation, and gate decision is written to a structured, queryable event trail that carries no manuscript or author text, so any run can be traced and recovered from a single command.
 
 ## The reviewing voice
 
