@@ -9,8 +9,11 @@ import {
   sanitiseAuthorFacingBody,
   scanAiTropes,
   scanMachineTokens,
+  citationKey,
   scrubLabel,
   scrubProsePunctuation,
+  stripEditorOnlySections,
+  unknownCitations,
   validateGrounding,
 } from '../grounding';
 
@@ -625,5 +628,265 @@ describe('shipped-report band and humanize gates', () => {
     expect(groundingKindsForceHalt(['word-band'])).toBe(false);
     expect(groundingKindsForceHalt(['humanize-unproven'])).toBe(false);
     expect(groundingKindsForceHalt(['editor-only-leak'])).toBe(true);
+  });
+});
+
+// The fixture reproduces a real internal report that leaked confidential prose into an
+// author letter: the writer received the section below with only its ids masked, so the
+// integrity signals and the coverage caveat stayed legible.
+describe('stripEditorOnlySections', () => {
+  const report = [
+    '# Peer Review Report: a manuscript',
+    '',
+    '## 8. What I require in a revised submission',
+    '',
+    'Report the versioned computational record for the full workflow.',
+    '',
+    '## 9. Confidential editor-only note',
+    '',
+    '*For the handling editor only. Never shared with authors.*',
+    '',
+    'The system identified a weak stylometric signal involving sentence-level uniformity.',
+    '',
+    '### Similarity',
+    '',
+    'A short span contains near-identical wording. A full similarity screen was not available.',
+    '',
+    'The lack of a direct analysis-code path should be checked against the complete submission.',
+    '',
+    '## 10. Closing',
+    '',
+    'There is a good paper within reach here.',
+  ].join('\n');
+
+  it('removes the confidential section and every subsection beneath it', () => {
+    const { body } = stripEditorOnlySections(report);
+    expect(body).not.toContain('stylometric');
+    expect(body).not.toContain('near-identical');
+    expect(body).not.toContain('similarity screen');
+    expect(body).not.toContain('analysis-code path');
+    expect(body).not.toContain('Confidential editor-only note');
+    expect(body).not.toContain('### Similarity');
+  });
+
+  it('resumes at the next sibling section rather than truncating the rest of the report', () => {
+    const { body } = stripEditorOnlySections(report);
+    expect(body).toContain('## 10. Closing');
+    expect(body).toContain('There is a good paper within reach here.');
+    expect(body).toContain('## 8. What I require in a revised submission');
+    expect(body).toContain('Report the versioned computational record for the full workflow.');
+  });
+
+  it('matches on the heading wording, not the section number the writer happened to emit', () => {
+    // knowledge/05 numbers this section 8; the live report emitted it as 9.
+    const renumbered = report.replace('## 9. Confidential editor-only note', '## 4. CONFIDENTIAL EDITOR ONLY NOTE');
+    const { body, strippedHeadings } = stripEditorOnlySections(renumbered);
+    expect(strippedHeadings).toHaveLength(1);
+    expect(body).not.toContain('stylometric');
+  });
+
+  it('reports what it removed so a silent no-match cannot pass for a clean strip', () => {
+    const { strippedHeadings } = stripEditorOnlySections(report);
+    expect(strippedHeadings).toEqual(['9. Confidential editor-only note']);
+  });
+
+  it('leaves a report without a confidential section untouched and says it matched nothing', () => {
+    const clean = ['# Report', '', '## 1. Opening', '', 'Body text.'].join('\n');
+    const { body, strippedHeadings } = stripEditorOnlySections(clean);
+    expect(body).toBe(clean);
+    expect(strippedHeadings).toEqual([]);
+  });
+
+  // A carriage return made every heading fail to match, so the strip silently returned the
+  // report unchanged and reported an empty heading list, which reads exactly like a clean report.
+  it('strips a report written with carriage returns instead of silently passing it through', () => {
+    const { body, strippedHeadings } = stripEditorOnlySections(report.split('\n').join('\r\n'));
+    expect(strippedHeadings).toEqual(['9. Confidential editor-only note']);
+    expect(body).not.toContain('stylometric');
+    expect(body).toContain('## 10. Closing');
+  });
+
+  it('ignores a hash line inside a fenced block so the confidential section cannot end early', () => {
+    const fenced = [
+      '## 9. Confidential editor-only note',
+      '',
+      '```',
+      '# not a heading, just a shell comment',
+      '```',
+      '',
+      'A weak stylometric signal appears in the prose.',
+      '',
+      '## 10. Closing',
+      '',
+      'Keep this line.',
+    ].join('\n');
+    const { body } = stripEditorOnlySections(fenced);
+    expect(body).not.toContain('stylometric');
+    expect(body).not.toContain('shell comment');
+    expect(body).toContain('Keep this line.');
+  });
+
+  // An unbalanced fence left the scan believing the rest of the document was code, so the
+  // confidential heading was never recognised and the report read exactly like a clean one.
+  // Heading detection is unreliable in a malformed document, so the strip cuts from the first
+  // editor-only-looking line to the end and records the malformation: over-stripping is
+  // recoverable, a leak is not.
+  it('cuts from the confidential heading to the end when an unclosed fence precedes it', () => {
+    const doc = [
+      '## 8. Revisions',
+      '',
+      '```',
+      'an unclosed snippet',
+      '',
+      '## 9. Confidential editor-only note',
+      '',
+      'A weak stylometric signal appears in the prose.',
+      '',
+      '## 10. Closing',
+      '',
+      'Author-facing text that is sacrificed to the over-strip.',
+    ].join('\n');
+    const { body, strippedHeadings } = stripEditorOnlySections(doc);
+    expect(strippedHeadings).toEqual(['9. Confidential editor-only note', '[unbalanced code fence: stripped to end of report]']);
+    expect(body).not.toContain('stylometric');
+    expect(body).toContain('## 8. Revisions');
+  });
+
+  it('never resurrects the confidential section through a hash line inside its unclosed fence', () => {
+    const doc = [
+      '## 9. Confidential editor-only note',
+      '',
+      '```',
+      '# not a heading, just a shell comment',
+      '',
+      'A weak stylometric signal appears in the prose.',
+      '',
+      '## 10. Closing',
+      '',
+      'Kept only in a balanced document.',
+    ].join('\n');
+    const { body, strippedHeadings } = stripEditorOnlySections(doc);
+    expect(body).not.toContain('stylometric');
+    expect(strippedHeadings).toContain('[unbalanced code fence: stripped to end of report]');
+  });
+
+  it('over-strips from a fenced editor-only look-alike line rather than risking a leak', () => {
+    const doc = [
+      '## 1. Opening',
+      '',
+      'Author-facing text that survives.',
+      '',
+      '```',
+      '# editor-only debug flag',
+      'more fenced text',
+      '',
+      '## 10. Closing',
+      '',
+      'Sacrificed to the over-strip.',
+    ].join('\n');
+    const { body, strippedHeadings } = stripEditorOnlySections(doc);
+    expect(body).toContain('Author-facing text that survives.');
+    expect(body).not.toContain('Sacrificed');
+    expect(strippedHeadings).toContain('[unbalanced code fence: stripped to end of report]');
+  });
+
+  it('returns the document unchanged when a fence is unbalanced but nothing looks editor-only', () => {
+    const doc = ['## 1. Opening', '', '```', 'unclosed but harmless', '', 'Tail text.'].join('\n');
+    const { body, strippedHeadings } = stripEditorOnlySections(doc);
+    expect(body).toBe(doc);
+    expect(strippedHeadings).toEqual([]);
+  });
+
+  it('catches the confidential heading under wordings the writer may reach for', () => {
+    for (const heading of [
+      '## Confidential note for the handling editor',
+      '## Editor-only appendix',
+      '## For the editor only',
+      "## Editor's eyes only",
+    ]) {
+      const doc = [heading, '', 'A weak stylometric signal.', '', '## Closing', '', 'Kept.'].join('\n');
+      const { body, strippedHeadings } = stripEditorOnlySections(doc);
+      expect(strippedHeadings, heading).toHaveLength(1);
+      expect(body, heading).not.toContain('stylometric');
+      expect(body, heading).toContain('Kept.');
+    }
+  });
+});
+
+// Three released-gate blocks called dossier-sourced citations fabricated because no
+// deterministic check tied the shipped reference list back to its permitted sources.
+describe('unknown-citation check', () => {
+  const dossier = [
+    'Thomsen, Cowan, & McAdams, 2025, Mental illness and personal recovery: A narrative identity framework, https://doi.org/10.1016/j.cpr.2025.102546',
+    'Anderson, 2024, Executing Psychobiography, 10.1093/oso/9780197602096.003.0010',
+  ];
+  const manuscriptRefs = [
+    'Suleiman-Martos, N., et al. (2020). Burnout in nursing: a meta-analysis. Journal of Advanced Nursing.',
+  ];
+  const known = [...dossier, ...manuscriptRefs];
+
+  it('passes a reference the dossier supplies, across formatting variants', () => {
+    const shipped = ['Thomsen, Cowan, & McAdams. (2025). *Mental illness and personal recovery*. https://doi.org/10.1016/j.cpr.2025.102546'];
+    expect(unknownCitations(shipped, known)).toEqual([]);
+  });
+
+  it('passes a reference the manuscript itself supplies', () => {
+    expect(unknownCitations(['Suleiman-Martos et al. (2020). Burnout in nursing.'], known)).toEqual([]);
+  });
+
+  it('flags a reference found in neither source', () => {
+    const shipped = ['Nowhere, A. B. (2019). A paper that was never retrieved. Imaginary Press.'];
+    expect(unknownCitations(shipped, known)).toEqual(shipped);
+  });
+
+  it('flags a right surname with the wrong year rather than waving it through', () => {
+    expect(unknownCitations(['Anderson (2024). Executing Psychobiography.'], known)).toEqual([]);
+    expect(unknownCitations(['Anderson (2021). Executing Psychobiography.'], known)).toHaveLength(1);
+  });
+
+  it('passes comma-less and corporate-author references', () => {
+    const who = 'World Health Organization. (2021). Mental health atlas 2020. WHO Press.';
+    expect(unknownCitations([who], ['World Health Organization, 2021, Mental health atlas 2020, https://who.int/x'])).toEqual([]);
+    expect(unknownCitations(['Anderson (2024). Executing Psychobiography.'], known)).toEqual([]);
+  });
+
+  it('skips entries with no extractable surname and year, never flagging them', () => {
+    expect(unknownCitations(['(no date). Untitled archival note.'], known)).toEqual([]);
+    expect(unknownCitations(['2020'], known)).toEqual([]);
+  });
+
+  it('matches through diacritics and case differences', () => {
+    expect(unknownCitations(['MÜLLER, K. (2018). Title.'], ['Müller, 2018, Title, doi'])).toEqual([]);
+    expect(unknownCitations(['Muller, K. (2018). Title.'], ['Müller, 2018, Title, doi'])).toEqual([]);
+  });
+
+  it('extracts the lead surname before an et al marker', () => {
+    expect(citationKey('Rubin et al. (2020). Autobiographical memory.')).toEqual({ surname: 'rubin', year: '2020' });
+  });
+
+  function citationInput(overrides: Record<string, unknown>) {
+    return {
+      authorFacingBody: 'The manuscript reports a concern.',
+      authorFacingCitedIds: [],
+      privateNotesBody: 'Editorial note.',
+      privateNotesReferencedIds: [],
+      ledgerIds,
+      editorOnlyIds,
+      ...overrides,
+    };
+  }
+
+  it('surfaces through validateGrounding as unknown-citation and never forces a halt', () => {
+    const result = validateGrounding(
+      citationInput({ references: ['Nowhere, A. (2019). Ghost paper.'], knownCitations: known }),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.kinds).toContain('unknown-citation');
+    expect(groundingKindsForceHalt(['unknown-citation'])).toBe(false);
+  });
+
+  it('runs only when both sides are supplied, so mode A and legacy callers are untouched', () => {
+    expect(validateGrounding(citationInput({ references: ['Nowhere, A. (2019). Ghost paper.'] })).kinds).not.toContain('unknown-citation');
+    expect(validateGrounding(citationInput({ knownCitations: known })).kinds).not.toContain('unknown-citation');
   });
 });

@@ -2,13 +2,16 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, type EvidenceData } from '@/lib/api';
 import { PHASE_DESCRIPTIONS, PHASES, phaseIndex, phaseLabel } from '@/lib/format';
 import { LENS_FALLBACK, LENS_INFO, prefixOf } from '@/lib/lenses';
+import { parseRetrySignal, retryLogMessage, retryPillLabel, type RetrySignal } from '@/lib/runEvents';
+import type { RunDrawerState } from '@/lib/runDrawer';
 import { Icon, Meter, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 import { LensCard, type LensStatus } from '@/components/LensCard';
 import { FindingRow } from '@/components/FindingRow';
+import { RunFindingsDrawer } from '@/components/RunFindingsDrawer';
 import { SeverityLegend } from '@/components/SeverityLegend';
 import { ActivityLog, type LogEntry } from '@/components/ActivityLog';
 
@@ -47,9 +50,38 @@ export default function RunPage(): ReactNode {
   const [connected, setConnected] = useState(false);
   const [paused, setPaused] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [retrying, setRetrying] = useState<RetrySignal | null>(null);
+  const [editorOnlyIds, setEditorOnlyIds] = useState<ReadonlySet<string>>(new Set());
+  const [drawer, setDrawer] = useState<RunDrawerState | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceData | null>(null);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const evidenceStale = useRef(true);
   const notified = useRef(false);
   const phaseRef = useRef('phase_0');
   const terminalRef = useRef<'complete' | 'failed' | null>(null);
+
+  const openDrawer = (next: RunDrawerState): void => {
+    setDrawer(next);
+    const cachedHasId =
+      next.mode !== 'finding' ||
+      (evidence !== null &&
+        [...evidence.findings, ...(evidence.editorOnly ?? [])].some((entry) => entry.id === next.findingId));
+    if (!evidenceStale.current && evidence !== null && cachedHasId) {
+      return;
+    }
+    evidenceStale.current = false;
+    setEvidenceLoading(true);
+    void api
+      .getEvidence(id)
+      .then((data) => {
+        setEvidence(data);
+        setEditorOnlyIds(new Set((data.editorOnly ?? []).map((entry) => entry.id)));
+      })
+      .catch(() => {
+        evidenceStale.current = true;
+      })
+      .finally(() => setEvidenceLoading(false));
+  };
 
   useEffect(() => {
     phaseRef.current = currentPhase;
@@ -87,6 +119,13 @@ export default function RunPage(): ReactNode {
 
     source.addEventListener('phase_status', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { phase: string | null; ts?: string };
+      const retry = parseRetrySignal(data);
+      if (retry !== null) {
+        setRetrying(retry);
+        addLog(`retry-${retry.attempt ?? 'manual'}-${data.ts ?? ''}`, data.ts, retryLogMessage(retry), data.phase ?? phaseRef.current);
+      } else if (data.phase !== null) {
+        setRetrying(null);
+      }
       if (data.phase !== null) {
         setPaused(false);
         if (terminalRef.current === 'failed') {
@@ -98,7 +137,9 @@ export default function RunPage(): ReactNode {
         } else {
           setCurrentPhase((prev) => (phaseIndex(data.phase) >= phaseIndex(prev) ? (data.phase as string) : prev));
         }
-        addLog(`phase-${data.phase}-${data.ts ?? ''}`, data.ts, `Started ${phaseLabel(data.phase)}`, data.phase);
+        if (retry === null) {
+          addLog(`phase-${data.phase}-${data.ts ?? ''}`, data.ts, `Started ${phaseLabel(data.phase)}`, data.phase);
+        }
       }
     });
     source.addEventListener('run_paused', (event) => {
@@ -133,6 +174,10 @@ export default function RunPage(): ReactNode {
             : `${lensDisplay} recorded a ${raw.severity} issue`;
       const finding: Finding = { findingId: raw.findingId, severity: raw.severity, scope: raw.scope, lensPrefix, lensDisplay, headline };
       setFindings((prev) => (prev.some((f) => f.findingId === finding.findingId) ? prev : [finding, ...prev].slice(0, 40)));
+      if (raw.scope === 'editor_only') {
+        setEditorOnlyIds((prev) => (prev.has(raw.findingId) ? prev : new Set(prev).add(raw.findingId)));
+      }
+      evidenceStale.current = true;
     });
     source.addEventListener('cost_tick', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { costUsdTotal: number; tokensIn: number; tokensOut: number };
@@ -145,6 +190,9 @@ export default function RunPage(): ReactNode {
     source.addEventListener('gate_verdict', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { verdict: string; cycle: number; source?: string; ts?: string; phase?: string };
       setGate(data.verdict === 'pass' ? null : { verdict: data.verdict, cycle: data.cycle });
+      if (data.verdict !== 'pass') {
+        evidenceStale.current = true;
+      }
       addLog(
         `gate-${data.cycle}-${data.source ?? 'gate'}-${data.verdict}`,
         data.ts,
@@ -172,12 +220,14 @@ export default function RunPage(): ReactNode {
     source.addEventListener('run_complete', () => {
       terminalRef.current = 'complete';
       setTerminal('complete');
+      setRetrying(null);
       source.close();
     });
     source.addEventListener('run_failed', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { phase?: string };
       terminalRef.current = 'failed';
       setTerminal('failed');
+      setRetrying(null);
       setFailedPhase(data.phase ?? phaseRef.current);
     });
 
@@ -245,7 +295,7 @@ export default function RunPage(): ReactNode {
   }, [lenses, findings]);
 
   const authorFindings = useMemo(() => findings.filter((f) => f.scope !== 'editor_only'), [findings]);
-  const editorOnlyCount = findings.filter((f) => f.scope === 'editor_only').length;
+  const editorOnlyCount = editorOnlyIds.size;
 
   const logList: LogEntry[] = useMemo(
     () =>
@@ -266,6 +316,7 @@ export default function RunPage(): ReactNode {
           <>
             {!connected && terminal === null ? <Pill tone="warn" label="Reconnecting" /> : null}
             {paused && terminal === null ? <Pill tone="warn" label="Paused" icon="pause" /> : null}
+            {retrying !== null && terminal === null ? <Pill tone="warn" icon="clock" label={retryPillLabel(retrying)} /> : null}
             {gate !== null && terminal === null ? (
               <Pill
                 tone="neutral"
@@ -340,11 +391,25 @@ export default function RunPage(): ReactNode {
             <div className="ticker" aria-live="polite">
               {editorOnlyCount > 0 ? (
                 <div className="ticker-row">
-                  <Pill tone="neutral" icon="shield" label={`${editorOnlyCount} confidential signal${editorOnlyCount === 1 ? '' : 's'} logged`} />
+                  <button
+                    type="button"
+                    className="pill-button"
+                    onClick={() => openDrawer({ mode: 'confidential' })}
+                    aria-haspopup="dialog"
+                    aria-label={`View ${editorOnlyCount} confidential signal${editorOnlyCount === 1 ? '' : 's'}`}
+                  >
+                    <Pill tone="neutral" icon="shield" label={`${editorOnlyCount} confidential signal${editorOnlyCount === 1 ? '' : 's'} logged`} />
+                  </button>
                 </div>
               ) : null}
               {authorFindings.map((finding) => (
-                <FindingRow key={finding.findingId} severity={finding.severity} lensDisplay={finding.lensDisplay} headline={finding.headline} />
+                <FindingRow
+                  key={finding.findingId}
+                  severity={finding.severity}
+                  lensDisplay={finding.lensDisplay}
+                  headline={finding.headline}
+                  onOpen={() => openDrawer({ mode: 'finding', findingId: finding.findingId })}
+                />
               ))}
               {findings.length === 0 ? <p className="sub muted" style={{ fontSize: 'var(--fs-small)' }}>No findings recorded yet.</p> : null}
             </div>
@@ -397,6 +462,14 @@ export default function RunPage(): ReactNode {
           </div>
         </div>
       </div>
+
+      <RunFindingsDrawer
+        state={drawer}
+        evidence={evidence}
+        loading={evidenceLoading}
+        ledgerHref={api.deliverableUrl(id, 'ledger_export', 'md')}
+        onClose={() => setDrawer(null)}
+      />
     </div>
   );
 }

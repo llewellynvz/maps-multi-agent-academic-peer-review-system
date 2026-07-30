@@ -92,7 +92,7 @@ function metaObject() {
       criterion: index + 1,
       score: 3,
       supportingIds: ['REV-STAT-0001'],
-      opposingIds: [],
+      opposingIds: [] as string[],
     })),
     average: 3.0,
     bottlenecks: [4, 5, 9],
@@ -147,7 +147,7 @@ function shippedObject() {
       score: 3,
       justification: 'Grounded in the ledger.',
     })),
-    references: [],
+    references: [] as string[],
     citedFindingIds: AUTHOR_IDS,
     editorOnlyLeak: false,
     humanizePairs: [
@@ -192,8 +192,16 @@ function mockDeps(
   shippedOverride?: ReturnType<typeof shippedObject>,
   metaSequence?: Array<ReturnType<typeof metaObject>>,
   shippedSequence?: Array<ReturnType<typeof shippedObject>>,
-): { deps: EngineDeps; criticCalls: number; specialistCalls: string[]; writerInputs: string[] } {
-  const state = { criticCalls: 0, metaCalls: 0, writerCalls: 0, specialistCalls: [] as string[], writerInputs: [] as string[] };
+): { deps: EngineDeps; criticCalls: number; specialistCalls: string[]; writerInputs: string[]; criticInputs: string[]; swarmInputs: string[] } {
+  const state = {
+    criticCalls: 0,
+    metaCalls: 0,
+    writerCalls: 0,
+    specialistCalls: [] as string[],
+    writerInputs: [] as string[],
+    criticInputs: [] as string[],
+    swarmInputs: [] as string[],
+  };
   const runDispatch = async (input: DispatchInput): Promise<DispatchResult> => {
     let object: unknown;
     switch (input.agent) {
@@ -202,6 +210,7 @@ function mockDeps(
         state.metaCalls += 1;
         break;
       case 'swarm':
+        state.swarmInputs.push(JSON.stringify(input));
         object = swarmBObject();
         break;
       case 'review-report-writer':
@@ -215,6 +224,7 @@ function mockDeps(
         object = specialistObject();
         break;
       case 'review-final-critic':
+        state.criticInputs.push(JSON.stringify(input));
         object = criticVerdicts[Math.min(state.criticCalls, criticVerdicts.length - 1)];
         state.criticCalls += 1;
         break;
@@ -243,6 +253,12 @@ function mockDeps(
     },
     get writerInputs() {
       return state.writerInputs;
+    },
+    get criticInputs() {
+      return state.criticInputs;
+    },
+    get swarmInputs() {
+      return state.swarmInputs;
     },
   };
 }
@@ -298,15 +314,212 @@ describe('phase 7 release gate routing', () => {
     expect(review.recommendation).toBe('major_revision');
   });
 
-  it('routes a block verdict to a halted, unreleased run', async () => {
-    const harness = mockDeps([critic('block', { mostDangerousDefect: 'A leaked confidential identity.' })]);
+  it('routes a persistent block verdict to a halted, unreleased run after one route-back', async () => {
+    const harness = mockDeps([
+      critic('block', { mostDangerousDefect: 'A leaked confidential identity.' }),
+      critic('block', { mostDangerousDefect: 'The identity leak survived the rewrite.' }),
+    ]);
     await runPhase7(harness.deps, reviewId);
     const cp = checkpointRow();
     expect(cp.gate).toBe('block');
     expect(cp.snapshot.released).toBe(false);
     const review = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(reviewId) as { status: string };
     expect(review.status).toBe('failed');
+    expect(harness.criticCalls).toBe(2);
+  });
+
+  it('routes a block back to the writer once, naming sections but never the critic prose, then releases', async () => {
+    const harness = mockDeps([
+      critic('block', {
+        mostDangerousDefect: 'The rubric exposes an internal coverage judgement.',
+        sectionsToRework: ['Rubric table'],
+      }),
+      critic('pass'),
+    ]);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.criticCalls).toBe(2);
+    const cp = checkpointRow();
+    expect(cp.status).toBe('completed');
+    expect(cp.snapshot.released).toBe(true);
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(2);
+    const rerouted = harness.writerInputs[harness.writerInputs.length - 1] ?? '';
+    expect(rerouted).toContain('final critic block on sections: Rubric table');
+    expect(rerouted).not.toContain('internal coverage judgement');
+  });
+
+  it('leaves phase 7 resumable when a pause lands mid-route-back, never completed-and-unreleased', async () => {
+    const harness = mockDeps([critic('block', { mostDangerousDefect: 'A defect the rewrite would fix.' })]);
+    let writerDispatches = 0;
+    const deps: EngineDeps = {
+      db: harness.deps.db,
+      runDispatch: harness.deps.runDispatch,
+      preDispatch: (input) => {
+        if (input.agent === 'review-report-writer') {
+          writerDispatches += 1;
+          if (writerDispatches === 2) {
+            return { pause: true, reason: 'cost_ceiling' };
+          }
+        }
+        return { pause: false };
+      },
+    };
+    await expect(runPhase7(deps, reviewId)).rejects.toBeInstanceOf(DispatchPauseError);
+    const cp = checkpointRow();
+    expect(cp.status).toBe('in_progress');
+    expect(cp.gate).toBe('block');
+  });
+
+  it('seeds the writer with a prior block\'s sections from the surviving checkpoint snapshot, never its prose', async () => {
+    sqlite
+      .prepare('INSERT INTO phase_checkpoints (id, review_id, phase, status, snapshot_json, fix_cycle_count, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(`cp-${reviewId}`, reviewId, 'engine_phase_7', 'pending', JSON.stringify({ released: false, blocked: true, reason: 'PRIOR-BLOCK-REASON about the rubric', sections: ['Rubric table'], fixCycles: 0 }), 0, new Date().toISOString());
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(1);
+    expect(harness.writerInputs[0]).toContain('a prior run of this gate was blocked by the final critic on sections: Rubric table');
+    expect(harness.writerInputs[0]).not.toContain('PRIOR-BLOCK-REASON');
+  });
+
+  it('seeds a generic rebuild instruction when the prior block snapshot carries no sections', async () => {
+    sqlite
+      .prepare('INSERT INTO phase_checkpoints (id, review_id, phase, status, snapshot_json, fix_cycle_count, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(`cp-${reviewId}`, reviewId, 'engine_phase_7', 'pending', JSON.stringify({ released: false, blocked: true, reason: 'PRIOR-BLOCK-REASON about the rubric', fixCycles: 0 }), 0, new Date().toISOString());
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.writerInputs[0]).toContain('a prior run of this gate was blocked by the final critic. Rebuild the report');
+    expect(harness.writerInputs[0]).not.toContain('PRIOR-BLOCK-REASON');
+  });
+
+  it('hands the final critic the field dossier and the structured evidence map', async () => {
+    writeArtefact(reviewId, 'p2-context', {
+      keyPapers: [{ citation: 'Thomsen, Cowan, & McAdams, 2025, Mental illness and personal recovery', whyItMatters: 'Comparator.' }],
+      comparators: [{ citation: 'Anderson, 2024, Executing Psychobiography', relevance: 'Method comparator.' }],
+      benchmarks: [],
+      contestedClaims: [],
+      methodNorms: [],
+    });
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    expect(harness.criticInputs).toHaveLength(1);
+    const criticInput = harness.criticInputs[0] ?? '';
+    expect(criticInput).toContain('Field dossier');
+    expect(criticInput).toContain('Thomsen');
+    expect(criticInput).toContain('Shipped evidence map');
+    expect(criticInput).toContain('The reported mean is impossible.');
+    const writerInput = harness.writerInputs[0] ?? '';
+    expect(writerInput).toContain('Executing Psychobiography');
+  });
+
+  it('routes back a reference found in neither the dossier nor the manuscript, then releases the corrected draft', async () => {
+    writeManuscriptBlob(reviewId, 'parse/section-map.json', JSON.stringify({
+      title: 'A brief wellbeing trial',
+      abstract: 'Abstract text.',
+      sections: [{ index: 0, heading: 'Results', text: 'The mean was 8.40.', lineStart: 1, lineEnd: 3 }],
+      references: [{ index: 0, raw: 'Suleiman-Martos, N., et al. (2020). Burnout in nursing.', title: 'Burnout in nursing', doi: null, year: 2020, venue: null, authors: [] }],
+      fullText: 'The mean was 8.40.',
+      parser: 'grobid',
+      parseQuality: 'good',
+    }));
+    writeArtefact(reviewId, 'p2-context', {
+      keyPapers: [{ citation: 'Thomsen, Cowan, & McAdams, 2025, Mental illness and personal recovery', whyItMatters: 'Comparator.' }],
+      comparators: [],
+      benchmarks: [],
+      contestedClaims: [],
+      methodNorms: [],
+    });
+    const base = shippedObject();
+    const withGhost = { ...base, references: ['Nowhere, A. B. (2019). A paper that was never retrieved.'] };
+    const harness = mockDeps([critic('pass')], undefined, undefined, [withGhost, base]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(2);
+    expect(harness.writerInputs[1]).toContain('field dossier');
+    expect(harness.writerInputs[1]).toContain('Nowhere');
+  });
+
+  // The writer is told the whole dossier is citable, so the checker must accept citations
+  // from every dossier section, not only keyPapers and comparators.
+  it('accepts a reference sourced from the dossier benchmarks rather than routing it back', async () => {
+    writeManuscriptBlob(reviewId, 'parse/section-map.json', JSON.stringify({
+      title: 'A brief wellbeing trial',
+      abstract: 'Abstract text.',
+      sections: [{ index: 0, heading: 'Results', text: 'The mean was 8.40.', lineStart: 1, lineEnd: 3 }],
+      references: [{ index: 0, raw: 'Suleiman-Martos, N., et al. (2020). Burnout in nursing.', title: 'Burnout in nursing', doi: null, year: 2020, venue: null, authors: [] }],
+      fullText: 'The mean was 8.40.',
+      parser: 'grobid',
+      parseQuality: 'good',
+    }));
+    writeArtefact(reviewId, 'p2-context', {
+      keyPapers: [],
+      comparators: [],
+      benchmarks: [{ metric: 'Internal consistency', value: '0.70', source: 'Nunnally & Bernstein, 1994, Psychometric Theory', tension: null }],
+      contestedClaims: [],
+      methodNorms: [],
+    });
+    const base = shippedObject();
+    const fromBenchmark = { ...base, references: ['Nunnally & Bernstein (1994). Psychometric Theory.'] };
+    const harness = mockDeps([critic('pass')], undefined, undefined, [fromBenchmark]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
     expect(harness.criticCalls).toBe(1);
+    expect(harness.writerInputs).toHaveLength(1);
+  });
+
+  it('id-masks the blocked section labels before they reach the writer or the snapshot', async () => {
+    const harness = mockDeps([
+      critic('block', { sectionsToRework: ['The unit grounded in REV-SIM-0001'] }),
+      critic('pass'),
+    ]);
+    await runPhase7(harness.deps, reviewId);
+    const rerouted = harness.writerInputs[harness.writerInputs.length - 1] ?? '';
+    expect(rerouted).toContain('final critic block on sections:');
+    expect(rerouted).not.toContain('REV-SIM-0001');
+    expect(rerouted).toContain('[EDITOR-ONLY]');
+  });
+
+  // GROBID can extract zero references from a clean manuscript. A dossier-only comparison
+  // would then call every manuscript-sourced citation fabricated and burn the grounding budget.
+  it('skips the citation check entirely when the manuscript reference list failed to parse', async () => {
+    writeArtefact(reviewId, 'p2-context', {
+      keyPapers: [{ citation: 'Thomsen, Cowan, & McAdams, 2025, Mental illness and personal recovery', whyItMatters: 'Comparator.' }],
+      comparators: [],
+      benchmarks: [],
+      contestedClaims: [],
+      methodNorms: [],
+    });
+    const base = shippedObject();
+    const manuscriptSourced = { ...base, references: ['Suleiman-Martos, N., et al. (2020). Burnout in nursing.'] };
+    const harness = mockDeps([critic('pass')], undefined, undefined, [manuscriptSourced]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(true);
+    expect(harness.criticCalls).toBe(1);
+    expect(harness.writerInputs).toHaveLength(1);
+  });
+
+  it('id-masks the block reason at capture so the snapshot and terminal events never carry an editor-only id', async () => {
+    const harness = mockDeps([
+      critic('block', { mostDangerousDefect: 'The notes quote REV-SIM-0001 next to REV-STAT-0001.' }),
+      critic('block', { mostDangerousDefect: 'The notes quote REV-SIM-0001 next to REV-STAT-0001.' }),
+    ]);
+    await runPhase7(harness.deps, reviewId);
+    const cp = checkpointRow();
+    expect(cp.snapshot.released).toBe(false);
+    const reason = String(cp.snapshot.reason);
+    expect(reason).toContain('[EDITOR-ONLY]');
+    expect(reason).not.toContain('REV-SIM-0001');
+    expect(reason).toContain('REV-STAT-0001');
+  });
+
+  it('stamps the gate-block terminal with its error class', async () => {
+    const harness = mockDeps([critic('block'), critic('block')]);
+    await runPhase7(harness.deps, reviewId);
+    const terminal = sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'run_terminal' ORDER BY seq DESC LIMIT 1")
+      .get(reviewId) as { payload_json: string };
+    expect(JSON.parse(terminal.payload_json).errorClass).toBe('release_gate_block');
   });
 
   it('recovers from a revise verdict then releases on the next pass', async () => {
@@ -348,7 +561,9 @@ describe('phase 7 release gate routing', () => {
     const ungrounded = { ...shippedObject(), bodyMarkdown: 'The central concern is REV-ZZZ-9999.', citedFindingIds: ['REV-ZZZ-9999'] };
     const harness = mockDeps([critic('pass')], ungrounded);
     await runPhase7(harness.deps, reviewId);
-    expect(harness.criticCalls).toBe(0);
+    // The deterministic rewrites are spent, so the confidentiality audit runs once on the
+    // last body before arbitration decides. The release outcome below is unchanged.
+    expect(harness.criticCalls).toBe(1);
     const cp = checkpointRow();
     expect(cp.gate).toBe('arbitrated');
     expect(cp.snapshot.released).toBe(false);
@@ -369,7 +584,9 @@ describe('phase 7 release gate routing', () => {
     };
     const harness = mockDeps([critic('pass')], withInlineId);
     await runPhase7(harness.deps, reviewId);
-    expect(harness.criticCalls).toBe(0);
+    // The deterministic rewrites are spent, so the confidentiality audit runs once on the
+    // last body before arbitration decides. The release outcome below is unchanged.
+    expect(harness.criticCalls).toBe(1);
     expect(checkpointRow().snapshot.released).toBe(false);
     expect(harness.writerInputs.length).toBeGreaterThanOrEqual(2);
     expect(harness.writerInputs[1]).toContain('id-free');
@@ -400,6 +617,36 @@ describe('phase 7 release gate routing', () => {
     expect(checkpointRow().snapshot.released).toBe(true);
   });
 
+  // A short body spent both deterministic rewrites on the word band, which used to end the loop
+  // before the critic ran, so a review reached its authors with the confidentiality audit skipped.
+  it('audits confidentiality even when the deterministic rewrites are spent, and a block still stops the release', async () => {
+    const base = shippedObject();
+    const short = {
+      ...base,
+      bodyMarkdown: [
+        'Dear Editor and Authors, I recommend major revision, and I hold this with moderate confidence.',
+        `**The reported mean is impossible.** ${HUMANISED[0]}`,
+        `**Sampling is under-described.** ${HUMANISED[1]}`,
+        HUMANISED[2],
+        narrativeFiller(400),
+      ].join('\n\n'),
+    };
+    const harness = mockDeps(
+      [critic('block', { mostDangerousDefect: 'The rubric exposes an editor-only coverage judgement to the authors.' })],
+      short,
+    );
+    await runPhase7(harness.deps, reviewId);
+
+    expect(harness.criticCalls).toBe(1);
+    const cp = checkpointRow();
+    expect(cp.gate).toBe('block');
+    expect(eventKinds()).not.toContain('arbitration');
+    const review = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(reviewId) as { status: string };
+    expect(review.status).toBe('failed');
+    const deliverableCount = (sqlite.prepare('SELECT count(*) AS n FROM deliverables WHERE review_id = ?').get(reviewId) as { n: number }).n;
+    expect(deliverableCount).toBe(0);
+  });
+
   it('ships via arbitration on an unresolvable cosmetic trope instead of destroying the review', async () => {
     const trope = '\n\nThe contribution is not only strong but also genuinely valuable here.';
     const base = shippedObject();
@@ -410,7 +657,9 @@ describe('phase 7 release gate routing', () => {
     const cp = checkpointRow();
     expect(cp.snapshot.released).toBe(true);
     expect(cp.gate).toBe('arbitrated');
-    expect(harness.criticCalls).toBe(0);
+    // The deterministic rewrites are spent, so the confidentiality audit runs once on the
+    // last body before arbitration decides. The release outcome below is unchanged.
+    expect(harness.criticCalls).toBe(1);
     const review = sqlite.prepare('SELECT recommendation FROM reviews WHERE id = ?').get(reviewId) as { recommendation: string };
     expect(review.recommendation).toBe('reject_and_resubmit');
   });
@@ -443,7 +692,9 @@ describe('phase 7 release gate routing', () => {
     const brokenMap = { ...shippedObject(), bodyMarkdown: 'Dear Editor and Authors, I recommend major revision.' };
     const harness = mockDeps([critic('pass')], brokenMap);
     await runPhase7(harness.deps, reviewId);
-    expect(harness.criticCalls).toBe(0);
+    // The deterministic rewrites are spent, so the confidentiality audit runs once on the
+    // last body before arbitration decides. The release outcome below is unchanged.
+    expect(harness.criticCalls).toBe(1);
     expect(checkpointRow().snapshot.released).toBe(false);
     expect(harness.writerInputs[1]).toContain('evidence map');
   });
@@ -704,5 +955,84 @@ describe('phase 7 release gate routing', () => {
       expect(input).not.toContain('REV-SIM-0001');
       expect(input).toContain('[EDITOR-ONLY]');
     }
+  });
+
+  // The released letter justified a low transparency score with an editor-only coverage
+  // finding, because the meta rubric named it as supporting evidence and only the id was masked.
+  it('withholds editor-only ids from the rubric support and decision hinges the writer receives', async () => {
+    const meta = metaObject();
+    meta.rubric[11] = { criterion: 12, score: 2, supportingIds: ['REV-STAT-0001', 'REV-SIM-0001'], opposingIds: ['REV-SIM-0001'] };
+    meta.decisionHinges = [
+      { findingId: 'REV-STAT-0001', hinge: 'Until resolved, cannot advance beyond major revision.' },
+      { findingId: 'REV-SIM-0001', hinge: 'The overlap signal has to be checked before acceptance.' },
+    ];
+    const harness = mockDeps([critic('pass')], undefined, [meta]);
+    await runPhase7(harness.deps, reviewId);
+
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(1);
+    for (const raw of harness.writerInputs) {
+      const pkg = JSON.parse(raw) as { parts: { prompt?: string } };
+      const seen = pkg.parts.prompt ?? '';
+      const start = seen.indexOf('Recommendation package');
+      const end = seen.indexOf('Swarm report critique', start);
+      const block = seen.slice(start, end === -1 ? undefined : end);
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      expect(block).not.toContain('REV-SIM-0001');
+      expect(block).not.toContain('[EDITOR-ONLY]');
+      expect(block).not.toContain('overlap signal has to be checked');
+      expect(block).toContain('REV-STAT-0001');
+    }
+  });
+
+  // Masking ids is not enough on its own: the confidential section's prose survived id
+  // redaction and reached the author letter as an established author omission.
+  it('never shows the confidential editor-only prose to the writer, while the critic still audits it', async () => {
+    writeArtefact(reviewId, 'p6-report', {
+      mode: 'A',
+      bodyMarkdown: [
+        '# Peer Review Report',
+        '',
+        '## 7. What I require in a revised submission',
+        '',
+        'Report the versioned computational record, grounded in REV-STAT-0001.',
+        '',
+        '## 8. Confidential editor-only note',
+        '',
+        'A weak stylometric signal appears in the prose, and a full similarity screen was unavailable.',
+        'The lack of a direct analysis-code path should be checked before it is treated as an author omission.',
+        '',
+        '## 9. Closing',
+        '',
+        'There is a good paper within reach here.',
+      ].join('\n'),
+    });
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+
+    expect(harness.writerInputs.length).toBeGreaterThanOrEqual(1);
+    for (const input of harness.writerInputs) {
+      // The section heading itself is named by the knowledge/05 template in every prompt,
+      // so the assertion targets the confidential substance the strip has to remove.
+      expect(input).not.toContain('stylometric');
+      expect(input).not.toContain('similarity screen');
+      expect(input).not.toContain('analysis-code path');
+      expect(input).toContain('There is a good paper within reach here.');
+      expect(input).toContain('Report the versioned computational record');
+    }
+
+    expect(harness.criticInputs).toHaveLength(1);
+    expect(harness.criticInputs[0]).toContain('stylometric');
+    expect(harness.criticInputs[0]).toContain('analysis-code path');
+
+    expect(harness.swarmInputs.length).toBeGreaterThanOrEqual(1);
+    for (const input of harness.swarmInputs) {
+      expect(input).not.toContain('stylometric');
+      expect(input).not.toContain('similarity screen');
+      expect(input).toContain('There is a good paper within reach here.');
+    }
+
+    const gateRecord = readArtefact<{ strippedEditorOnlySections: string[] }>(reviewId, 'p7-gate-record');
+    expect(gateRecord.strippedEditorOnlySections).toEqual(['8. Confidential editor-only note']);
   });
 });

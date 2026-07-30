@@ -6,7 +6,77 @@ All notable changes to Collegia are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Live findings are now clickable while a review runs. Selecting a row in the
+  findings ticker opens a drawer with the finding's claim, its place in the
+  manuscript, its severity, and the suggested next step, and the confidential
+  signals counter opens a labelled editor-only list with the same detail. The
+  detail comes from the existing evidence endpoint, so nothing new crosses the
+  stream and the stream's masking of confidential headlines is unchanged.
+- A blocked or crashed review now retries itself in the background, up to twice,
+  before parking as failed with the manual Retry button still available. The
+  run screen shows the retry attempt and its reason instead of halting. Retries
+  are durable commands, so a worker restart can no longer lose an accepted
+  retry after it has already wiped the phases it meant to re-run, duplicate
+  retry clicks collapse into one, and a retry command that cannot apply is
+  discarded once with an error event rather than re-polling forever.
+
 ### Fixed
+- The release critic can no longer call a legitimately cited work fabricated.
+  Three of four failed reviews were blocked for citing literature that sits,
+  verifiably, in that review's own field dossier: the writer is instructed to
+  cite only from the dossier, but the critic was never given the dossier to
+  check against. The critic now receives the dossier and the report's
+  structured evidence map, the dossier serialisation carries its comparator
+  works, and a deterministic check routes any reference found in neither the
+  dossier nor the manuscript's own reference list back to the writer before
+  the critic ever judges it.
+- A release-gate block now gets one chance to be fixed before it fails the
+  review. A cosmetic word-count miss earned two rewrites and still shipped,
+  while a substantive block was terminal on its first appearance with zero
+  rewrite attempts. The writer is now told which sections the critic blocked
+  and rewrites them once, and only a block that survives that rewrite fails
+  the review. The one exception is a block raised after the deterministic
+  rewrite budget is already spent, which stays terminal because that critic
+  run is the mandatory confidentiality audit. A retried gate also reads the
+  prior run's blocked sections instead of re-rolling blind, and a retry that
+  regenerates earlier phases clears that memory so it cannot mislead.
+- A retry aimed downstream of the blocked gate can no longer wedge a review.
+  One review failed five times in a row with zero model calls because a
+  phase-8 retry left the blocked phase-7 checkpoint marked complete, so every
+  re-run skipped the gate and finished unreleased. A retry now re-opens the
+  unreleased gate phase regardless of the requested target.
+- A confidential finding can no longer be named as the evidence behind an
+  author-facing rubric score. The recommendation package handed to the writer
+  listed editor-only findings as the support for a criterion and as decision
+  hinges, with only the identifier masked, which told the writer that hidden
+  evidence existed and left it to reconstruct that evidence from the surrounding
+  text. That is how a coverage limitation in the review packet reached one
+  author letter as a settled reporting defect. Those identifiers are now
+  withheld from the writer altogether, and a criterion left without visible
+  support falls back to the author-facing ledger. Arbitration still grounds its
+  decision on the complete set.
+- No review can now reach its authors without the confidentiality audit having
+  run. The release gate spent one shared budget on both kinds of correction, so
+  two mechanical rewrites, of the kind a narrative that lands outside the word
+  band triggers, used the budget up and ended the gate loop before the release
+  critic ever read the letter. Arbitration then released it unaudited. The
+  mechanical rewrites and the critic's revisions now draw on separate budgets,
+  and when the mechanical ones are spent the critic still audits the last draft
+  and can still stop the release. A cosmetic defect continues to ship through
+  arbitration rather than destroying a finished review.
+- The confidential editor-only section of the internal report no longer reaches
+  the writer that drafts the author letter. Only the finding identifiers were
+  masked before, so the similarity and stylometric signals in that section
+  stayed legible to the writer in full. The section and its subsections are now
+  removed from that one input, keyed on the heading wording rather than its
+  number because the number varies between reports, and the release gate records
+  which heading it removed so an audit can see when the strip matched nothing.
+  If a novel wording ever slips past the strip, the release critic's
+  confidentiality audit still stands between the draft and the authors, and a
+  blocked run releases no deliverables.
+  The release critic still receives the whole report, because it has to read the
+  confidential material to judge whether any of it leaked.
 - Reviewers now read the manuscript in its real word order. The GROBID parser
   collapsed every inline citation to the head of its paragraph and fused the
   words either side of it, so each paragraph reached the reviewers rearranged.

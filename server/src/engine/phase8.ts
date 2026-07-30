@@ -106,7 +106,7 @@ function alignmentFallbackMarkdown(reviewId: string): string | null {
 function runAuditText(gateRecord: Record<string, unknown>): string {
   const fixCycles = typeof gateRecord.fixCycles === 'number' ? gateRecord.fixCycles : 0;
   const verdict = typeof gateRecord.verdict === 'string' ? gateRecord.verdict : 'pass';
-  const lines = [`Release verdict: ${verdict}. Fix cycles used: ${fixCycles} of 2.`];
+  const lines = [`Release verdict: ${verdict}. Fix cycles used: ${fixCycles}.`];
   const arbitration = gateRecord.arbitration as Record<string, unknown> | undefined;
   if (arbitration !== undefined) {
     lines.push(`Arbitration outcome: ${String(arbitration.outcome)}. ${String(arbitration.rationale)}`);

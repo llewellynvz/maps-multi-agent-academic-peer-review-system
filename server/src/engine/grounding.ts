@@ -52,6 +52,7 @@ export type GroundingFailureKind =
   | 'evidence-map-mismatch'
   | 'humanize-unproven'
   | 'word-band'
+  | 'unknown-citation'
   | null;
 
 export interface EvidenceMapEntry {
@@ -85,6 +86,8 @@ export interface GroundingInput {
   authorFacingAncillary?: string;
   humanizePairs?: HumanizePair[];
   narrativeBand?: NarrativeBand;
+  references?: string[];
+  knownCitations?: string[];
 }
 
 export interface GroundingResult {
@@ -92,6 +95,49 @@ export interface GroundingResult {
   kind: GroundingFailureKind;
   kinds: Exclude<GroundingFailureKind, null>[];
   failures: string[];
+}
+
+function foldCitationText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+const CITATION_YEAR = /(?:19|20)\d{2}/;
+
+export function citationKey(reference: string): { surname: string; year: string } | null {
+  const year = CITATION_YEAR.exec(reference)?.[0];
+  if (year === undefined) {
+    return null;
+  }
+  const head = reference.split(/[,(\d]/)[0] ?? '';
+  const surname = head
+    .replace(/\bet al\b.*/i, '')
+    .replace(/[^\p{L}\s'-]/gu, ' ')
+    .trim();
+  if (surname.replace(/[^\p{L}]/gu, '').length < 2) {
+    return null;
+  }
+  return { surname: foldCitationText(surname), year };
+}
+
+export function unknownCitations(references: string[], knownCitations: string[]): string[] {
+  const known = knownCitations.map(foldCitationText);
+  const unknown: string[] = [];
+  for (const reference of references) {
+    const key = citationKey(reference);
+    if (key === null) {
+      continue;
+    }
+    const matched = known.some((entry) => entry.includes(key.surname) && entry.includes(key.year));
+    if (!matched) {
+      unknown.push(reference);
+    }
+  }
+  return unknown;
 }
 
 export function redactEditorOnlyIds(content: string, editorOnlyIds: Set<string>): string {
@@ -104,6 +150,62 @@ export function redactEditorOnlyIds(content: string, editorOnlyIds: Set<string>)
 
 export function redactSupersededIds(content: string, currentIds: Set<string>): string {
   return content.replace(FINDING_ID_TOKEN, (id) => (currentIds.has(id) ? id : '[SUPERSEDED]'));
+}
+
+const MARKDOWN_HEADING = /^(#{1,6})\s+(.*)$/;
+const CODE_FENCE = /^\s*(?:```|~~~)/;
+const EDITOR_ONLY_HEADING = /editor[-\s]?only|editor'?s? eyes only|confidential.{0,40}editor|editor.{0,40}confidential/i;
+
+export function stripEditorOnlySections(markdown: string): { body: string; strippedHeadings: string[] } {
+  const scan = (fenceAware: boolean): { body: string; strippedHeadings: string[]; endedInFence: boolean } => {
+    const kept: string[] = [];
+    const strippedHeadings: string[] = [];
+    let cutAtLevel: number | null = null;
+    let insideFence = false;
+    for (const rawLine of markdown.split('\n')) {
+      const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+      if (fenceAware && CODE_FENCE.test(line)) {
+        insideFence = !insideFence;
+      }
+      const heading = insideFence ? null : MARKDOWN_HEADING.exec(line);
+      if (heading !== null) {
+        const level = heading[1]?.length ?? 1;
+        const text = (heading[2] ?? '').trim();
+        if (cutAtLevel !== null && level <= cutAtLevel) {
+          cutAtLevel = null;
+        }
+        if (cutAtLevel === null && EDITOR_ONLY_HEADING.test(text)) {
+          cutAtLevel = level;
+          strippedHeadings.push(text);
+          continue;
+        }
+      }
+      if (cutAtLevel === null) {
+        kept.push(rawLine);
+      }
+    }
+    return { body: kept.join('\n'), strippedHeadings, endedInFence: insideFence };
+  };
+  const aware = scan(true);
+  if (!aware.endedInFence) {
+    return { body: aware.body, strippedHeadings: aware.strippedHeadings };
+  }
+  // An unbalanced fence makes heading detection unreliable for the rest of the document, so
+  // everything from the first editor-only-looking line onward is cut and the malformation is
+  // recorded: over-stripping is recoverable, a leaked confidential section is not.
+  const lines = markdown.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const raw = lines[index] ?? '';
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const heading = MARKDOWN_HEADING.exec(line);
+    if (heading !== null && EDITOR_ONLY_HEADING.test((heading[2] ?? '').trim())) {
+      return {
+        body: lines.slice(0, index).join('\n'),
+        strippedHeadings: [(heading[2] ?? '').trim(), '[unbalanced code fence: stripped to end of report]'],
+      };
+    }
+  }
+  return { body: aware.body, strippedHeadings: aware.strippedHeadings };
 }
 
 const QUARANTINE_MARKER = /\[\[?QUARANTINED:[^\]]*\]?\]/g;
@@ -539,6 +641,17 @@ export function validateGrounding(input: GroundingInput): GroundingResult {
       kind = 'evidence-map-mismatch';
       kinds.push('evidence-map-mismatch');
       failures.push(...mapFailures);
+    }
+  }
+
+  if (input.references !== undefined && input.references.length > 0 && input.knownCitations !== undefined && input.knownCitations.length > 0) {
+    const unknown = unknownCitations(input.references, input.knownCitations);
+    if (unknown.length > 0) {
+      kind = 'unknown-citation';
+      kinds.push('unknown-citation');
+      failures.push(
+        ...unknown.map((reference) => `reference "${reference}" names a work found neither in the field dossier nor in the manuscript's own reference list`),
+      );
     }
   }
 

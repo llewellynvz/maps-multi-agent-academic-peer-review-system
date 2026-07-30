@@ -326,6 +326,11 @@ main.page { flex: 1; padding: 40px 0 80px; }
 
 .ticker { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .ticker-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-md); background: var(--surface-glass-1); border: 1px solid var(--border-1); }
+button.ticker-row { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.ticker-row:hover { border-color: var(--psy-teal); }
+button.ticker-row:focus-visible { outline: 2px solid var(--psy-teal); outline-offset: 2px; }
+.pill-button { background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; }
+.pill-button:focus-visible { outline: 2px solid var(--psy-teal); outline-offset: 2px; }
 
 .spinner { width: 18px; height: 18px; border: 2px solid rgba(254,252,245,0.2); border-top-color: var(--psy-teal); border-radius: 50%; animation: spin 800ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

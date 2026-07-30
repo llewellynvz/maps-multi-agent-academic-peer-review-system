@@ -90,6 +90,12 @@ already-validated pre-alignment report ships at its own recommendation rather th
 a complete review. So a `release_gate_block` that reaches you is a real, substantive halt,
 not a formatting artefact.
 
+A blocked run now recovers itself before it reaches you. The gate routes a first critic
+block back to the writer for one targeted rewrite, and a run that still fails retries
+itself in the background up to twice (a budget shared with engine errors) before parking
+as failed. A `release_gate_block` sitting on failed has therefore already survived a
+rewrite and two background retries.
+
 **Recovery.** Re-run the gate. Either use the retry control on the run page for Phase 7,
 or run:
 
@@ -122,7 +128,10 @@ standard output and to a rotating log:
 docker compose logs mara | grep -i "engine error"
 ```
 
-**Recovery.** Retry the failing phase named in the reason. For a failure in Phase 3:
+**Recovery.** An `engine_error` run schedules its own background retry of the failing
+phase, up to two attempts shared with gate blocks, so a review sitting on failed has
+already exhausted that budget. To retry manually, target the failing phase named in the
+reason. For a failure in Phase 3:
 
 ```bash
 pnpm -C server exec tsx scripts/retry-review.ts <reviewId> phase_3

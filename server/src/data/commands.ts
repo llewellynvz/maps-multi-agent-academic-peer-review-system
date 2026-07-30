@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { phaseCheckpoints, reviewEvents, reviews, runCommands } from '../db/schema';
 import { nowIso } from './db';
@@ -32,9 +32,8 @@ function pendingCommandExists(db: MaraDatabase, reviewId: string, command: RunCo
   const commands = db
     .select({ id: runCommands.id, command: runCommands.command })
     .from(runCommands)
-    .where(eq(runCommands.reviewId, reviewId))
-    .all()
-    .filter((row) => row.command === command);
+    .where(and(eq(runCommands.reviewId, reviewId), eq(runCommands.command, command)))
+    .all();
   if (commands.length === 0) {
     return false;
   }
@@ -77,7 +76,7 @@ export function submitRunControl(
   const review = requireReview(db, reviewId);
 
   if (command === 'retry_phase') {
-    validateRetryPhase(db, reviewId, args);
+    validateRetryPhase(db, reviewId, args, review.status);
   }
 
   let noop = false;
@@ -101,6 +100,10 @@ export function submitRunControl(
     if (['completed', 'failed', 'cancelled'].includes(review.status)) {
       noop = true;
     }
+  } else if (command === 'retry_phase') {
+    if (pendingCommandExists(db, reviewId, 'retry_phase')) {
+      noop = true;
+    }
   }
 
   if (!noop) {
@@ -116,10 +119,21 @@ export function submitRunControl(
   };
 }
 
-function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<string, unknown>): void {
+export function submitAutoRetryPhase(db: MaraDatabase, reviewId: string, phase: string): { noop: boolean } {
+  if (pendingCommandExists(db, reviewId, 'retry_phase')) {
+    return { noop: true };
+  }
+  insertRunCommand(db, reviewId, 'retry_phase', { phase, auto: true });
+  return { noop: false };
+}
+
+function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<string, unknown>, reviewStatus: string): void {
   const phase = typeof args.phase === 'string' ? args.phase : '';
   if (phase === '') {
     throw new ApiError('unprocessable', 'A phase name is required to retry a phase.', { field: 'phase' });
+  }
+  if (!/^phase_\d+$/.test(phase)) {
+    throw new ApiError('unprocessable', `Phase ${phase} is not a retryable engine phase.`, { field: 'phase' });
   }
   const candidates = [phase, `engine_${phase}`];
   const rows = db.select().from(phaseCheckpoints).where(eq(phaseCheckpoints.reviewId, reviewId)).all();
@@ -127,7 +141,11 @@ function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<str
   if (match === undefined) {
     throw new ApiError('unprocessable', `No checkpoint exists for phase ${phase}.`, { field: 'phase' });
   }
-  if (match.status !== 'failed' && match.status !== 'completed') {
+  const retryable =
+    match.status === 'failed' ||
+    match.status === 'completed' ||
+    (match.status === 'pending' && reviewStatus === 'failed');
+  if (!retryable) {
     throw new ApiError('unprocessable', `Phase ${phase} is ${match.status} and cannot be retried.`, { field: 'phase' });
   }
 }

@@ -3,6 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import type { MaraClient, MaraDatabase } from '../db/client';
 import { manuscripts, reviewEvents, reviews, runCommands } from '../db/schema';
 import { getReviewOptions, insertEvent, mergeReviewOptions, pauseReview, updateReview } from '../workflow/repo';
+import { submitAutoRetryPhase } from '../data/commands';
 import { readSetting, writeSetting } from '../data/settings-store';
 import { deleteArtefactsByPrefix, readArtefactsByPrefix } from '../engine/artefacts';
 import { writeHeartbeat } from '../data/heartbeat';
@@ -14,6 +15,8 @@ export type EngineResult = 'completed' | 'paused' | 'cancelled' | 'stopped' | 'f
 const WORKER_LEASE_KEY = 'worker_lease';
 const QUEUEABLE_STATUSES = new Set(['created', 'awaiting_input', 'paused']);
 const RESUMABLE_STATUSES = new Set(['awaiting_input', 'paused']);
+const MAX_AUTO_RETRIES = 2;
+const AUTO_RETRY_CLASSES = new Set(['release_gate_block', 'engine_error']);
 
 interface WorkerLease {
   workerId: string;
@@ -141,28 +144,46 @@ export class WorkerRunner {
         continue;
       }
       const args = safeArgs(command.argsJson);
-      if (command.command === 'run' || command.command === 'resume') {
+      if (command.command === 'run' || command.command === 'resume' || command.command === 'retry_phase') {
+        let retryStart: number | null = null;
         try {
-          this.db.transaction(
+          retryStart = this.db.transaction(
             (tx) => {
-              this.applyDurable(tx, command.reviewId, command.command, args);
+              const start =
+                command.command === 'retry_phase' ? this.applyRetryPhaseDb(tx, command.reviewId, args) : null;
               insertEvent(tx, {
                 reviewId: command.reviewId,
                 kind: 'control_ack',
                 payload: { commandId: command.id, command: command.command },
               });
               tx.delete(runCommands).where(eq(runCommands.id, command.id)).run();
+              if (command.command !== 'retry_phase') {
+                this.applyDurable(tx, command.reviewId, command.command, args);
+              }
+              return start;
             },
             { behavior: 'immediate' },
           );
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           this.log(`could not apply ${command.command} for ${command.reviewId}: ${message}`);
+          if (command.command === 'retry_phase') {
+            this.discardPoisonCommand(command.id, command.reviewId, message);
+          }
           continue;
+        }
+        if (retryStart !== null) {
+          try {
+            this.invalidateFilesFromPhase(command.reviewId, retryStart);
+            mergeReviewOptions(this.db, command.reviewId, { pendingInvalidateFrom: null });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.log(`review ${command.reviewId}: artefact invalidation incomplete, will finish on recovery: ${message}`);
+          }
         }
         this.applyMemory(command.reviewId, command.command, args, command.createdAt);
       } else {
-        this.applyCommand(command.reviewId, command.command, args, command.createdAt);
+        this.applyCommand(command.reviewId, command.command);
         insertEvent(this.db, {
           reviewId: command.reviewId,
           kind: 'control_ack',
@@ -211,7 +232,7 @@ export class WorkerRunner {
     return tx.select({ status: reviews.status }).from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0]?.status;
   }
 
-  private applyCommand(reviewId: string, command: string, args: Record<string, unknown>, createdAt: string): void {
+  private applyCommand(reviewId: string, command: string): void {
     switch (command) {
       case 'pause': {
         this.pauseRequested.add(reviewId);
@@ -226,25 +247,40 @@ export class WorkerRunner {
         }
         break;
       }
-      case 'retry_phase': {
-        const phase = typeof args.phase === 'string' ? args.phase : '';
-        if (phase !== '') {
-          if (this.reviewErrorClass(reviewId) === 'release_gate_block') {
-            this.invalidateFromPhase(reviewId, phase);
-          } else {
-            this.resetPhaseCheckpoint(reviewId, phase);
-          }
-          this.intents.set(reviewId, { kind: 'run', args: {}, createdAt });
-        }
-        break;
-      }
       default:
         break;
     }
   }
 
-  private resetPhaseCheckpoint(reviewId: string, phase: string): void {
+  private discardPoisonCommand(commandId: string, reviewId: string, message: string): void {
+    try {
+      this.db.delete(runCommands).where(eq(runCommands.id, commandId)).run();
+      this.ackedCommands.add(commandId);
+    } catch (discardError) {
+      const detail = discardError instanceof Error ? discardError.message : String(discardError);
+      this.log(`could not discard poison retry command ${commandId}: ${detail}`);
+      return;
+    }
+    try {
+      insertEvent(this.db, {
+        reviewId,
+        kind: 'error',
+        payload: { message: `A retry command could not be applied and was discarded: ${message}` },
+      });
+      insertEvent(this.db, { reviewId, kind: 'control_ack', payload: { commandId, command: 'retry_phase' } });
+    } catch {
+      this.log(`poison retry command ${commandId} discarded without an audit event (review row missing)`);
+    }
+  }
+
+  private resetPhaseCheckpoint(reviewId: string, phase: string, clearSnapshot = false): void {
     const key = phase.startsWith('engine_') ? phase : `engine_${phase}`;
+    if (clearSnapshot) {
+      this.client.sqlite
+        .prepare("UPDATE phase_checkpoints SET status = 'pending', snapshot_json = NULL, updated_at = ? WHERE review_id = ? AND phase = ?")
+        .run(new Date().toISOString(), reviewId, key);
+      return;
+    }
     this.client.sqlite
       .prepare("UPDATE phase_checkpoints SET status = 'pending', updated_at = ? WHERE review_id = ? AND phase = ?")
       .run(new Date().toISOString(), reviewId, key);
@@ -257,67 +293,145 @@ export class WorkerRunner {
     return row?.error_class ?? null;
   }
 
-  private invalidateFromPhase(reviewId: string, phase: string): void {
+  private applyRetryPhaseDb(tx: MaraDatabase, reviewId: string, args: Record<string, unknown>): number | null {
+    const phase = typeof args.phase === 'string' ? args.phase : '';
+    if (phase === '') {
+      return null;
+    }
+    const auto = args.auto === true;
+    const errorClass = this.reviewErrorClass(reviewId);
+    const gateRetry = errorClass === 'release_gate_block';
     const startMatch = /phase_(\d+)/.exec(phase);
-    const start = startMatch !== null ? Number.parseInt(startMatch[1]!, 10) : 7;
-    const cycleFindingIds = new Set<string>();
-    const collectIds = (value: unknown): void => {
-      const ids = (value as { mergedIds?: unknown }).mergedIds;
-      if (Array.isArray(ids)) {
-        for (const id of ids) {
-          if (typeof id === 'string') {
-            cycleFindingIds.add(id);
+    let start = startMatch !== null ? Number.parseInt(startMatch[1]!, 10) : 7;
+    const gateCheckpoint = this.client.sqlite
+      .prepare("SELECT status, snapshot_json FROM phase_checkpoints WHERE review_id = ? AND phase = 'engine_phase_7'")
+      .get(reviewId) as { status: string; snapshot_json: string | null } | undefined;
+    let gateSnapshot: { released?: boolean; blocked?: boolean; reason?: string } | null = null;
+    try {
+      gateSnapshot = gateCheckpoint?.snapshot_json != null ? JSON.parse(gateCheckpoint.snapshot_json) : null;
+    } catch {
+      gateSnapshot = null;
+    }
+    if (gateRetry && start > 7 && gateCheckpoint?.status === 'completed' && gateSnapshot?.released === false) {
+      start = 7;
+    }
+
+    if (gateRetry) {
+      const cycleFindingIds = new Set<string>();
+      const collectIds = (value: unknown): void => {
+        const ids = (value as { mergedIds?: unknown }).mergedIds;
+        if (Array.isArray(ids)) {
+          for (const id of ids) {
+            if (typeof id === 'string') {
+              cycleFindingIds.add(id);
+            }
           }
         }
+      };
+      for (let n = start; n <= 8; n += 1) {
+        for (const entry of readArtefactsByPrefix(reviewId, `merge-p${n}-`)) {
+          collectIds(entry.value);
+        }
+        const markerRows = this.client.sqlite
+          .prepare('SELECT merged_ids_json FROM merge_markers WHERE review_id = ? AND marker LIKE ?')
+          .all(reviewId, `p${n}-%`) as Array<{ merged_ids_json: string }>;
+        for (const row of markerRows) {
+          collectIds({ mergedIds: JSON.parse(row.merged_ids_json) });
+        }
+        const markers = this.client.sqlite
+          .prepare('DELETE FROM merge_markers WHERE review_id = ? AND marker LIKE ?')
+          .run(reviewId, `p${n}-%`);
+        this.resetPhaseCheckpoint(reviewId, `phase_${n}`, n === 7 && start < 7);
+        if (markers.changes > 0) {
+          this.log(`review ${reviewId}: invalidated ${markers.changes} phase_${n} merge markers for gate retry`);
+        }
       }
-    };
-    for (let n = start; n <= 8; n += 1) {
-      for (const entry of readArtefactsByPrefix(reviewId, `merge-p${n}-`)) {
-        collectIds(entry.value);
+      if (cycleFindingIds.size > 0) {
+        const ids = [...cycleFindingIds];
+        const placeholders = ids.map(() => '?').join(',');
+        const purge = this.client.sqlite.transaction(() => {
+          this.client.sqlite.pragma('defer_foreign_keys = ON');
+          this.client.sqlite.exec('CREATE TEMP TABLE IF NOT EXISTS _mara_purge (marker INTEGER)');
+          this.client.sqlite
+            .prepare(`DELETE FROM findings WHERE review_id = ? AND id IN (${placeholders})`)
+            .run(reviewId, ...ids);
+          this.client.sqlite.exec('DROP TABLE IF EXISTS _mara_purge');
+        });
+        purge();
+        this.log(`review ${reviewId}: purged ${ids.length} invalidated-cycle ledger rows for gate retry`);
       }
-      const markerRows = this.client.sqlite
-        .prepare('SELECT merged_ids_json FROM merge_markers WHERE review_id = ? AND marker LIKE ?')
-        .all(reviewId, `p${n}-%`) as Array<{ merged_ids_json: string }>;
-      for (const row of markerRows) {
-        collectIds({ mergedIds: JSON.parse(row.merged_ids_json) });
-      }
-      const removed = deleteArtefactsByPrefix(reviewId, `p${n}-`);
-      deleteArtefactsByPrefix(reviewId, `merge-p${n}-`);
-      const markers = this.client.sqlite
-        .prepare('DELETE FROM merge_markers WHERE review_id = ? AND marker LIKE ?')
-        .run(reviewId, `p${n}-%`);
-      this.resetPhaseCheckpoint(reviewId, `phase_${n}`);
-      if (removed.length > 0 || markers.changes > 0) {
-        this.log(
-          `review ${reviewId}: invalidated ${removed.length} phase_${n} artefacts and ${markers.changes} merge markers for gate retry`,
-        );
-      }
+      mergeReviewOptions(tx, reviewId, { pendingInvalidateFrom: start });
+    } else {
+      this.resetPhaseCheckpoint(reviewId, phase);
     }
-    if (cycleFindingIds.size > 0) {
-      const ids = [...cycleFindingIds];
-      const placeholders = ids.map(() => '?').join(',');
-      const purge = this.client.sqlite.transaction(() => {
-        this.client.sqlite.pragma('defer_foreign_keys = ON');
-        this.client.sqlite.exec('CREATE TEMP TABLE IF NOT EXISTS _mara_purge (marker INTEGER)');
-        this.client.sqlite
-          .prepare(`DELETE FROM findings WHERE review_id = ? AND id IN (${placeholders})`)
-          .run(reviewId, ...ids);
-        this.client.sqlite.exec('DROP TABLE IF EXISTS _mara_purge');
-      });
-      purge();
-      this.log(`review ${reviewId}: purged ${ids.length} invalidated-cycle ledger rows for gate retry`);
-    }
+
     this.client.sqlite
-      .prepare("UPDATE reviews SET error_class = NULL, updated_at = ? WHERE id = ?")
+      .prepare('UPDATE reviews SET error_class = NULL, updated_at = ? WHERE id = ?')
       .run(new Date().toISOString(), reviewId);
+    if (this.currentStatus(tx, reviewId) === 'failed') {
+      updateReview(tx, reviewId, { status: 'queued' });
+    }
+
+    const attempt = auto ? this.countAutoRetries(reviewId) + 1 : null;
+    const reason = gateRetry
+      ? 'the release gate blocked the deliverables'
+      : `a transient engine error interrupted ${phase}`;
     // Advance the event sequence past the prior terminal so a fresh terminal is never suppressed by
     // the intra-run dedup, even if the re-run throws before it emits its own first event.
-    insertEvent(this.db, {
+    insertEvent(tx, {
       reviewId,
       kind: 'phase_transition',
       phase: `phase_${start}`,
-      payload: { retry: true, invalidatedFrom: start },
+      payload: {
+        retry: true,
+        invalidatedFrom: start,
+        auto,
+        ...(attempt !== null ? { attempt, maxAttempts: MAX_AUTO_RETRIES } : {}),
+        reason,
+      },
     });
+    return gateRetry ? start : null;
+  }
+
+  private invalidateFilesFromPhase(reviewId: string, start: number): void {
+    for (let n = start; n <= 8; n += 1) {
+      const removed = deleteArtefactsByPrefix(reviewId, `p${n}-`);
+      deleteArtefactsByPrefix(reviewId, `merge-p${n}-`);
+      if (removed.length > 0) {
+        this.log(`review ${reviewId}: invalidated ${removed.length} phase_${n} artefacts for gate retry`);
+      }
+    }
+  }
+
+  private countAutoRetries(reviewId: string): number {
+    const row = this.client.sqlite
+      .prepare(
+        "SELECT COUNT(*) AS n FROM review_events WHERE review_id = ? AND kind = 'phase_transition' AND json_extract(payload_json, '$.retry') = 1 AND json_extract(payload_json, '$.auto') = 1",
+      )
+      .get(reviewId) as { n: number };
+    return row.n;
+  }
+
+  private maybeScheduleAutoRetry(reviewId: string, errorClass: string): void {
+    if (!AUTO_RETRY_CLASSES.has(errorClass)) {
+      return;
+    }
+    const attempts = this.countAutoRetries(reviewId);
+    if (attempts >= MAX_AUTO_RETRIES) {
+      this.log(`review ${reviewId}: auto-retry budget exhausted after ${attempts} attempts; leaving failed for manual retry`);
+      return;
+    }
+    const review = this.db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1).all()[0];
+    const phase = errorClass === 'release_gate_block' ? 'phase_7' : (review?.currentPhase ?? 'phase_7');
+    try {
+      const result = submitAutoRetryPhase(this.db, reviewId, phase);
+      if (result.noop !== true) {
+        this.log(`review ${reviewId}: scheduled auto-retry ${attempts + 1} of ${MAX_AUTO_RETRIES} for ${phase} (${errorClass})`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log(`review ${reviewId}: could not schedule auto-retry: ${message}`);
+    }
   }
 
   private clearPendingResume(reviewId: string): void {
@@ -325,6 +439,16 @@ export class WorkerRunner {
     if (options.pendingResume !== undefined && options.pendingResume !== null) {
       mergeReviewOptions(this.db, reviewId, { pendingResume: null });
     }
+  }
+
+  private pendingInvalidateFrom(optionsJson: string): number | null {
+    try {
+      const options = JSON.parse(optionsJson) as { pendingInvalidateFrom?: unknown };
+      if (typeof options.pendingInvalidateFrom === 'number') {
+        return options.pendingInvalidateFrom;
+      }
+    } catch {}
+    return null;
   }
 
   private pendingResume(optionsJson: string): { answers: Record<string, string>; preset?: string } | undefined {
@@ -484,6 +608,7 @@ export class WorkerRunner {
           ? 'the release gate blocked the deliverables after the fix-cycle budget was exhausted'
           : 'the review finished the pipeline without reaching a released state';
       this.emitTerminal(reviewId, 'failed', { errorClass, message, durationMs }, runStartSeq);
+      this.maybeScheduleAutoRetry(reviewId, errorClass);
     } else if (result === 'paused') {
       this.pauseRequested.delete(reviewId);
       updateReview(this.db, reviewId, { status: 'paused' });
@@ -497,6 +622,7 @@ export class WorkerRunner {
         { errorClass: 'engine_error', message: 'the engine reported an unrecoverable failure' },
         runStartSeq,
       );
+      this.maybeScheduleAutoRetry(reviewId, 'engine_error');
     }
   }
 
@@ -656,6 +782,16 @@ export class WorkerRunner {
     const rows = this.db.select().from(reviews).all();
     const ts = new Date().toISOString();
     for (const row of rows) {
+      const pendingWipe = this.pendingInvalidateFrom(row.optionsJson);
+      if (pendingWipe !== null) {
+        try {
+          this.invalidateFilesFromPhase(row.id, pendingWipe);
+          mergeReviewOptions(this.db, row.id, { pendingInvalidateFrom: null });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(`review ${row.id}: artefact invalidation incomplete, will retry on next recovery: ${message}`);
+        }
+      }
       if (row.status === 'running' || row.status === 'sanitizing') {
         this.intents.set(row.id, { kind: 'run', args: this.recoveredArgs(row.id), createdAt: row.createdAt ?? ts, recovered: true });
       } else if (row.status === 'queued') {

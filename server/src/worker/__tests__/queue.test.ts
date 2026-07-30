@@ -7,6 +7,7 @@ import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
 import { artefactExists, writeArtefact } from '../../engine/artefacts';
 import { blobDir } from '../../paths';
+import { submitRunControl } from '../../data/commands';
 import { pauseReview, updateReview } from '../../workflow/repo';
 import { WorkerRunner, type EngineResult, type WorkerProcessors } from '../runner';
 
@@ -346,6 +347,199 @@ describe('retry_phase recovery semantics', () => {
     expect(checkpointStatus(id, 'engine_phase_7')).toBe('pending');
     expect(checkpointStatus(id, 'engine_phase_8')).toBe('completed');
     expect(engineOrder).toEqual([id]);
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
+
+  // A retry once lived only in worker memory: a restart between the destructive purge and the
+  // re-run silently lost it, leaving a wiped review parked on failed.
+  it('survives a worker crash between accepting the retry and running it', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_7' });
+
+    const crashed = new WorkerRunner({ client, processors: countingProcessors([]) });
+    crashed.pollCommands();
+    expect(reviewStatus(id)).toBe('queued');
+
+    const engineOrder: string[] = [];
+    const survivor = new WorkerRunner({ client, processors: countingProcessors(engineOrder) });
+    await survivor.runOnce();
+    expect(engineOrder).toEqual([id]);
+    expect(reviewStatus(id)).toBe('completed');
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
+
+  // A phase_8-targeted retry after a phase_7 halt left engine_phase_7 completed, so phaseDone
+  // short-circuited and the pipeline failed not_released five times with zero dispatches.
+  it('clamps a downstream retry target back to the unreleased gate phase', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    client.sqlite
+      .prepare('UPDATE phase_checkpoints SET snapshot_json = ? WHERE review_id = ? AND phase = ?')
+      .run(JSON.stringify({ released: false, blocked: true, reason: 'gate block' }), id, 'engine_phase_7');
+    writeArtefact(id, 'p7-shipped-0', { stale: true });
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_8' });
+
+    const runner = new WorkerRunner({ client, processors: countingProcessors([]) });
+    await runner.runOnce();
+
+    expect(checkpointStatus(id, 'engine_phase_7')).toBe('pending');
+    expect(artefactExists(id, 'p7-shipped-0')).toBe(false);
+    const retryEvent = client.sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'phase_transition' AND json_extract(payload_json, '$.retry') = 1")
+      .get(id) as { payload_json: string };
+    expect(JSON.parse(retryEvent.payload_json).invalidatedFrom).toBe(7);
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
+
+  it('clears the stale gate snapshot when a retry regenerates the phases beneath it', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    client.sqlite
+      .prepare('UPDATE phase_checkpoints SET snapshot_json = ? WHERE review_id = ? AND phase = ?')
+      .run(JSON.stringify({ released: false, blocked: true, reason: 'a draft that will no longer exist' }), id, 'engine_phase_7');
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_5' });
+
+    const runner = new WorkerRunner({ client, processors: countingProcessors([]) });
+    await runner.runOnce();
+
+    const snapshot = (client.sqlite
+      .prepare('SELECT snapshot_json FROM phase_checkpoints WHERE review_id = ? AND phase = ?')
+      .get(id, 'engine_phase_7') as { snapshot_json: string | null }).snapshot_json;
+    expect(snapshot).toBeNull();
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
+
+  it('discards a retry whose transaction cannot apply, once, instead of re-polling it forever', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    client.sqlite
+      .prepare('INSERT INTO merge_markers (id, review_id, marker, merged_ids_json, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(randomUUID(), id, 'p7-corrupt', 'not json at all', new Date().toISOString());
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_7' });
+
+    const engineOrder: string[] = [];
+    const runner = new WorkerRunner({ client, processors: countingProcessors(engineOrder) });
+    await runner.runOnce();
+    await runner.runOnce();
+
+    const remaining = (client.sqlite.prepare('SELECT COUNT(*) AS n FROM run_commands').get() as { n: number }).n;
+    expect(remaining).toBe(0);
+    expect(engineOrder).toEqual([]);
+    expect(reviewStatus(id)).toBe('failed');
+    const errorEvents = (client.sqlite
+      .prepare("SELECT COUNT(*) AS n FROM review_events WHERE review_id = ? AND kind = 'error'")
+      .get(id) as { n: number }).n;
+    expect(errorEvents).toBe(1);
+  });
+
+  it('accepts one queued retry and noops the duplicates', () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    const first = submitRunControl(client.db, id, 'retry_phase', { phase: 'phase_7' });
+    const second = submitRunControl(client.db, id, 'retry_phase', { phase: 'phase_7' });
+    expect(first.noop).toBeUndefined();
+    expect(second.noop).toBe(true);
+    const pending = (client.sqlite.prepare('SELECT COUNT(*) AS n FROM run_commands').get() as { n: number }).n;
+    expect(pending).toBe(1);
+  });
+
+  // A crash mid-retried-run leaves the checkpoint pending while the review is failed; the manual
+  // Retry button is the designated backstop and must not 422 in that state.
+  it('accepts a manual retry of a pending phase when the review itself is failed', () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    client.sqlite
+      .prepare("UPDATE phase_checkpoints SET status = 'pending' WHERE review_id = ? AND phase = 'engine_phase_7'")
+      .run(id);
+    const result = submitRunControl(client.db, id, 'retry_phase', { phase: 'phase_7' });
+    expect(result.accepted).toBe(true);
+    expect(result.noop).toBeUndefined();
+  });
+
+  it('retries a gate block in the background twice, then parks the review for a manual retry', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    failReview(id, 'release_gate_block');
+    insertRunCommand(id, 'retry_phase', { phase: 'phase_7' });
+
+    const blockingProcessors: WorkerProcessors = {
+      startIngest: async () => 'ingested',
+      resumeIngest: async () => 'ingested',
+      runEngine: async (reviewId) => {
+        client.sqlite
+          .prepare("UPDATE reviews SET status = 'failed', error_class = 'release_gate_block', current_phase = 'phase_7' WHERE id = ?")
+          .run(reviewId);
+        client.sqlite
+          .prepare("UPDATE phase_checkpoints SET status = 'completed', snapshot_json = ? WHERE review_id = ? AND phase = 'engine_phase_7'")
+          .run(JSON.stringify({ released: false, blocked: true, reason: 'still blocked' }), reviewId);
+        return 'completed';
+      },
+    };
+    const runner = new WorkerRunner({ client, processors: blockingProcessors });
+    for (let i = 0; i < 6; i += 1) {
+      await runner.runOnce();
+      await runner.settle();
+    }
+
+    const autoEvents = (client.sqlite
+      .prepare("SELECT COUNT(*) AS n FROM review_events WHERE review_id = ? AND kind = 'phase_transition' AND json_extract(payload_json, '$.retry') = 1 AND json_extract(payload_json, '$.auto') = 1")
+      .get(id) as { n: number }).n;
+    expect(autoEvents).toBe(2);
+    const firstAuto = client.sqlite
+      .prepare("SELECT payload_json FROM review_events WHERE review_id = ? AND kind = 'phase_transition' AND json_extract(payload_json, '$.auto') = 1 ORDER BY seq LIMIT 1")
+      .get(id) as { payload_json: string };
+    const payload = JSON.parse(firstAuto.payload_json) as { attempt: number; maxAttempts: number; reason: string };
+    expect(payload.attempt).toBe(1);
+    expect(payload.maxAttempts).toBe(2);
+    expect(payload.reason).toContain('release gate blocked');
+    expect(payload.reason).not.toContain('still blocked');
+    expect(reviewStatus(id)).toBe('failed');
+    const pending = (client.sqlite.prepare('SELECT COUNT(*) AS n FROM run_commands').get() as { n: number }).n;
+    expect(pending).toBe(0);
+    rmSync(blobDir(id), { recursive: true, force: true });
+  });
+
+  // A crash inside a phase leaves no checkpoint row for it, so the auto-retry must not depend on
+  // the manual path's checkpoint validation.
+  it('auto-retries an engine crash that left no checkpoint for the failed phase', async () => {
+    const id = `retry-${randomUUID()}`;
+    insertReview(id, '2026-07-14T00:00:00.000Z');
+    completeIngest(id);
+    insertRunCommand(id, 'run');
+
+    const crashing: WorkerProcessors = {
+      startIngest: async () => 'ingested',
+      resumeIngest: async () => 'ingested',
+      runEngine: async (reviewId) => {
+        client.sqlite
+          .prepare("UPDATE reviews SET status = 'failed', error_class = 'engine_error', current_phase = 'phase_3' WHERE id = ?")
+          .run(reviewId);
+        return 'failed';
+      },
+    };
+    const runner = new WorkerRunner({ client, processors: crashing });
+    await runner.runOnce();
+    await runner.settle();
+
+    const queuedRetry = client.sqlite
+      .prepare("SELECT args_json FROM run_commands WHERE review_id = ? AND command = 'retry_phase'")
+      .get(id) as { args_json: string } | undefined;
+    expect(queuedRetry).toBeDefined();
+    expect(JSON.parse(queuedRetry!.args_json)).toEqual({ phase: 'phase_3', auto: true });
     rmSync(blobDir(id), { recursive: true, force: true });
   });
 });

@@ -39,6 +39,7 @@ import {
   sanitiseAuthorFacingBody,
   scanAiTropes,
   scrubLabel,
+  stripEditorOnlySections,
   tokenOverlap,
   validateGrounding,
   type GroundingFailureKind,
@@ -50,6 +51,7 @@ import { assemblePrivateNotes, RECOMMENDATION_LABEL } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
 const MAX_FIX_CYCLES = 2;
+const MAX_BLOCK_CYCLES = 1;
 const TROPE_REPASS_THRESHOLD = 3;
 
 function checkpointKey(phase: string): string {
@@ -67,10 +69,40 @@ function fieldDossierContent(reviewId: string): string | null {
   }
   return JSON.stringify({
     keyPapers,
+    comparators: Array.isArray(dossier.comparators) ? dossier.comparators : [],
     benchmarks: dossier.benchmarks,
     contestedClaims: dossier.contestedClaims,
     methodNorms: dossier.methodNorms,
   });
+}
+
+function knownCitationsFor(reviewId: string, manuscriptReferences: Array<{ raw: string; title: string | null }>): string[] {
+  const citations: string[] = [];
+  if (artefactExists(reviewId, 'p2-context')) {
+    const dossier = readArtefact<FieldContextScoutOutput>(reviewId, 'p2-context');
+    for (const paper of Array.isArray(dossier.keyPapers) ? dossier.keyPapers : []) {
+      citations.push(paper.citation);
+    }
+    for (const comparator of Array.isArray(dossier.comparators) ? dossier.comparators : []) {
+      citations.push(comparator.citation);
+    }
+    for (const benchmark of Array.isArray(dossier.benchmarks) ? dossier.benchmarks : []) {
+      citations.push(benchmark.source);
+    }
+    for (const entry of Array.isArray(dossier.contestedClaims) ? dossier.contestedClaims : []) {
+      citations.push(entry);
+    }
+    for (const entry of Array.isArray(dossier.recentReviews) ? dossier.recentReviews : []) {
+      citations.push(entry);
+    }
+    for (const entry of Array.isArray(dossier.methodNorms) ? dossier.methodNorms : []) {
+      citations.push(entry);
+    }
+  }
+  for (const reference of manuscriptReferences) {
+    citations.push(reference.title === null ? reference.raw : `${reference.raw} ${reference.title}`);
+  }
+  return citations;
 }
 
 function renderVoiceProfile(raw: VoiceProfile): string {
@@ -272,15 +304,26 @@ function withDerivedCitedIds(shipped: ShippedReportEnvelope): ShippedReportEnvel
   return { ...shipped, evidenceMap, citedFindingIds: [...new Set(evidenceMap.flatMap((entry) => entry.findingIds))] };
 }
 
-function recommendationPackage(meta: ReviewMetaReviewerOutput): Record<string, unknown> {
+// Masking an editor-only id to [EDITOR-ONLY] told the writer that hidden support existed and
+// invited it to reconstruct that support from the surrounding prose, so the ids are withheld
+// outright.
+function recommendationPackage(
+  meta: ReviewMetaReviewerOutput,
+  editorOnlyIds: Set<string>,
+): Record<string, unknown> {
+  const visible = (ids: string[]): string[] => ids.filter((id) => !editorOnlyIds.has(id));
   return {
     recommendation: meta.recommendation,
     recommendationConfidence: meta.recommendationConfidence,
-    rubric: meta.rubric,
+    rubric: meta.rubric.map((row) => ({
+      ...row,
+      supportingIds: visible(row.supportingIds),
+      opposingIds: visible(row.opposingIds),
+    })),
     average: meta.average,
     bottlenecks: meta.bottlenecks,
     scopeFit: meta.scopeFit,
-    decisionHinges: meta.decisionHinges,
+    decisionHinges: meta.decisionHinges.filter((hinge) => !editorOnlyIds.has(hinge.findingId)),
   };
 }
 
@@ -355,6 +398,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   const report = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
   const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
   const dossierContent = fieldDossierContent(reviewId);
+  const knownCitations =
+    ctx.sectionMap.references.length > 0 ? knownCitationsFor(reviewId, ctx.sectionMap.references) : [];
 
   await withPhase('phase_7', async () => {
     updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
@@ -363,6 +408,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
 
     const findings = getCurrentFindings(db, reviewId);
     const ledgerIds = new Set(findings.map((finding) => finding.id));
+
+    const internalReportStrip = stripEditorOnlySections(report.bodyMarkdown);
+    const authorFacingInternalReport = internalReportStrip.body;
 
     const [meta0, swarmCritique] = await Promise.all([
       runMetaReviewer(deps, reviewId, 0, digest, report, swarm, findings, ledgerIds, options),
@@ -375,7 +423,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         assembleInput: {
           mode: 'B',
           artefacts: [
-            { label: 'Draft internal report', content: report.bodyMarkdown },
+            { label: 'Draft internal report (confidential editor-only sections removed)', content: authorFacingInternalReport },
             {
               label: 'Merged evidence ledger (current findings, canonical ids)',
               content: JSON.stringify(ledgerForReport(findings), null, 2),
@@ -389,6 +437,10 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
 
     let currentMeta = meta0;
     let fixCycles = 0;
+    let groundingCycles = 0;
+    let criticCycles = 0;
+    let blockCycles = 0;
+    let groundingExhausted = false;
     let released = false;
     let releaseVerdict: 'pass' | 'arbitrated' = 'pass';
     let finalRecommendation: Recommendation = currentMeta.recommendation;
@@ -396,12 +448,27 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     let arbitration: ArbitrationRecord | null = null;
     let blocked = false;
     let blockReason = '';
+    let blockSections: string[] = [];
     let lastGroundingFailureKinds: Exclude<GroundingFailureKind, null>[] = [];
     const scrubbedTokens: string[] = [];
     let lastObjection = '';
     let priorDefect = '';
     let lastShipped: ShippedReportEnvelope | null = null;
     let lastPrivateNotes = '';
+
+    const priorCheckpoint = getCheckpoint(db, reviewId, checkpointKey('phase_7'));
+    if (priorCheckpoint?.status === 'pending') {
+      const snapshot = priorCheckpoint.snapshot as { blocked?: boolean; sections?: unknown } | null;
+      if (snapshot?.blocked === true) {
+        const sections = Array.isArray(snapshot.sections)
+          ? snapshot.sections.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+          : [];
+        priorDefect =
+          sections.length > 0
+            ? `a prior run of this gate was blocked by the final critic on sections: ${sections.join(', ')}. Rebuild those sections from the first draft, grounding every claim strictly in the author-facing ledger and the field dossier.`
+            : 'a prior run of this gate was blocked by the final critic. Rebuild the report from the first draft, grounding every claim strictly in the author-facing ledger and the field dossier.';
+      }
+    }
 
     for (let cycle = 0; ; cycle += 1) {
       const authorFacing = getCurrentFindings(db, reviewId).filter((finding) => finding.scope !== 'editor_only');
@@ -422,9 +489,12 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         assembleInput: {
           mode: 'B',
           artefacts: [
-            { label: 'Recommendation package (from the meta-reviewer)', content: redact(JSON.stringify(recommendationPackage(currentMeta), null, 2)) },
+            { label: 'Recommendation package (from the meta-reviewer)', content: redact(JSON.stringify(recommendationPackage(currentMeta, editorOnlyIds), null, 2)) },
             { label: 'Swarm report critique (Phase 7 mode B)', content: redact(JSON.stringify(swarmCritique.critique, null, 2)) },
-            { label: 'Full internal report (Phase 6, yours)', content: redact(report.bodyMarkdown) },
+            {
+              label: 'Full internal report (Phase 6, yours, confidential editor-only sections removed)',
+              content: redact(authorFacingInternalReport),
+            },
             {
               label: 'Author-facing ledger (cite only these ids; editor-only findings are excluded by construction)',
               content: JSON.stringify(ledgerForReport(authorFacing), null, 2),
@@ -478,6 +548,8 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         authorFacingAncillary: shipped.rubricTable.map((row) => row.justification).join('\n'),
         humanizePairs: shipped.humanizePairs,
         narrativeBand: NARRATIVE_WORD_BAND,
+        references: shipped.references,
+        knownCitations,
       });
 
       if (!grounding.ok) {
@@ -506,9 +578,12 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
                         ? `grounding validator: your humanizePairs are not evidence that the humanise pass ran. Every "before" must be a phrase you actually removed, so it must not survive anywhere in the body, and every "after" must be copied verbatim from a sentence in your final bodyMarkdown. Repair the pairs against the body you are shipping, or run the pass properly: ${maskedObjection}`
                         : grounding.kind === 'word-band'
                           ? `grounding validator: ${maskedObjection}. Land inside the band by expanding the thinnest majors or cutting restatement, and change no finding, severity, or score while you do it.`
-                          : `grounding validator: ${maskedObjection}`;
+                          : grounding.kind === 'unknown-citation'
+                            ? `grounding validator: ${maskedObjection}. Cite only literature from the field dossier or the manuscript's own reference list, or delete the entry and the sentences that rely on it.`
+                            : `grounding validator: ${maskedObjection}`;
         emitGateVerdict(db, reviewId, { cycle, source: 'grounding-validator', verdict: 'revise', failures: grounding.failures });
         fixCycles += 1;
+        groundingCycles += 1;
         recordGateCheckpoint(db, {
           reviewId,
           phase: checkpointKey('phase_7'),
@@ -517,13 +592,16 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
           fixCycleCount: fixCycles,
           snapshot: { cycle, source: 'grounding-validator', failures: grounding.failures },
         });
-        if (fixCycles >= MAX_FIX_CYCLES) {
-          break;
+        if (groundingCycles < MAX_FIX_CYCLES) {
+          continue;
         }
-        continue;
+        // Deterministic rewrites are spent, but nothing may reach an author without the
+        // confidentiality audit, so the critic still runs on this body before arbitration.
+        groundingExhausted = true;
+      } else {
+        lastGroundingFailureKinds = [];
       }
 
-      lastGroundingFailureKinds = [];
       const runAudit = `Fix cycles used so far: ${fixCycles}. This is gate cycle ${cycle}.`;
       const critic = await runAgent<ReviewFinalCriticOutput>(deps, {
         reviewId,
@@ -539,6 +617,20 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               label: 'Merged evidence ledger (current findings, canonical ids)',
               content: JSON.stringify(ledgerForReport(currentAll), null, 2),
             },
+            ...(dossierContent !== null
+              ? [{
+                  label: 'Field dossier (the only literature the writer may name; audit named works against this and the manuscript references)',
+                  content: dossierContent,
+                }]
+              : []),
+            {
+              label: 'Shipped evidence map (structured; the report body is id-free by design)',
+              content: JSON.stringify(
+                { evidenceMap: shipped.evidenceMap, citedFindingIds: shipped.citedFindingIds, references: shipped.references },
+                null,
+                2,
+              ),
+            },
             { label: 'Swarm summary', content: JSON.stringify(swarm, null, 2) },
             { label: 'Run audit facts', content: runAudit },
           ],
@@ -547,9 +639,49 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         },
       });
 
-      lastObjection = critic.mostDangerousDefect ?? critic.failureConstructionAttempt;
+      if (!groundingExhausted) {
+        lastObjection = critic.mostDangerousDefect ?? critic.failureConstructionAttempt;
+      }
 
       emitGateVerdict(db, reviewId, { cycle, source: 'final-critic', verdict: critic.verdict, lens: critic.lens });
+
+      if (critic.verdict === 'block') {
+        blockReason = redact(critic.mostDangerousDefect ?? 'Release blocked at the final critic.');
+        blockSections = critic.sectionsToRework.map(redact);
+        if (!groundingExhausted && blockCycles < MAX_BLOCK_CYCLES) {
+          blockCycles += 1;
+          fixCycles += 1;
+          priorDefect =
+            blockSections.length > 0
+              ? `final critic block on sections: ${blockSections.join(', ')}. Rebuild those sections, grounding every claim strictly in the author-facing ledger and the field dossier, and change nothing else.`
+              : 'final critic block. Rebuild the report, grounding every claim strictly in the author-facing ledger and the field dossier.';
+          recordGateCheckpoint(db, {
+            reviewId,
+            phase: checkpointKey('phase_7'),
+            status: 'in_progress',
+            gateVerdict: 'block',
+            fixCycleCount: fixCycles,
+            snapshot: { cycle, verdict: 'block', reason: blockReason, routedBack: true },
+          });
+          continue;
+        }
+        blocked = true;
+        recordGateCheckpoint(db, {
+          reviewId,
+          phase: checkpointKey('phase_7'),
+          status: 'completed',
+          gateVerdict: 'block',
+          fixCycleCount: fixCycles,
+          snapshot: { cycle, verdict: 'block', reason: blockReason },
+        });
+        break;
+      }
+
+      if (groundingExhausted) {
+        // The audit ran and cleared confidentiality; the spent deterministic objection is
+        // still outstanding, so arbitration decides the release exactly as it did before.
+        break;
+      }
 
       if (critic.verdict === 'pass') {
         released = true;
@@ -566,25 +698,12 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         break;
       }
 
-      if (critic.verdict === 'block') {
-        blocked = true;
-        blockReason = critic.mostDangerousDefect ?? 'Release blocked at the final critic.';
-        recordGateCheckpoint(db, {
-          reviewId,
-          phase: checkpointKey('phase_7'),
-          status: 'completed',
-          gateVerdict: 'block',
-          fixCycleCount: fixCycles,
-          snapshot: { cycle, verdict: 'block', reason: blockReason },
-        });
-        break;
-      }
-
       priorDefect =
         critic.verdict === 'revise'
-          ? `final critic revise on sections: ${critic.sectionsToRework.join(', ')}`
+          ? `final critic revise on sections: ${critic.sectionsToRework.map(redact).join(', ')}`
           : `final critic revise-specialist on lens ${critic.lens ?? 'unknown'}`;
       fixCycles += 1;
+      criticCycles += 1;
       recordGateCheckpoint(db, {
         reviewId,
         phase: checkpointKey('phase_7'),
@@ -594,7 +713,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         snapshot: { cycle, verdict: critic.verdict, lens: critic.lens },
       });
 
-      if (fixCycles >= MAX_FIX_CYCLES) {
+      if (criticCycles >= MAX_FIX_CYCLES) {
         break;
       }
 
@@ -785,7 +904,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         reviewId,
         phase: checkpointKey('phase_7'),
         status: 'completed',
-        snapshot: { released: false, blocked: true, reason: blockReason, fixCycles, arbitration },
+        snapshot: { released: false, blocked: true, reason: blockReason, sections: blockSections, fixCycles, arbitration },
       });
       annotatePhase({
         'mara.critic_verdict': releaseVerdict,
@@ -796,7 +915,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         reviewId,
         kind: 'run_terminal',
         phase: 'phase_7',
-        payload: { released: false, reason: blockReason },
+        payload: { released: false, reason: blockReason, errorClass: 'release_gate_block' },
       });
       return;
     }
@@ -816,7 +935,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       const priorStress = await runPriorStressTest(deps, reviewId, {
         userPrior: intake.userPrior,
         digest,
-        recommendationPackage: recommendationPackage(currentMeta),
+        recommendationPackage: recommendationPackage(currentMeta, priorEditorOnlyIds),
         findings: priorFindings.filter((finding) => finding.scope !== 'editor_only'),
         ledgerIds: priorLedgerIds,
         editorOnlyIds: priorEditorOnlyIds,
@@ -850,6 +969,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       recommendation: finalRecommendation,
       recommendationConfidence: finalConfidence,
       rubricAverage: currentMeta.average,
+      strippedEditorOnlySections: internalReportStrip.strippedHeadings,
       ...(arbitration !== null ? { arbitration } : {}),
       ...(scrubbedTokens.length > 0 ? { scrubbedTokens: [...new Set(scrubbedTokens)] } : {}),
     };
