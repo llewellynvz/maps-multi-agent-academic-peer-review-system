@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { phaseCheckpoints, reviewEvents, reviews, runCommands } from '../db/schema';
 import { nowIso } from './db';
@@ -81,8 +81,22 @@ export function submitRunControl(
     if (pendingCommandExists(db, reviewId, 'run')) {
       return { accepted: true, command, noop: true, status: review.status };
     }
-    db.update(reviews).set({ errorClass: null, updatedAt: nowIso() }).where(eq(reviews.id, reviewId)).run();
-    insertRunCommand(db, reviewId, 'run', {});
+    // Queued (not left as failed) so the retry reads as live: cancel applies, delete waits, a restart
+    // re-queues it, and the intake page keeps polling. Failed ingest checkpoints are cleared so the steps
+    // run again: a cached failed sanitize would otherwise re-halt without re-screening the manuscript.
+    db.transaction((tx) => {
+      tx.update(reviews).set({ status: 'queued', errorClass: null, updatedAt: nowIso() }).where(eq(reviews.id, reviewId)).run();
+      tx.delete(phaseCheckpoints)
+        .where(
+          and(
+            eq(phaseCheckpoints.reviewId, reviewId),
+            eq(phaseCheckpoints.status, 'failed'),
+            inArray(phaseCheckpoints.phase, ['parse', 'sanitize', 'phase_1']),
+          ),
+        )
+        .run();
+      insertRunCommand(tx, reviewId, 'run', {});
+    });
     return { accepted: true, command, status: review.status };
   }
 

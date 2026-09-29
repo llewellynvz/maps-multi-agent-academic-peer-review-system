@@ -152,17 +152,19 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
 export function purgeReview(client: MaraClient, id: string): void {
   assertSafeReviewId(id);
   const { db, sqlite } = client;
-  const row = getReviewRow(db, id);
-  if (row === undefined) {
+  if (getReviewRow(db, id) === undefined) {
     removeReviewDirectories(id);
     return;
   }
-  // The worker keeps writing blobs for a live review and would recreate its directory after the purge.
-  if (ACTIVE_STATUSES.has(row.status)) {
-    throw new ApiError('conflict', 'This review is still queued or running. Cancel it before deleting it.');
-  }
 
   const purge = sqlite.transaction(() => {
+    // The worker keeps writing blobs for a review it is executing and would recreate its directory after
+    // the purge. A merely queued review is safe to delete (the worker drops a queued id that no longer
+    // exists), and it must stay deletable when no worker is running to act on a cancel.
+    const current = sqlite.prepare('SELECT status FROM reviews WHERE id = ?').get(id) as { status: string } | undefined;
+    if (current !== undefined && EXECUTING_STATUSES.has(current.status)) {
+      throw new ApiError('conflict', 'This review is still running. Cancel it and wait for it to stop before deleting it.');
+    }
     sqlite.exec('CREATE TEMP TABLE IF NOT EXISTS _mara_purge (marker INTEGER)');
     sqlite.prepare('DELETE FROM reviews WHERE id = ?').run(id);
     sqlite.exec('DROP TABLE IF EXISTS _mara_purge');
@@ -204,6 +206,7 @@ function removeReviewDirectories(id: string): void {
 }
 
 const ACTIVE_STATUSES = new Set(['queued', 'sanitizing', 'running']);
+const EXECUTING_STATUSES = new Set(['sanitizing', 'running']);
 
 export interface PurgeAllRoots {
   blobsRoot: string;

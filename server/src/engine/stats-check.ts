@@ -335,7 +335,7 @@ const PARENTHETICAL = /\(([^()]{1,200})\)/g;
 const MEAN_IN_GROUP = /\bM\s*=\s*(\d+\.(\d+))/;
 // A thousands separator ("N = 1,234", "N = 1 234") belongs to the number: stopping at it read n = 1 and
 // raised a granularity finding against a perfectly ordinary mean.
-const N_IN_GROUP = /\b[nN]\s*=\s*(\d{1,3}(?:[,\u00a0\u2009 ]\d{3})+|\d{1,6})(?![\d.,])/;
+const N_IN_GROUP = /\b[nN]\s*=\s*(\d{1,3}(?:[,\u00a0\u2009 ]\d{3})+|\d{1,6})(?!\d|[.,]\d)/;
 
 export function extractGrimCandidates(text: string): GrimCandidate[] {
   const candidates: GrimCandidate[] = [];

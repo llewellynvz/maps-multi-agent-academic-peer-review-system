@@ -118,8 +118,10 @@ describe('buildAnswersPayload', () => {
 
   it('sends the chosen depth even when the lite-parse asked no preset question', () => {
     const noPreset = TODAY.filter((question) => question.id !== 'preset');
-    const payload = buildAnswersPayload(noPreset, { ...untouched, preset: 'thorough' });
+    const payload = buildAnswersPayload(noPreset, { ...untouched, preset: 'thorough', presetTouched: true });
     expect(payload[0]).toEqual({ questionId: 'preset', value: 'thorough' });
+    const untouchedPayload = buildAnswersPayload(noPreset, { ...untouched, preset: 'balanced' });
+    expect(untouchedPayload.some((entry) => entry.questionId === 'preset')).toBe(false);
   });
 
   it('records the detected or default value for every new id even when untouched', () => {

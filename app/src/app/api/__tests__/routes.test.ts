@@ -114,7 +114,7 @@ describe('session failed-attempt throttle', () => {
       const owner = { 'x-forwarded-for': '192.0.2.10' };
       const throttled = await sessionPOST(req('/api/session', { method: 'POST', headers: owner, body: JSON.stringify({ passphrase: 'wrong' }) }));
       expect(throttled.status).toBe(429);
-      vi.setSystemTime(new Date('2026-09-29T10:00:06Z'));
+      vi.setSystemTime(new Date('2026-09-29T10:00:46Z'));
       const ownerLogin = await sessionPOST(req('/api/session', { method: 'POST', headers: owner, body: JSON.stringify({ passphrase: 'letmein' }) }));
       expect(ownerLogin.status).toBe(200);
     } finally {

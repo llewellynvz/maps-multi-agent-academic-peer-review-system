@@ -15,6 +15,8 @@ export type EngineResult = 'completed' | 'paused' | 'cancelled' | 'stopped' | 'f
 const WORKER_LEASE_KEY = 'worker_lease';
 const QUEUEABLE_STATUSES = new Set(['created', 'awaiting_input', 'paused']);
 const RESUMABLE_STATUSES = new Set(['awaiting_input', 'paused']);
+// Statuses in which the worker owns the review: a stop intent is still pending until it leaves them.
+const IN_FLIGHT_STATUSES = new Set(['queued', 'sanitizing', 'running']);
 const MAX_AUTO_RETRIES = 2;
 const AUTO_RETRY_CLASSES = new Set(['release_gate_block', 'engine_error']);
 
@@ -242,7 +244,13 @@ export class WorkerRunner {
     if (command === 'resume') {
       const answers = (args.answers as Record<string, string> | undefined) ?? {};
       const preset = typeof args.preset === 'string' ? args.preset : undefined;
-      mergeReviewOptions(tx, reviewId, { pendingResume: { answers, ...(preset !== undefined ? { preset } : {}) } });
+      mergeReviewOptions(tx, reviewId, {
+        pendingResume: {
+          answers,
+          ...(preset !== undefined ? { preset } : {}),
+          ...(args.trigger === 'clarify' ? { trigger: 'clarify' } : {}),
+        },
+      });
       if (RESUMABLE_STATUSES.has(this.currentStatus(tx, reviewId) ?? '')) {
         updateReview(tx, reviewId, { status: 'queued' });
       }
@@ -502,16 +510,19 @@ export class WorkerRunner {
     return null;
   }
 
-  private pendingResume(optionsJson: string): { answers: Record<string, string>; preset?: string } | undefined {
+  private pendingResume(
+    optionsJson: string,
+  ): { answers: Record<string, string>; preset?: string; trigger?: string } | undefined {
     try {
       const options = JSON.parse(optionsJson) as { pendingResume?: unknown };
       const marker = options.pendingResume;
       if (marker !== null && typeof marker === 'object') {
-        const { answers, preset } = marker as { answers?: unknown; preset?: unknown };
+        const { answers, preset, trigger } = marker as { answers?: unknown; preset?: unknown; trigger?: unknown };
         if (answers !== null && typeof answers === 'object') {
           return {
             answers: answers as Record<string, string>,
             ...(typeof preset === 'string' ? { preset } : {}),
+            ...(typeof trigger === 'string' ? { trigger } : {}),
           };
         }
       }
@@ -595,7 +606,9 @@ export class WorkerRunner {
             outcome = await this.processors.startIngest(reviewId, this.recoveredArgs(reviewId));
             // The restarted run suspends at the same questions; feed it the answers the user already gave
             // rather than asking again.
-            if (outcome === 'suspended' && !this.cancelRequested.has(reviewId)) {
+            // Only answers from the clarify form are replayed; a plain Resume carries none, and replaying an
+            // empty set would skip the questions the user has not yet answered.
+            if (outcome === 'suspended' && !this.cancelRequested.has(reviewId) && intent.args.trigger === 'clarify') {
               outcome = await this.processors.resumeIngest(reviewId, intent.answers ?? {}, intent.preset);
             }
           }
@@ -604,6 +617,7 @@ export class WorkerRunner {
           // A retried or recovered ingest carries no upload args; take the stored manuscript's name and type
           // rather than letting a DOCX default to application/pdf.
           const args = typeof intent.args.filePath === 'string' ? intent.args : this.recoveredArgs(reviewId);
+          updateReview(this.db, reviewId, { status: 'sanitizing' });
           outcome = await this.processors.startIngest(reviewId, args);
         }
         if (outcome === 'suspended') {
@@ -658,7 +672,7 @@ export class WorkerRunner {
       // shutdown mid-run leaves it running, and then the intent must survive for recover() to apply.
       try {
         const status = this.currentStatus(this.db, reviewId);
-        if (status !== undefined && status !== 'running' && status !== 'sanitizing' && status !== 'queued') {
+        if (status !== undefined && !IN_FLIGHT_STATUSES.has(status)) {
           mergeReviewOptions(this.db, reviewId, { pendingStop: null });
         }
       } catch {
@@ -871,7 +885,7 @@ export class WorkerRunner {
         }
       }
       const pendingStop = this.pendingStop(row.optionsJson);
-      if (pendingStop !== null && (row.status === 'running' || row.status === 'sanitizing' || row.status === 'queued')) {
+      if (pendingStop !== null && IN_FLIGHT_STATUSES.has(row.status)) {
         mergeReviewOptions(this.db, row.id, { pendingStop: null });
         if (pendingStop === 'cancel') {
           updateReview(this.db, row.id, { status: 'cancelled' });
@@ -889,7 +903,7 @@ export class WorkerRunner {
         if (resume !== undefined) {
           this.intents.set(row.id, {
             kind: 'resume',
-            args: {},
+            args: resume.trigger !== undefined ? { trigger: resume.trigger } : {},
             answers: resume.answers,
             ...(resume.preset !== undefined ? { preset: resume.preset } : {}),
             createdAt: row.createdAt ?? ts,

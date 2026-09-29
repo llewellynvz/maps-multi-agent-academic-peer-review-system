@@ -11,9 +11,9 @@ const WINDOW_MS = 15 * 60 * 1000;
 const failedAttempts = new Map<string, { count: number; resetAt: number }>();
 let globalFailures = { count: 0, resetAt: 0 };
 // Past the global limit, a hard lockout would let anyone lock the owner out by failing 20 times. Instead one
-// passphrase check is allowed through every GLOBAL_DRIP_MS across all clients: guessing stays throttled to
-// a crawl while the owner, retrying, still gets in.
-const GLOBAL_DRIP_MS = 5000;
+// passphrase check is allowed through every GLOBAL_DRIP_MS across all clients. At 45 s that is 80 guesses an
+// hour, the same ceiling the old 20-per-15-minutes lockout allowed, while the owner can still get in.
+const GLOBAL_DRIP_MS = 45_000;
 let lastGlobalDrip = 0;
 
 function clientKey(req: NextRequest): string {

@@ -194,10 +194,18 @@ describe('guarded purge (DATA-19..21)', () => {
     purgeReview(client, review.id);
   });
 
+  it('lets a queued review be deleted even when no worker is running to cancel it', () => {
+    const review = createReview(client.db, { title: 'Queued' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'queued' WHERE id = ?").run(review.id);
+    purgeReview(client, review.id);
+    const row = client.sqlite.prepare('SELECT count(*) AS n FROM reviews WHERE id = ?').get(review.id) as { n: number };
+    expect(row.n).toBe(0);
+  });
+
   it('refuses to purge a review that is still running', () => {
     const review = createReview(client.db, { title: 'Live' });
     client.sqlite.prepare("UPDATE reviews SET status = 'running' WHERE id = ?").run(review.id);
-    expect(() => purgeReview(client, review.id)).toThrow(/still queued or running/);
+    expect(() => purgeReview(client, review.id)).toThrow(/still running/);
     const row = client.sqlite.prepare('SELECT count(*) AS n FROM reviews WHERE id = ?').get(review.id) as { n: number };
     expect(row.n).toBe(1);
   });
@@ -221,13 +229,23 @@ describe('guarded purge (DATA-19..21)', () => {
 
   it('retries an ingest that failed before completing by queueing a fresh ingest run', () => {
     const review = createReview(client.db, { title: 'Halted' });
-    client.sqlite.prepare("UPDATE reviews SET status = 'failed', error_class = 'parse_failed' WHERE id = ?").run(review.id);
+    client.sqlite.prepare("UPDATE reviews SET status = 'failed', error_class = 'tier_3_tampering' WHERE id = ?").run(review.id);
+    client.sqlite
+      .prepare("INSERT INTO phase_checkpoints (id, review_id, phase, status, updated_at) VALUES (?, ?, 'sanitize', 'failed', ?)")
+      .run(randomUUID(), review.id, new Date().toISOString());
     const result = submitRunControl(client.db, review.id, 'retry_phase', { phase: 'phase_0' });
     expect(result.noop).toBeUndefined();
     const commands = client.sqlite.prepare('SELECT command FROM run_commands WHERE review_id = ?').all(review.id) as Array<{ command: string }>;
     expect(commands.map((row) => row.command)).toEqual(['run']);
-    const row = client.sqlite.prepare('SELECT error_class FROM reviews WHERE id = ?').get(review.id) as { error_class: string | null };
-    expect(row.error_class).toBeNull();
+    const failedCheckpoints = client.sqlite
+      .prepare("SELECT count(*) AS n FROM phase_checkpoints WHERE review_id = ? AND status = 'failed'")
+      .get(review.id) as { n: number };
+    expect(failedCheckpoints.n).toBe(0);
+    const row = client.sqlite.prepare('SELECT status, error_class FROM reviews WHERE id = ?').get(review.id) as {
+      status: string;
+      error_class: string | null;
+    };
+    expect(row).toEqual({ status: 'queued', error_class: null });
   });
 
   it('stops question polling once the review has failed', () => {

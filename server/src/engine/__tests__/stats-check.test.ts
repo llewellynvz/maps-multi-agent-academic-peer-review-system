@@ -128,6 +128,8 @@ describe('extractGrimCandidates', () => {
   it('reads a sample size written with a thousands separator as one number', () => {
     expect(extractGrimCandidates('(M = 3.47, SD = 1.2, N = 1,234)')[0]?.n).toBe(1234);
     expect(extractGrimCandidates('(M = 3.47, SD = 1.2, N = 1 234)')[0]?.n).toBe(1234);
+    expect(extractGrimCandidates('(n = 25, M = 3.47, SD = 1.1)')[0]?.n).toBe(25);
+    expect(extractGrimCandidates('(M = 3.47, n = 25.5)')).toEqual([]);
     expect(deterministicStatsFindings(sectionMapWith('Scores were stable (M = 3.47, SD = 1.2, N = 1,234).'))).toEqual([]);
   });
 

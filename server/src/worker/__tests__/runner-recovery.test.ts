@@ -190,7 +190,7 @@ describe('WorkerRunner ingest resume reconciliation (F11)', () => {
     insertReview('rev-missing', '2026-07-14T00:00:00.000Z');
     insertManuscript('rev-missing', 'application/pdf', 'study.pdf', 'data/blobs/rev-missing/manuscript/original.pdf');
     client.sqlite.prepare("UPDATE reviews SET status = 'awaiting_input' WHERE id = 'rev-missing'").run();
-    insertRunCommand('rev-missing', 'resume', { answers: { field: 'wellbeing' } });
+    insertRunCommand('rev-missing', 'resume', { trigger: 'clarify', answers: { field: 'wellbeing' } });
 
     const calls = { start: 0, resume: 0 };
     const seenArgs: Array<Record<string, unknown>> = [];

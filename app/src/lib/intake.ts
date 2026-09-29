@@ -68,6 +68,9 @@ export function resolveAnswer(question: Question, answers: Record<string, string
 export interface SubmitContext {
   answers: Record<string, string>;
   preset: string;
+  // Whether the user picked a depth. Without a preset question an untouched chip is only the screen's
+  // placeholder, and sending it would override the default tier saved in Settings.
+  presetTouched?: boolean;
   journal: string;
   focus: string[];
   notes: string;
@@ -94,9 +97,9 @@ export function buildAnswersPayload(
       payload.push({ questionId: question.id, value: context.answers[question.id] ?? '' });
     }
   }
-  // The depth chips are always on screen, so the choice is always sent, even for a lite-parse that did not
-  // ask a preset question; otherwise the user's pick was silently dropped.
-  if (!questions.some((question) => question.id === 'preset')) {
+  // The depth chips are always on screen, so a depth the user picked is sent even when the lite-parse
+  // asked no preset question; otherwise that pick was silently dropped.
+  if (context.presetTouched === true && !questions.some((question) => question.id === 'preset')) {
     payload.unshift({ questionId: 'preset', value: context.preset });
   }
   payload.push({ questionId: 'feedback_focus', value: context.focus });

@@ -54,7 +54,7 @@ function mapQuestion(raw: RawQuestion, detectedField: string): Question {
 
 const INGEST_FAILURE_MESSAGE: Record<string, string> = {
   parse_failed: 'The manuscript could not be structured (the PDF parser may be unavailable). Retry once it is running.',
-  tier_3_tampering: 'The manuscript was stopped because it contains instructions aimed at the reviewer.',
+  tier_3_tampering: 'The manuscript was stopped because it appears to contain misrepresented data or results planted to skew the review. See the editor note.',
   ingest_failed: 'Reading the manuscript failed. Retry the review to try again.',
 };
 

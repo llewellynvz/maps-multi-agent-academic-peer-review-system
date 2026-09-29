@@ -25,6 +25,7 @@ export default function ClarifyPage(): ReactNode {
   const [notes, setNotes] = useState('');
   const [journal, setJournal] = useState('');
   const [preset, setPreset] = useState('balanced');
+  const [presetTouched, setPresetTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +70,7 @@ export default function ClarifyPage(): ReactNode {
     setSubmitting(true);
     try {
       const payload = !useDefaults && data !== null
-        ? buildAnswersPayload(data.questions, { answers, preset, journal, focus, notes })
+        ? buildAnswersPayload(data.questions, { answers, preset, presetTouched, journal, focus, notes })
         : [];
       await api.submitAnswers(id, { answers: payload, useDefaults });
       router.push(`/reviews/${id}/run`);
@@ -166,7 +167,7 @@ export default function ClarifyPage(): ReactNode {
               ...(PRESET_TIME[option] !== undefined ? { hint: PRESET_TIME[option] } : {}),
             }))}
             value={preset}
-            onChange={(value) => setPreset(value as string)}
+            onChange={(value) => { setPreset(value as string); setPresetTouched(true); }}
           />
         </div>
         {layout.journal !== null ? (
