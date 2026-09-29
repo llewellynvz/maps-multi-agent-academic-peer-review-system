@@ -316,6 +316,15 @@ const bindings: GoldenBinding[] = [
       expect(Math.abs(weightSum - 1)).toBeLessThan(1e-9);
       expect(value.composite).toBeGreaterThanOrEqual(0);
       expect(value.composite).toBeLessThanOrEqual(1);
+      // The composite must be reachable from its own components: the positive weighted sum, less at most
+      // the full 0.1 penalty for an unsupported-claim rate of 1.
+      const positive =
+        value.weights.evidenceGroundingRate * value.evidenceGroundingRate +
+        value.weights.actionabilityIndex * value.actionabilityIndex +
+        value.weights.decisionStability * value.decisionStability +
+        value.weights.toneRiskScore * value.toneRiskScore;
+      expect(value.composite).toBeLessThanOrEqual(positive + 0.01);
+      expect(value.composite).toBeGreaterThanOrEqual(positive - value.weights.unsupportedClaimPenalty - 0.01);
     },
   },
   {

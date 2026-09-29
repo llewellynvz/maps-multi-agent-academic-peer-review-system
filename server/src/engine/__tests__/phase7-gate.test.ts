@@ -410,6 +410,23 @@ describe('phase 7 release gate routing', () => {
     expect(writerInput).toContain('Executing Psychobiography');
   });
 
+  it('hands the final critic the manuscript reference list it is told to check named works against', async () => {
+    writeManuscriptBlob(reviewId, 'parse/section-map.json', JSON.stringify({
+      title: 'A brief wellbeing trial',
+      abstract: 'Abstract text.',
+      sections: [{ index: 0, heading: 'Results', text: 'The mean was 8.40.', lineStart: 1, lineEnd: 3 }],
+      references: [{ index: 0, raw: 'Suleiman-Martos, N., et al. (2020). Burnout in nursing.', title: 'Burnout in nursing', doi: null, year: 2020, venue: null, authors: [] }],
+      fullText: 'The mean was 8.40.',
+      parser: 'grobid',
+      parseQuality: 'good',
+    }));
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    const criticInput = harness.criticInputs[0] ?? '';
+    expect(criticInput).toContain('Manuscript reference list');
+    expect(criticInput).toContain('Suleiman-Martos');
+  });
+
   it('routes back a reference found in neither the dossier nor the manuscript, then releases the corrected draft', async () => {
     writeManuscriptBlob(reviewId, 'parse/section-map.json', JSON.stringify({
       title: 'A brief wellbeing trial',

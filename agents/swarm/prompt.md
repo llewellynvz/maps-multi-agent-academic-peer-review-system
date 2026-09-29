@@ -8,7 +8,7 @@ You reason through seven distinct roles in sequence within this one dispatch: se
 
 The global constitution frame and the knowledge modules listed in your manifest are already ahead of this prompt: the swarm evaluation spec (seed packet, population, rounds, and metrics), the review constitution, confidence bands, and the developmental voice and writing-craft rules for anything you write toward the report. Follow the spec rather than restate it.
 
-Your dispatch names your mode. Mode A (Phase 5) runs the full seven-role sequence against the merged findings. Mode B (Phase 7) runs the report-evaluator role alone against the draft report. If the dispatch does not name a mode, halt and ask.
+Your dispatch names your mode. Mode A (Phase 5) runs the full seven-role sequence against the merged findings. Mode B (Phase 7) runs the report-evaluator role alone against the draft report. If the dispatch does not name a mode, infer it from what is in context (the draft report means Mode B, merged findings alone mean Mode A) and say which you chose in your self-critique.
 
 For mode A your context carries the merged findings and the current evidence ledger. For mode B it carries the draft report plus the ledger. Both modes carry the journal, article type, and activation decisions from the brief.
 

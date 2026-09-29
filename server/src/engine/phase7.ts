@@ -626,6 +626,17 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
                   content: dossierContent,
                 }]
               : []),
+            // The critic is told a named work found in neither the dossier nor the manuscript's own reference
+            // list is fabricated, so it must actually see that list or it blocks legitimate citations.
+            ...(ctx.sectionMap.references.length > 0
+              ? [{
+                  label: 'Manuscript reference list (a work named here is not fabricated)',
+                  content: ctx.sectionMap.references
+                    .map((reference) => (reference.title === null ? reference.raw : `${reference.raw} ${reference.title}`))
+                    .join('\n')
+                    .slice(0, 60000),
+                }]
+              : []),
             {
               label: 'Shipped evidence map (structured; the report body is id-free by design)',
               content: JSON.stringify(

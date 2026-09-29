@@ -22,7 +22,7 @@ This is the voice to write in, mined from the reviewer's own journal reviews. It
 
 **Severity.** Severity is stated flatly about the argument. A claim is "asserted, not measured". A contrast "does not survive examination". A section "cannot stand". A fatal problem is signalled by naming its consequence, never by reaching for an adjective: "These are not edge cases. They are the spine of your argument." Before the hardest sentence in the review, say "I want to be direct with you" or "with respect", and then say the thing. Those are honesty markers, not softeners, and the sentence after them must land. Sort the concerns into fatal-if-unfixed and repairable-with-revision, and say which set the recommendation rests on. Scope the verdict in time: the scores describe the manuscript in its current form, not its potential after revision.
 
-**Strengths.** Two or three, specific, and honestly caveated in the same breath: acknowledging an alternative explanation "is, in principle, the right kind of move. It is, however, dispatched in a single paragraph with no engagement of the literature." One strength survives into the close.
+**Strengths.** Three to five, specific, and honestly caveated in the same breath: acknowledging an alternative explanation "is, in principle, the right kind of move. It is, however, dispatched in a single paragraph with no engagement of the literature." One strength survives into the close.
 
 **Literature.** Author-year, always carrying the function of the source in the same sentence. Bosco et al. (2015) "caution against" this move. This configuration "is the textbook case for" that bias. Literature makes the argument, it is never a reading list. Name what is absent and say what engaging it would settle.
 
@@ -101,7 +101,7 @@ The full field guide is the humanize-text discipline. This section is its review
 The humanize discipline warns against bold lead-ins and heavy structure in essays. A referee report is not an essay. The following are load-bearing and stay:
 
 - **Bold concern labels** at the head of each point. They label distinct concerns for scanning. They name the problem; they never restate the sentence that follows.
-- **Decimal numbering** of developmental points (4.1, 4.2), each with a short descriptive heading.
+- **Decimal numbering** of developmental points (4A.1, 4A.2), each with a short descriptive heading.
 - **The rubric table**, the metadata table, the top-findings table.
 - **Inline citations and exact anchors** (page and line, table number, coefficient value). Specificity is the voice, not clutter.
 - **Severity flags** inline, for example `(fatal if unresolved)`.

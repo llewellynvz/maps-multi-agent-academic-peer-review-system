@@ -41,13 +41,14 @@ describe('deterministic screen', () => {
     expect(matches.every((match) => match.tier <= 2)).toBe(true);
   });
 
-  it('catches the aggressive injection planted in the tier-3 fixture', () => {
+  it('catches the aggressive injection in the fixture as Tier 2 instructional content (knowledge/01)', () => {
     const matches = screenText(tier3);
-    const tier3Ids = matches.filter((match) => match.tier === 3).map((match) => match.patternId);
-    expect(tier3Ids).toContain('override-previous-instructions');
-    expect(tier3Ids).toContain('disregard-reviewer-guidelines');
-    expect(tier3Ids).toContain('force-acceptance');
-    expect(tier3Ids).toContain('suppress-weaknesses');
+    const ids = matches.map((match) => match.patternId);
+    expect(ids).toContain('override-previous-instructions');
+    expect(ids).toContain('disregard-reviewer-guidelines');
+    expect(ids).toContain('force-acceptance');
+    expect(ids).toContain('suppress-weaknesses');
+    expect(matches.every((match) => match.tier === 2)).toBe(true);
   });
 });
 
@@ -84,12 +85,26 @@ describe('tier routing', () => {
     expect(result.sanitizedText).not.toMatch(/REV-[A-Z]{3,4}-\d{4}/);
   });
 
-  it('halts on a tier-3 manuscript', async () => {
+  it('quarantines aggressive instructions and continues, per the governance tiers', async () => {
     const result = await sanitizeManuscript({
       text: tier3,
       runDispatch: async () => dispatchResult({ tier: 0, spans: [], rationale: 'clean' }),
       reviewId: 'rev-tier3',
       detect: neutralDetect,
+    });
+
+    expect(result.tier).toBe(2);
+    expect(result.status).toBe('quarantined');
+    expect(result.halted).toBe(false);
+    expect(result.sanitizedText).not.toMatch(/IGNORE ALL PREVIOUS INSTRUCTIONS/);
+    expect(result.sanitizedText).not.toMatch(/immediate acceptance/);
+  });
+
+  it('halts when the detector finds data-misrepresenting tampering', async () => {
+    const result = await sanitizeManuscript({
+      text: clean,
+      runDispatch: async () => dispatchResult({ tier: 3, spans: [], rationale: 'false retraction notice' }),
+      reviewId: 'rev-tamper',
     });
 
     expect(result.tier).toBe(3);
@@ -139,7 +154,7 @@ describe('PIPE-25 detector dispatch', () => {
     expect(result.status).toBe('clean');
   });
 
-  it('still halts on tier-3 content when the detector dispatch is refused', async () => {
+  it('still quarantines injected instructions when the detector dispatch is refused', async () => {
     const result = await sanitizeManuscript({
       text: tier3,
       runDispatch: async () => {
@@ -148,8 +163,9 @@ describe('PIPE-25 detector dispatch', () => {
       reviewId: 'rev-refused',
     });
 
-    expect(result.tier).toBe(3);
-    expect(result.status).toBe('halted');
+    expect(result.tier).toBe(2);
+    expect(result.status).toBe('quarantined');
+    expect(result.sanitizedText).not.toMatch(/IGNORE ALL PREVIOUS INSTRUCTIONS/);
   });
 
   it('escalates a deterministically clean manuscript when the detector reports a tier', async () => {

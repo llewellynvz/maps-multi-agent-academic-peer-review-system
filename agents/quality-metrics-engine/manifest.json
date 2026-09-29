@@ -1,7 +1,12 @@
 {
   "name": "quality-metrics-engine",
-  "promptVersion": "1.1.0",
-  "phase": [8],
+  "promptVersion": "1.1.1",
+  "phase": [
+    8
+  ],
   "role": "cheap",
-  "knowledge": ["01_REVIEW_GOVERNANCE.md", "05_REVIEW_TEMPLATES.md"]
+  "knowledge": [
+    "01_REVIEW_GOVERNANCE.md",
+    "05_REVIEW_TEMPLATES.md"
+  ]
 }

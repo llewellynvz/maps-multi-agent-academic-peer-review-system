@@ -7,6 +7,9 @@
 useDefault = true
 
 [allowlist]
+# AND: a finding is suppressed only when it is one of these synthetic strings AND in one of these files.
+# With the default OR, the paths alone would silence every finding in the two test files.
+condition = "AND"
 description = "Synthetic API-key strings used only to exercise the AES-256-GCM key-vault round-trip. Not real credentials; the test master key is a run of zeroes."
 paths = [
   '''server/src/security/__tests__/key-vault\.test\.ts''',

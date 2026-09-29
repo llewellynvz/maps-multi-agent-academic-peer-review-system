@@ -22,6 +22,23 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Agent and knowledge consistency:
+  - The final critic is now given the manuscript's reference list it is told to
+    check named works against, so it no longer blocks legitimate citations as
+    fabricated; with either source missing it escalates instead of blocking.
+  - Knowledge modules no longer contradict each other: strengths are three to
+    five everywhere (06 said two or three), a major-class recommendation carries
+    6 to 12 majors (04 said 4 to 8), the statistical lens's fallback band agrees
+    with the confidence it caps, developmental points are numbered 4A.1, and
+    dead references to a skill file and a non-existent module are gone.
+  - The voice profiler loads the governance module like every other agent.
+  - The quality-metrics contract defines the unsupported-claim penalty as a rate
+    and the tone score's scale; its golden is now arithmetically reachable and
+    the golden test checks that.
+  - Prompts no longer tell an unattended pipeline to "halt and ask", the scout's
+    plan mode names its required `mode` field, the AI-content analyst names the
+    citation verdicts that actually exist, and decision hinges use the one form
+    knowledge/03 mandates.
 - Second review pass:
   - A failed ingest workflow (a provider error during lite-parse, say) is now a
     failed review (`ingest_failed`) instead of being read as a completed ingest
