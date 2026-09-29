@@ -31,6 +31,16 @@ export function isReasoningModel(provider: DispatchProvider, model: string): boo
   return /^gpt-5/i.test(model) || /^o[13]/i.test(model);
 }
 
+// 'xhigh' arrived with gpt-5.1-codex-max and the gpt-5.2+ family; gpt-5, gpt-5.1 and the o-series reject
+// it and top out at 'high'. Sending the wrong ceiling turns every call into a 400.
+export function maxReasoningEffort(model: string): 'high' | 'xhigh' {
+  const minor = /^gpt-5\.(\d+)/i.exec(model)?.[1];
+  if (minor !== undefined && Number(minor) >= 2) {
+    return 'xhigh';
+  }
+  return /codex-max/i.test(model) ? 'xhigh' : 'high';
+}
+
 export type ProviderFactories = Record<DispatchProvider, () => ModelFactory>;
 
 function memoize(factory: () => ModelFactory): () => ModelFactory {

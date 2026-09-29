@@ -15,6 +15,14 @@ export interface SimilarityReport {
 
 const WORD = /[a-z0-9]+/g;
 
+function medianOfSorted(values: number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2 === 1 ? (values[mid] ?? 0) : ((values[mid - 1] ?? 0) + (values[mid] ?? 0)) / 2;
+}
+
 export function normaliseForSimilarity(text: string): string[] {
   return (text.toLowerCase().match(WORD) ?? []).filter((token) => token.length > 0);
 }
@@ -69,7 +77,7 @@ export function crossReviewSimilarity(
     count: prepared.length,
     pairs,
     mean: values.length === 0 ? 0 : sum / values.length,
-    median: values.length === 0 ? 0 : (values[Math.floor(values.length / 2)] ?? 0),
+    median: medianOfSorted(values),
     max: values.length === 0 ? 0 : (values.at(-1) ?? 0),
     aboveThreshold: pairs.filter((pair) => pair.similarity >= threshold),
   };

@@ -44,4 +44,20 @@ describe('crossReviewSimilarity', () => {
     expect(report.mean).toBe(0);
     expect(report.aboveThreshold).toEqual([]);
   });
+
+  it('averages the two middle values for an even number of pairs', () => {
+    const report = crossReviewSimilarity(
+      [
+        { id: 'a', text: 'alpha beta gamma delta epsilon zeta eta theta iota kappa' },
+        { id: 'b', text: 'alpha beta gamma delta epsilon zeta eta theta lambda mu' },
+        { id: 'c', text: 'alpha beta gamma delta nu xi omicron pi rho sigma' },
+        { id: 'd', text: 'tau upsilon phi chi psi omega one two three four' },
+      ],
+      { shingleSize: 2 },
+    );
+    const sorted = report.pairs.map((pair) => pair.similarity).sort((l, r) => l - r);
+    expect(sorted).toHaveLength(6);
+    expect(report.median).toBeCloseTo(((sorted[2] ?? 0) + (sorted[3] ?? 0)) / 2);
+    expect(sorted[2]).not.toBe(sorted[3]);
+  });
 });

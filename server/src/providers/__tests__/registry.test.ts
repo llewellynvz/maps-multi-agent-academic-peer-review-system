@@ -4,7 +4,7 @@ import { createAnthropicProvider } from '../anthropic';
 import { createGoogleProvider } from '../google';
 import { createOllamaProvider } from '../ollama';
 import { createOpenAiProvider } from '../openai';
-import { createRegistry, isReasoningModel, type ProviderFactories } from '../registry';
+import { createRegistry, isReasoningModel, maxReasoningEffort, type ProviderFactories } from '../registry';
 import type { DispatchProvider } from '../types';
 
 function sentinelModel(id: string): LanguageModel {
@@ -92,6 +92,17 @@ describe('isReasoningModel', () => {
     expect(isReasoningModel('openai', 'o3')).toBe(true);
     expect(isReasoningModel('azure', 'gpt-4o')).toBe(false);
     expect(isReasoningModel('local', 'qwen2:7b')).toBe(false);
+  });
+});
+
+describe('maxReasoningEffort', () => {
+  it('sends xhigh only to models that accept it', () => {
+    expect(maxReasoningEffort('gpt-5.6-sol')).toBe('xhigh');
+    expect(maxReasoningEffort('gpt-5.2')).toBe('xhigh');
+    expect(maxReasoningEffort('gpt-5.1-codex-max')).toBe('xhigh');
+    expect(maxReasoningEffort('gpt-5.1')).toBe('high');
+    expect(maxReasoningEffort('gpt-5')).toBe('high');
+    expect(maxReasoningEffort('o3')).toBe('high');
   });
 });
 

@@ -22,6 +22,21 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Ingest, sanitiser and provider fixes from a code review:
+  - Participant-instruction prose such as "you are now going to see…" no longer
+    trips the tier-3 role-reassignment pattern and halts the review, and "as an
+    aid" / "has an aim" no longer match the AI-address pattern and get
+    quarantined mid-word.
+  - Word list items survive DOCX parsing, so numbered reference lists and
+    bulleted body text are no longer dropped; escaped entities are decoded once.
+  - Reasoning models get the effort ceiling they accept: `xhigh` for gpt-5.2+
+    and codex-max, `high` for gpt-5, gpt-5.1 and the o-series, which reject
+    `xhigh`.
+  - A citation mismatch seen while another backend was down is no longer cached
+    for 30 days.
+  - A GROBID parse reports its real quality instead of always "good".
+  - A DOI wrapped in brackets no longer keeps the closing bracket.
+  - The cross-review similarity median averages the middle pair for even counts.
 - Web app hardening from a code review:
   - The login page only redirects to a same-origin path after sign-in, so a
     crafted `?from=javascript:…` or off-site link can no longer run script or

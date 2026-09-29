@@ -23,7 +23,10 @@ export const injectionPatterns: InjectionPattern[] = [
   {
     id: 'role-reassignment',
     tier: 3,
-    regex: /you\s+are\s+now\s+(an?\s+|the\s+)?[a-z]/i,
+    // A role noun is required: "you are now going to see…" is ordinary participant-instruction prose and
+    // must not halt the review as tier-3 tampering.
+    regex:
+      /you\s+are\s+now\s+(an?\s+|the\s+|my\s+|our\s+)?(\w+\s+)?(ai|assistant|author|advocate|editor|reviewer|referee|model|chatbot|bot|agent|system|evaluator|judge|critic|champion|supporter|expert|dan)\b/i,
     description: 'Attempt to reassign the reviewer role',
   },
   {
@@ -53,7 +56,7 @@ export const injectionPatterns: InjectionPattern[] = [
   {
     id: 'ai-address',
     tier: 2,
-    regex: /as\s+an?\s+ai(\s+(language\s+model|reviewer|assistant|system))?/i,
+    regex: /\bas\s+an?\s+ai\b(\s+(language\s+model|reviewer|assistant|system))?/i,
     description: 'Text addressed to an AI reviewer',
   },
   {

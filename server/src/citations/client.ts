@@ -99,7 +99,9 @@ export function createCitationClient(options: CitationClientOptions = {}): Citat
       const result: VerifyReferenceResult =
         verified ?? bestMismatch ?? { status: 'not_found', source: null, confidence: 0 };
 
-      const cacheable = result.status !== 'not_found' || !backendUnavailable;
+      // Only a verification is final while a backend was down: a not_found or a loose mismatch may be
+      // the outage talking, and caching it would pin that verdict for every later review of the reference.
+      const cacheable = result.status === 'verified' || !backendUnavailable;
       if (cache !== null && cacheable) {
         cache.set(reference, result.source, result);
       }

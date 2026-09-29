@@ -29,19 +29,26 @@ function isBoldOnly(rawInner: string, text: string): boolean {
   return bold === text;
 }
 
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
+
+// One pass, so an escaped entity in the manuscript ("&amp;lt;" for a literal "&lt;") is decoded once.
 function decodeEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+  return value.replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, name: string) => ENTITIES[name] ?? '');
+}
+
+// Mammoth renders Word list paragraphs, numbered reference lists included, as <li> with no inner <p>.
+// Treat each item as its own paragraph, and end an item's text where a nested list begins.
+function listItemsAsParagraphs(html: string): string {
+  return html
+    .replace(/<li\b[^>]*>/gi, '<p>')
+    .replace(/<\/li>/gi, '</p>')
+    .replace(/<(ol|ul)\b[^>]*>/gi, '</p>');
 }
 
 function toBlocks(html: string): HtmlBlock[] {
   const blockPattern = /<(h[1-6]|p)\b[^>]*>([\s\S]*?)<\/\1>/gi;
   const blocks: HtmlBlock[] = [];
+  html = listItemsAsParagraphs(html);
   let match: RegExpExecArray | null = blockPattern.exec(html);
   while (match !== null) {
     const tag = (match[1] ?? '').toLowerCase();
