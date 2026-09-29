@@ -22,6 +22,9 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Dependency audit is clean at the high level again: Next.js moves to 16.3.6
+  (critical advisory) and overrides pin patched `fast-uri`, `sharp`,
+  `ip-address`, `js-yaml`, `nanoid` and `@xmldom/xmldom`.
 - The release critic can no longer call a legitimately cited work fabricated.
   Three of four failed reviews were blocked for citing literature that sits,
   verifiably, in that review's own field dossier: the writer is instructed to
