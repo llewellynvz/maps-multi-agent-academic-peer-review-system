@@ -228,6 +228,20 @@ All notable changes to Collegia are recorded here. The format follows
   instance. Server errors return a fixed message rather than internal paths.
 
 ### Changed
+- Injection handling now follows knowledge/01: instructional text aimed at the
+  reviewer ("ignore previous instructions", role reassignment, forced
+  acceptance, suppressed weaknesses) is Tier 2, so it is quarantined and the
+  review continues with an editor-only `REV-SAN` signal that names what was found
+  and where without repeating it. Only data-misrepresenting tampering (Tier 3,
+  assigned by the detector) halts a run. Previously the deterministic screen
+  halted on instruction text, contradicting the governance module and the
+  sanitiser agent's own contract.
+- Docker publishes the app on 127.0.0.1 by default (`MARA_BIND` to widen it),
+  and exemplar review letters are mounted at run time rather than copied into
+  image layers.
+- CI now runs gitleaks over the full history, as the README already claimed,
+  and the gitleaks allowlist only suppresses the synthetic strings in their own
+  test files.
 - The default frontier deployment example moved to GPT-5.6 Sol, replacing GPT-5.1,
   with a matching cost entry so spend on it is tracked. Every reasoning-class
   dispatch now defaults to the highest reasoning effort each model actually
