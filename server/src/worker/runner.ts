@@ -204,13 +204,33 @@ export class WorkerRunner {
         }
         this.applyMemory(command.reviewId, command.command, args, command.createdAt);
       } else {
+        try {
+          // A pause or cancel for the review in flight only takes effect at the next phase boundary. Record
+          // the intent in the same transaction as the ack, so a restart before that boundary (a SIGKILL,
+          // a crash) honours it instead of resuming the run the user stopped.
+          this.db.transaction(
+            (tx) => {
+              if (
+                (command.command === 'pause' || command.command === 'cancel') &&
+                command.reviewId === this.activeReviewId
+              ) {
+                mergeReviewOptions(tx, command.reviewId, { pendingStop: command.command });
+              }
+              insertEvent(tx, {
+                reviewId: command.reviewId,
+                kind: 'control_ack',
+                payload: { commandId: command.id, command: command.command },
+              });
+              tx.delete(runCommands).where(eq(runCommands.id, command.id)).run();
+            },
+            { behavior: 'immediate' },
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(`could not acknowledge ${command.command} for ${command.reviewId}: ${message}`);
+          continue;
+        }
         this.applyCommand(command.reviewId, command.command);
-        insertEvent(this.db, {
-          reviewId: command.reviewId,
-          kind: 'control_ack',
-          payload: { commandId: command.id, command: command.command },
-        });
-        this.db.delete(runCommands).where(eq(runCommands.id, command.id)).run();
       }
       this.ackedCommands.add(command.id);
       this.log(`command ${command.command} for ${command.reviewId}`);
@@ -218,6 +238,7 @@ export class WorkerRunner {
   }
 
   private applyDurable(tx: MaraDatabase, reviewId: string, command: string, args: Record<string, unknown>): void {
+    mergeReviewOptions(tx, reviewId, { pendingStop: null });
     if (command === 'resume') {
       const answers = (args.answers as Record<string, string> | undefined) ?? {};
       const preset = typeof args.preset === 'string' ? args.preset : undefined;
@@ -462,6 +483,15 @@ export class WorkerRunner {
     }
   }
 
+  private pendingStop(optionsJson: string): 'pause' | 'cancel' | null {
+    try {
+      const value = (JSON.parse(optionsJson) as { pendingStop?: unknown }).pendingStop;
+      return value === 'pause' || value === 'cancel' ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
   private pendingInvalidateFrom(optionsJson: string): number | null {
     try {
       const options = JSON.parse(optionsJson) as { pendingInvalidateFrom?: unknown };
@@ -624,6 +654,16 @@ export class WorkerRunner {
     } finally {
       this.pauseRequested.delete(reviewId);
       this.activeReviewId = null;
+      // Once the review has left the running states the stop it carried was honoured or overtaken. A
+      // shutdown mid-run leaves it running, and then the intent must survive for recover() to apply.
+      try {
+        const status = this.currentStatus(this.db, reviewId);
+        if (status !== undefined && status !== 'running' && status !== 'sanitizing' && status !== 'queued') {
+          mergeReviewOptions(this.db, reviewId, { pendingStop: null });
+        }
+      } catch {
+        // The review may have been deleted mid-run; nothing to clear.
+      }
     }
   }
 
@@ -829,6 +869,18 @@ export class WorkerRunner {
           const message = error instanceof Error ? error.message : String(error);
           this.log(`review ${row.id}: artefact invalidation incomplete, will retry on next recovery: ${message}`);
         }
+      }
+      const pendingStop = this.pendingStop(row.optionsJson);
+      if (pendingStop !== null && (row.status === 'running' || row.status === 'sanitizing' || row.status === 'queued')) {
+        mergeReviewOptions(this.db, row.id, { pendingStop: null });
+        if (pendingStop === 'cancel') {
+          updateReview(this.db, row.id, { status: 'cancelled' });
+          this.emitTerminal(row.id, 'cancelled', {});
+        } else {
+          pauseReview(this.db, row.id, { reason: 'user_pause' });
+        }
+        this.log(`review ${row.id}: honoured a ${pendingStop} acknowledged before the restart`);
+        continue;
       }
       if (row.status === 'running' || row.status === 'sanitizing') {
         this.intents.set(row.id, { kind: 'run', args: this.recoveredArgs(row.id), createdAt: row.createdAt ?? ts, recovered: true });

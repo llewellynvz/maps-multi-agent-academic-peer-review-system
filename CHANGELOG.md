@@ -22,6 +22,12 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- A pause or cancel pressed on the review in flight is recorded durably when it
+  is acknowledged, so a worker restart before the next phase boundary honours it
+  instead of silently resuming, and paying for, the run you stopped.
+- After a flood of wrong passphrases the login no longer locks everyone out for
+  15 minutes. One passphrase check is let through every five seconds instead,
+  which keeps guessing throttled while the owner can still sign in.
 - Web app:
   - A wrong passphrase shows its error on the login form instead of reloading
     the page, and a lapsed session returns you to the exact page (with its query)

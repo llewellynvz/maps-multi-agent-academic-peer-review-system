@@ -10,6 +10,11 @@ const GLOBAL_FAILURE_LIMIT = 20;
 const WINDOW_MS = 15 * 60 * 1000;
 const failedAttempts = new Map<string, { count: number; resetAt: number }>();
 let globalFailures = { count: 0, resetAt: 0 };
+// Past the global limit, a hard lockout would let anyone lock the owner out by failing 20 times. Instead one
+// passphrase check is allowed through every GLOBAL_DRIP_MS across all clients: guessing stays throttled to
+// a crawl while the owner, retrying, still gets in.
+const GLOBAL_DRIP_MS = 5000;
+let lastGlobalDrip = 0;
 
 function clientKey(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -42,9 +47,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
     const active = failedAttempts.get(key);
 
-    if ((active !== undefined && active.count >= FAILURE_LIMIT) || globalFailures.count >= GLOBAL_FAILURE_LIMIT) {
-      const resetAt = active !== undefined ? active.resetAt : globalFailures.resetAt;
-      const retryAfter = Math.ceil((resetAt - now) / 1000);
+    const clientLocked = active !== undefined && active.count >= FAILURE_LIMIT;
+    let globalLocked = globalFailures.count >= GLOBAL_FAILURE_LIMIT;
+    if (globalLocked && !clientLocked && now - lastGlobalDrip >= GLOBAL_DRIP_MS) {
+      lastGlobalDrip = now;
+      globalLocked = false;
+    }
+    if (clientLocked || globalLocked) {
+      const retryAfter = clientLocked ? Math.ceil((active.resetAt - now) / 1000) : Math.ceil(GLOBAL_DRIP_MS / 1000);
       return NextResponse.json(
         { error: { code: 'rate_limited', message: 'Too many failed attempts. Try again later.' } },
         { status: 429, headers: { 'Retry-After': String(retryAfter) } },

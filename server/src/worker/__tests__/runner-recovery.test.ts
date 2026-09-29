@@ -398,3 +398,48 @@ describe('WorkerRunner durable apply-then-ack recovery', () => {
     expect((JSON.parse(terminal[0]!.payload_json) as { outcome: string }).outcome).toBe('complete');
   });
 });
+
+describe('WorkerRunner durable pause and cancel of the review in flight', () => {
+  for (const command of ['cancel', 'pause'] as const) {
+    it(`honours a ${command} acknowledged mid-phase after a crash, instead of resuming the run`, async () => {
+      insertReview('rev-live', '2026-07-14T00:00:00.000Z');
+      completeIngest('rev-live');
+      insertRunCommand('rev-live', 'run');
+
+      let markStarted: () => void = () => undefined;
+      const engineStarted = new Promise<void>((resolve) => {
+        markStarted = resolve;
+      });
+      let release: () => void = () => undefined;
+      const engineReleased = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const processors: WorkerProcessors = {
+        startIngest: async () => 'ingested',
+        resumeIngest: async () => 'ingested',
+        runEngine: async (reviewId) => {
+          updateReview(client.db, reviewId, { status: 'running' });
+          markStarted();
+          await engineReleased;
+          return 'stopped';
+        },
+      };
+      const runnerA = new WorkerRunner({ client, processors });
+      runnerA.pollCommands();
+      void runnerA.runOnce();
+      await engineStarted;
+
+      insertRunCommand('rev-live', command);
+      runnerA.pollCommands();
+
+      // The worker dies before the phase boundary: runnerA never reaches its stopping point.
+      expect(reviewStatus('rev-live')).toBe('running');
+      const runnerB = new WorkerRunner({ client, processors: completingProcessors([]) });
+      runnerB.recover();
+      expect(reviewStatus('rev-live')).toBe(command === 'cancel' ? 'cancelled' : 'paused');
+      await runnerB.runOnce();
+      expect(reviewStatus('rev-live')).toBe(command === 'cancel' ? 'cancelled' : 'paused');
+      release();
+    });
+  }
+});
