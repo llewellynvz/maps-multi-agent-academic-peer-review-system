@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Collegia are recorded here. The format follows
+All notable changes to MARA are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -282,6 +282,17 @@ All notable changes to Collegia are recorded here. The format follows
   instance. Server errors return a fixed message rather than internal paths.
 
 ### Changed
+- Documentation rewritten for release: an enterprise README (with the broken hero
+  and architecture image paths fixed and stale guidance corrected), a new
+  configuration reference (`docs/CONFIGURATION.md`) covering every environment
+  variable and provider routing, a new security and data-protection document
+  (`docs/SECURITY.md`), and an operations runbook updated for intake failures,
+  durable pause and cancel, sign-in throttling, and network exposure.
+- The licence is tightened: all rights reserved with no commercial rights, and
+  express prohibitions on AI training and evaluation use, benchmarking, reverse
+  engineering, reuse of prompts and the knowledge base, and use of outputs for
+  third-party decisions, with confidentiality, termination, remedies, and Dutch
+  governing law. Every package is marked `UNLICENSED`.
 - Injection handling now follows knowledge/01: instructional text aimed at the
   reviewer ("ignore previous instructions", role reassignment, forced
   acceptance, suppressed weaknesses) is Tier 2, so it is quarantined and the

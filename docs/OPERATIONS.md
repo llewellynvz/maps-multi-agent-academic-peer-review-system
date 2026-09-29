@@ -1,6 +1,6 @@
 # Operations runbook
 
-This runbook covers day-to-day operation of the Collegia review platform: watching a
+This runbook covers day-to-day operation of the MARA review platform: watching a
 review as it runs, recovering the failure classes the engine can produce, and backing up
 and restoring the durable state. Commands assume you are in the repository root on the
 host that runs the container, the same place you run `docker compose`.
@@ -10,7 +10,7 @@ unique prefix of it.
 
 ## 1. Overview
 
-Collegia reviews a manuscript through a nine-phase pipeline (Phases 0 to 8). A single
+MARA reviews a manuscript through a nine-phase pipeline (Phases 0 to 8). A single
 worker holds a lease and processes one review at a time. It leases a queued review,
 ingests the manuscript, then runs the engine phases in order: sanitisation and structured
 analysis, field context and citation audit, the specialist lenses with their challenge
@@ -49,7 +49,9 @@ its phase, status, latency, and cost, and a run total), and the ordered event ti
 
 ### What a healthy run looks like
 
-In the timeline you should see the phases advance in order as `phase_transition` events,
+In the timeline you should see each engine phase announce its start with a
+`phase_transition` event carrying `started: true`, and report its results in a second
+`phase_transition` event when it finishes. Between them you should see
 `finding_recorded` events as findings merge into the ledger, and a `phase_critique` entry
 after each of Phases 1 to 6. At Phase 7 you should see one or more `gate_verdict` events
 (source `grounding-validator`, then `final-critic`) resolving to `pass`, followed by a
@@ -170,7 +172,53 @@ because a review needs at least one completed specialist pass and integrity scre
 required. That case surfaces as an engine error on the phase (section 3.2), and you retry
 the phase the same way.
 
-### 3.4 Cost-ceiling pause
+### 3.4 Intake failure (Phase 0 and Phase 1)
+
+**Symptom.** The review status is `failed` before any engine phase ran, with one of these
+error classes. The intake and new-review screens stop polling and show the reason.
+
+| Error class | Meaning |
+|---|---|
+| `parse_failed` | A PDF could not be structured, usually because GROBID was unreachable or still starting. |
+| `ingest_failed` | The ingest workflow itself failed, typically a model-provider error during lite parsing (credentials, quota, or network). |
+| `tier_3_tampering` | The detector found data-misrepresenting tampering (for example a fabricated retraction notice) and halted the run by design. |
+
+**Diagnosis.** Run the timeline. The last events before `run_terminal` show the step that
+failed. For provider errors, read the worker log:
+
+```bash
+docker compose logs mara | grep -iE "ingest|dispatch" | tail -50
+```
+
+**Recovery.** Fix the cause (start GROBID, correct provider credentials in `.env` or
+**Settings**), then press **Retry** on the run page, or run:
+
+```bash
+pnpm -C server exec tsx scripts/retry-review.ts <reviewId> phase_0
+```
+
+Retrying an intake failure re-queues the review, clears its failed intake checkpoints, and
+re-runs ingest from the stored manuscript with its original file type. Completed steps are
+reused. A `tier_3_tampering` retry re-screens the manuscript under the current rules; if
+the tampering is genuine it halts again, and the editor-only notes explain why.
+
+Instructional prompt injection ("ignore previous instructions", role reassignment, forced
+acceptance) does **not** fail a review. It is Tier 2: the passages are quarantined, the
+review continues on sanitised text, and a `REV-SAN` editor-only signal records what was
+found and where.
+
+### 3.5 Pause and cancel
+
+Pause and cancel are durable. For the review that is running, the command is acknowledged
+immediately and takes effect at the next phase boundary. The intent is written in the same
+transaction as the acknowledgement, so if the worker restarts before that boundary (a
+crash, `docker compose restart`, or a forced stop), recovery honours the pause or cancel
+instead of resuming the run. A queued review is paused or cancelled at once.
+
+A cancelled review can be deleted. A running review cannot be deleted until it has
+stopped; cancel it and wait for the status to change.
+
+### 3.6 Cost-ceiling pause
 
 **Symptom.** The run stops cleanly with status `paused`, not `failed`. The timeline shows
 a `phase_transition` event marked paused with reason `cost_ceiling`. Every dispatch
@@ -257,8 +305,31 @@ decide whether to retry it.
 
 Deletion is always explicit. A single review can be removed from settings or its library
 card behind a typed confirmation, which purges its database rows, blob directory, and
-deliverables. Settings also offers a delete-all behind a stronger typed confirmation. It
+deliverables. A review the worker is executing cannot be deleted until it stops; a queued
+review can be. Settings also offers a delete-all behind a stronger typed confirmation. It
 refuses while any review is queued or running, then removes every review in one
 transaction, sweeps directories left behind by earlier deletions, and clears stale ingest
 snapshots. Cached citation lookups and instance settings are kept. There is no undo for
 either path, so export the run archive first if the audit trail matters.
+
+## 6. Access and sign-in
+
+When an instance passphrase is set, the web application and API require a session. After
+five failed sign-ins from one client, that client is refused for fifteen minutes. After
+twenty failures across all clients, one passphrase check is admitted every 45 seconds, so
+an attacker cannot lock the owner out while guessing stays throttled. A successful sign-in
+resets the counters.
+
+If the passphrase is lost, stop the stack and clear it directly in the database:
+
+```bash
+docker compose stop
+sqlite3 data/mara.db "DELETE FROM settings WHERE key = 'passphrase';"
+docker compose start
+```
+
+## 7. Network exposure
+
+The container publishes on `127.0.0.1` by default. To serve other machines, set a
+passphrase first, then set `MARA_BIND=0.0.0.0` (or a specific interface) and place a
+TLS-terminating reverse proxy in front. See [SECURITY.md](SECURITY.md).

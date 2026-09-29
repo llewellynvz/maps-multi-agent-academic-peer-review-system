@@ -1,62 +1,229 @@
-MARA: Multi-Agent Review Architecture
-Proprietary Software Licence
+MARA: MULTI-AGENT REVIEW ARCHITECTURE
+PROPRIETARY SOFTWARE LICENCE: ALL RIGHTS RESERVED, NO COMMERCIAL RIGHTS
 
-Copyright (c) 2026 Llewellyn van Zyl and Psynalytics B.V. All rights reserved.
+Copyright (c) 2026 Llewellyn E. van Zyl and Psynalytics B.V.
+All rights reserved.
 
-1. Ownership and confidentiality
-   This software, its source code, models, prompts, knowledge base, design
-   assets, and accompanying documentation (the "Software") are the proprietary
-   and confidential property of Llewellyn van Zyl and Psynalytics B.V. (the
-   "Owner"). The Software is licensed, not sold, and no title or ownership is
-   transferred by access to it.
+READ THIS LICENCE CAREFULLY. BY ACCESSING, VIEWING, CLONING, DOWNLOADING, OR
+OTHERWISE OBTAINING ANY PART OF THE SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ
+AND UNDERSTOOD THIS LICENCE AND THAT NO RIGHTS ARE GRANTED TO YOU EXCEPT AS
+EXPRESSLY STATED IN A SEPARATE WRITTEN AGREEMENT SIGNED BY THE OWNER.
 
-2. No licence granted
-   No right or licence, express or implied, is granted to any person or
-   organisation to use, run, copy, reproduce, modify, adapt, translate, create
-   derivative works of, publish, distribute, sublicense, lease, rent, sell,
-   disclose, or otherwise exploit the Software or any part of it, in whole or in
-   part, in any form or by any means, without the prior written permission of
-   the Owner.
+1. DEFINITIONS
 
-3. Commercial use prohibited
-   Commercial use of the Software is expressly prohibited. This includes, without
-   limitation, use in or for any product, service, consultancy, research output,
-   or internal business operation intended to generate revenue or commercial
-   advantage, whether or not a fee is charged.
+1.1 "Owner" means Llewellyn E. van Zyl and Psynalytics B.V., jointly and
+    severally, and their successors and assigns.
 
-4. No redistribution
-   The Software may not be redistributed, mirrored, hosted, or made available to
-   any third party. Access granted to one individual does not extend to any other
-   individual or entity.
+1.2 "Software" means the MARA system and every part of it, in any form and in
+    any medium, including without limitation: source code, object code, build
+    and configuration files, database schemas and migrations, agent prompts and
+    manifests, the knowledge base, rubrics, scoring methods, schemas, test
+    fixtures and golden outputs, datasets, documentation, designs, diagrams,
+    images, brand assets, names, and any output, derivative, translation,
+    adaptation, or modification of any of the foregoing.
 
-5. Permission requests
-   Any use requires a separate written agreement with the Owner. Requests may be
-   directed to hello@psynalytics.com. Any permission that is granted is limited
-   to its stated scope and may be revoked at any time.
+1.3 "Commercial Use" means any use that is intended for, directed toward, or
+    results in commercial advantage or monetary compensation, directly or
+    indirectly, whether or not a fee is charged, including without limitation
+    use in or for any product, service, platform, consultancy, editorial or
+    publishing workflow, paid or grant-funded research, training, teaching for
+    a fee, or the internal operations of any business, institution, publisher,
+    journal, or other organisation.
 
-6. No warranty
-   The Software is provided "as is", without warranty of any kind, express or
-   implied, including but not limited to the warranties of merchantability,
-   fitness for a particular purpose, and non-infringement. The Owner does not
-   warrant that the Software is error-free or fit for any particular use.
+1.4 "AI Use" means any use of the Software, in whole or in part, to train,
+    pre-train, fine-tune, distil, evaluate, benchmark, align, prompt, ground,
+    retrieve into, or otherwise develop or improve any machine-learning model,
+    artificial-intelligence system, dataset, or corpus, including by scraping,
+    crawling, indexing, or ingestion.
 
-7. Limitation of liability
-   To the maximum extent permitted by law, the Owner shall not be liable for any
-   claim, damages, or other liability, whether in an action of contract, tort, or
-   otherwise, arising from, out of, or in connection with the Software or the use
-   or other dealings in the Software.
+2. OWNERSHIP
 
-8. Nature of the Software
-   The Software produces developmental, pre-submission editorial feedback. It is
-   not affiliated with any journal, is not a certification of quality, and is not
-   a substitute for human peer review or professional judgement. Outputs are
-   advisory and must be verified by a qualified person before any reliance.
+2.1 The Software is the proprietary and confidential property of the Owner and
+    is protected by copyright, database right, trade secret, and other
+    intellectual-property laws and international treaties. The Software is not
+    sold. No title to or ownership of the Software, or of any intellectual
+    property in it, is transferred to any person.
 
-9. Termination
-   Any breach of this Licence terminates all rights immediately and requires the
-   destruction of all copies of the Software in the breaching party's possession
-   or control.
+2.2 All rights not expressly granted in a separate written agreement signed by
+    the Owner are reserved by the Owner.
 
-Unauthorised use, reproduction, or distribution of the Software, or any portion
-of it, may result in civil and criminal penalties, and will be prosecuted to the
-maximum extent possible under the law.
+3. NO LICENCE GRANTED
+
+3.1 No right or licence, express or implied, by estoppel or otherwise, is
+    granted to any person or entity to use, run, execute, install, deploy,
+    host, copy, reproduce, store, modify, adapt, translate, port, fork, merge,
+    create derivative works of, compile, decompile, publish, display, perform,
+    distribute, redistribute, disclose, transmit, sublicense, sell, resell,
+    lease, rent, lend, or otherwise make available or exploit the Software or
+    any part of it, for any purpose, without the prior written agreement of
+    the Owner, signed by the Owner.
+
+3.2 Visibility of the Software on a public or shared code-hosting service
+    confers no licence. To the limited extent that the terms of service of such
+    a hosting service grant other users of that service a right to view or fork
+    the repository through the service's own functionality, that right is
+    confined strictly to what those terms require. It includes no right to
+    download, clone for use, run, modify, copy outside the service, or exploit
+    the Software, and any fork remains subject to every restriction in this
+    Licence.
+
+4. EXPRESSLY PROHIBITED ACTS
+
+Without limiting section 3, and without the Owner's prior signed written
+agreement, no person may:
+
+4.1 make any Commercial Use of the Software. COMMERCIAL USE IS PROHIBITED
+    WITHOUT EXCEPTION, and no permission for Commercial Use shall be implied
+    from any permission granted for any other purpose;
+
+4.2 make any AI Use of the Software;
+
+4.3 use the Software, or any output generated by it, to review, assess, rank,
+    screen, or decide upon any manuscript, grant, candidate, or submission for
+    any journal, publisher, funder, institution, or other third party;
+
+4.4 reverse engineer, decompile, disassemble, or otherwise attempt to derive
+    the source code, prompts, knowledge base, methods, or trade secrets of the
+    Software, except to the extent that such restriction is expressly
+    prohibited by mandatory applicable law;
+
+4.5 copy, extract, reuse, or reproduce the agent prompts, knowledge base,
+    rubrics, review templates, scoring methods, or architecture of the
+    Software, in whole or in substantial part, or use them as a reference to
+    build a competing or substantially similar system;
+
+4.6 benchmark the Software, or publish, disclose, or share any evaluation,
+    comparison, performance result, review output, screenshot, or description
+    of its internal operation;
+
+4.7 remove, alter, or obscure any copyright notice, licence notice,
+    proprietary legend, attribution, or brand mark in or on the Software;
+
+4.8 circumvent, disable, or interfere with any security, access-control,
+    licensing, or confidentiality mechanism of the Software;
+
+4.9 use any name, trade mark, logo, or brand of the Owner, including "MARA"
+    and "Psynalytics", except as required to identify the Owner as the source
+    of the Software; or
+
+4.10 permit, assist, or enable any other person to do any of the above.
+
+5. CONFIDENTIALITY
+
+5.1 The Software, including its prompts, knowledge base, methods, and
+    architecture, constitutes confidential information and trade secrets of
+    the Owner. Any person who obtains access to the Software shall keep it
+    strictly confidential, shall not disclose it to any third party, and shall
+    protect it with at least the degree of care that person uses for their own
+    most sensitive information, and in no event less than reasonable care.
+
+5.2 These obligations continue after any access ends and after any termination
+    under section 8.
+
+6. WRITTEN AGREEMENTS AND PERMISSIONS
+
+6.1 Any permission to use the Software must be set out in a separate written
+    agreement signed by the Owner. Enquiries may be directed to
+    hello@psynalytics.com.
+
+6.2 Any permission granted is personal, non-exclusive, non-transferable,
+    non-sublicensable, limited to its express scope, purpose, and duration, and
+    revocable by the Owner at any time on notice. Any permission that does not
+    expressly authorise Commercial Use or AI Use excludes them.
+
+6.3 Any permission granted to one individual does not extend to any other
+    individual, employer, institution, or entity.
+
+7. FEEDBACK AND CONTRIBUTIONS
+
+7.1 Any suggestion, comment, issue report, pull request, patch, or other
+    feedback or contribution relating to the Software that is provided to the
+    Owner may be used by the Owner without restriction or obligation. To the
+    fullest extent permitted by law, the contributor assigns to the Owner all
+    right, title, and interest in it, waives any moral rights in it to the
+    extent waivable, and confirms that it is their original work and does not
+    infringe the rights of any third party.
+
+7.2 Submitting a contribution confers no licence to the Software.
+
+8. TERMINATION
+
+8.1 Any unauthorised act in relation to the Software, and any breach of this
+    Licence or of any written agreement with the Owner, immediately and
+    automatically terminates any permission that may have been granted, without
+    notice.
+
+8.2 On termination, or on the Owner's request at any time, the person
+    concerned shall immediately cease all use of the Software, permanently
+    delete and destroy every copy of it in their possession or control
+    (including backups, forks, derivatives, and any model, dataset, or corpus
+    into which it was incorporated), and certify that destruction to the Owner
+    in writing within seven (7) days.
+
+9. REMEDIES
+
+9.1 Any unauthorised use or disclosure of the Software would cause the Owner
+    irreparable harm for which damages would not be an adequate remedy. The
+    Owner is entitled to seek injunctive or other equitable relief in any
+    competent jurisdiction, without posting a bond, in addition to any other
+    remedy available at law, including damages, an account of profits, and
+    recovery of legal costs.
+
+9.2 Unauthorised use, reproduction, or distribution of the Software may give
+    rise to civil liability and to criminal penalties, and will be pursued to
+    the fullest extent permitted by law.
+
+10. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING WITHOUT LIMITATION ANY WARRANTY
+OF MERCHANTABILITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE,
+ACCURACY, NON-INFRINGEMENT, OR THAT THE SOFTWARE WILL BE ERROR-FREE,
+UNINTERRUPTED, OR SECURE.
+
+11. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE OWNER
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
+EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA,
+REPUTATION, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ANY USE OF OR INABILITY TO USE IT, HOWEVER CAUSED AND UNDER ANY THEORY OF
+LIABILITY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+12. NATURE OF THE SOFTWARE
+
+The Software produces developmental, pre-submission editorial feedback. It is
+not affiliated with any journal or publisher, is not a certification of
+quality, and is not a substitute for human peer review or professional
+judgement. All outputs are advisory and must be verified by a qualified person
+before any reliance is placed on them.
+
+13. GENERAL
+
+13.1 Governing law. This Licence and any dispute or claim arising out of or in
+     connection with it or the Software, including non-contractual disputes or
+     claims, are governed by the laws of the Netherlands, excluding its
+     conflict-of-laws rules and the United Nations Convention on Contracts for
+     the International Sale of Goods.
+
+13.2 Jurisdiction. The competent courts of the Netherlands have exclusive
+     jurisdiction over any such dispute or claim, without prejudice to the
+     Owner's right to seek injunctive relief in any other jurisdiction.
+
+13.3 Severability. If any provision of this Licence is held invalid or
+     unenforceable, it shall be enforced to the maximum extent permissible and
+     the remaining provisions shall remain in full force and effect.
+
+13.4 No waiver. No failure or delay by the Owner in exercising any right shall
+     operate as a waiver of it.
+
+13.5 Precedence. This Licence prevails over any other licence notice, file,
+     badge, or metadata in or accompanying the Software, and over any terms
+     proposed by any other person. Only a written agreement signed by the Owner
+     may vary it.
+
+13.6 Third-party components. Third-party open-source components used by the
+     Software remain subject to their own licences. Nothing in this Licence
+     restricts rights granted under those licences in those components alone.
+
+Contact for permissions and notices: hello@psynalytics.com
