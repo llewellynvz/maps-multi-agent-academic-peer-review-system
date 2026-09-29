@@ -34,7 +34,7 @@ export default function SetupPage(): ReactNode {
       setKeyState('verified');
     } catch (err) {
       setKeyState('failed');
-      setKeyMessage(err instanceof Error ? err.message : 'The key could not be verified.');
+      setKeyMessage(err instanceof Error ? err.message : 'The key could not be saved.');
     }
   };
 
@@ -78,11 +78,11 @@ export default function SetupPage(): ReactNode {
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <button className="btn btn-secondary" onClick={verifyKey} disabled={apiKey.length === 0 || keyState === 'checking'}>
-                {keyState === 'checking' ? <Spinner /> : null} Verify key
+                {keyState === 'checking' ? <Spinner /> : null} Save key
               </button>
-              {keyState === 'checking' ? <Pill tone="neutral" label="Checking" icon="clock" /> : null}
-              {keyState === 'verified' ? <Pill tone="info" label="Verified" icon="check" /> : null}
-              {keyState === 'failed' ? <Pill tone="fail" label="Not verified" /> : null}
+              {keyState === 'checking' ? <Pill tone="neutral" label="Saving" icon="clock" /> : null}
+              {keyState === 'verified' ? <Pill tone="info" label="Saved" icon="check" /> : null}
+              {keyState === 'failed' ? <Pill tone="fail" label="Not saved" /> : null}
             </div>
             {keyState === 'failed' ? <p className="sub" style={{ marginTop: 10 }}>{keyMessage}</p> : null}
             {apiKey.length === 0 ? <p className="sub muted" style={{ marginTop: 10 }}>A key is optional here. You can add one later in settings.</p> : null}

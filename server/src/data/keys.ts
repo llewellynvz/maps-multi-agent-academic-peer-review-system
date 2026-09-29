@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { providerKeys } from '../db/schema';
 import { nowIso } from './db';
@@ -104,16 +104,17 @@ const PROVIDER_ENV_VAR: Record<string, string> = {
 // Providers read their credentials from the environment. Without this, a key added through the UI is
 // sealed to disk or held in memory and never consulted, so the pipeline still fails on a missing env var.
 // Environment values win: a deployment's own configuration is never overridden by a stored key.
+// Within a source the newest key wins, so adding a corrected or rotated key takes effect without first
+// deleting the one it replaces.
 export function providerKeyEnv(db: MaraDatabase): Record<string, string> {
   const resolved: Record<string, string> = {};
-  for (const [id, entry] of sessionKeys) {
-    void id;
+  for (const entry of [...sessionKeys.values()].reverse()) {
     const name = PROVIDER_ENV_VAR[entry.provider];
     if (name !== undefined && resolved[name] === undefined) {
       resolved[name] = entry.apiKey;
     }
   }
-  for (const row of db.select().from(providerKeys).all()) {
+  for (const row of db.select().from(providerKeys).orderBy(desc(providerKeys.createdAt), sql`rowid desc`).all()) {
     const name = PROVIDER_ENV_VAR[row.provider];
     if (name === undefined || resolved[name] !== undefined) {
       continue;

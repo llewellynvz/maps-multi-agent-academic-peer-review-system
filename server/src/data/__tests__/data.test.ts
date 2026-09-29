@@ -101,6 +101,18 @@ describe('provider key envelope encryption (SEC-13/17)', () => {
     const merged = mergeProviderKeyEnv({ OPENAI_API_KEY: '' }, providerKeyEnv(client.db));
     expect(merged.OPENAI_API_KEY).toBe('sk-disk-STOREDKEY');
   });
+
+  it('uses the newest stored key when a provider has several', () => {
+    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-TYPO', persist: 'disk' });
+    addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-FIXED', persist: 'disk' });
+    addKey(client.db, { provider: 'google', apiKey: 'g-session-OLD', persist: 'session' });
+    addKey(client.db, { provider: 'google', apiKey: 'g-session-NEW', persist: 'session' });
+
+    const env = providerKeyEnv(client.db);
+    expect(env.OPENAI_API_KEY).toBe('sk-disk-FIXED');
+    expect(env.GOOGLE_API_KEY).toBe('g-session-NEW');
+  });
 });
 
 describe('preset override at the answer step (PIPE-30)', () => {

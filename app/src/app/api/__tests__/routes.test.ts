@@ -141,3 +141,59 @@ describe('SSE events route (API-22)', () => {
     await reader!.cancel().catch(() => undefined);
   });
 });
+
+describe('SSE events route for an unknown review', () => {
+  it('returns 404 instead of streaming an empty run', async () => {
+    const res = await eventsGET(req('/api/reviews/nope/events'), { params: Promise.resolve({ id: 'nope' }) });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('cross-site request guard', () => {
+  it('refuses a state-changing request a browser marks cross-site', async () => {
+    const res = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { 'sec-fetch-site': 'cross-site' } }),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('falls back to comparing Origin with Host', async () => {
+    const foreign = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'https://evil.example', host: '127.0.0.1' } }),
+    );
+    expect(foreign.status).toBe(403);
+    const same = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'http://127.0.0.1', host: '127.0.0.1' } }),
+    );
+    expect(same.status).toBe(201);
+  });
+
+  it('leaves reads alone', async () => {
+    const res = await reviewsGET(req('/api/reviews', { headers: { 'sec-fetch-site': 'cross-site' } }));
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('request body validation', () => {
+  it('rejects a mistyped settings patch with 422 instead of crashing', async () => {
+    const wrongType = await settingsPUT(req('/api/settings', { method: 'PUT', body: JSON.stringify({ passphrase: 123 }) }));
+    expect(wrongType.status).toBe(422);
+    const nullBody = await settingsPUT(req('/api/settings', { method: 'PUT', body: 'null' }));
+    expect(nullBody.status).toBe(422);
+  });
+
+  it('rejects a non-string review title', async () => {
+    const res = await reviewsPOST(req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 5 }) }));
+    expect(res.status).toBe(422);
+  });
+
+  it('refuses an upload whose declared length is over the cap before parsing it', async () => {
+    const created = await reviewsPOST(req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'Big' }) }));
+    const { id } = (await created.json()) as { id: string };
+    const res = await manuscriptPOST(
+      req(`/api/reviews/${id}/manuscript`, { method: 'POST', body: 'x', headers: { 'content-length': String(200 * 1024 * 1024) } }),
+      { params: Promise.resolve({ id }) },
+    );
+    expect(res.status).toBe(413);
+  });
+});

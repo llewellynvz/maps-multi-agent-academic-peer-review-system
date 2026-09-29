@@ -55,6 +55,19 @@ export default function RunPage(): ReactNode {
   const [drawer, setDrawer] = useState<RunDrawerState | null>(null);
   const [evidence, setEvidence] = useState<EvidenceData | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [controlError, setControlError] = useState<string | null>(null);
+
+  // Run controls report their failures instead of assuming success: a rejected pause must not leave the
+  // badge claiming the run is paused while it carries on.
+  const control = async (action: () => Promise<unknown>, onSuccess?: () => void): Promise<void> => {
+    setControlError(null);
+    try {
+      await action();
+      onSuccess?.();
+    } catch (err) {
+      setControlError(err instanceof Error ? err.message : 'The request did not go through.');
+    }
+  };
   const evidenceStale = useRef(true);
   const notified = useRef(false);
   const phaseRef = useRef('phase_0');
@@ -429,7 +442,7 @@ export default function RunPage(): ReactNode {
                   <button
                     className="btn btn-secondary"
                     onClick={() => {
-                      void api.retryPhase(id, failedPhase).then(() => window.location.reload());
+                      void control(() => api.retryPhase(id, failedPhase), () => window.location.reload());
                     }}
                   >
                     Retry from {phaseLabel(failedPhase)}
@@ -437,16 +450,18 @@ export default function RunPage(): ReactNode {
                 ) : null}
                 <button className="btn btn-ghost" onClick={() => router.push(`/reviews/${id}/results`)}>View partial results</button>
               </div>
+              {controlError !== null ? <div role="alert" style={{ marginTop: 12 }}><Pill tone="fail" label={controlError} /></div> : null}
             </div>
           ) : null}
 
           {terminal === null ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-ghost" onClick={() => { setPaused(true); void api.pause(id); }}><Icon name="pause" /> Pause</button>
-                <button className="btn btn-ghost" onClick={() => { setPaused(false); void api.resume(id); }}><Icon name="play" /> Resume</button>
-                <button className="btn btn-ghost" onClick={() => void api.cancel(id)}>Cancel</button>
+                <button className="btn btn-ghost" onClick={() => { void control(() => api.pause(id), () => setPaused(true)); }}><Icon name="pause" /> Pause</button>
+                <button className="btn btn-ghost" onClick={() => { void control(() => api.resume(id), () => setPaused(false)); }}><Icon name="play" /> Resume</button>
+                <button className="btn btn-ghost" onClick={() => { void control(() => api.cancel(id)); }}>Cancel</button>
               </div>
+              {controlError !== null ? <div role="alert" style={{ marginTop: 12 }}><Pill tone="fail" label={controlError} /></div> : null}
             </div>
           ) : null}
 

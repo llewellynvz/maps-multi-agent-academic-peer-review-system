@@ -29,7 +29,7 @@ function collapseFindingIds() {
           if (index > last) {
             replacement.push({ type: 'text', value: value.slice(last, index) });
           }
-          const ids = match[0].match(ID) ?? [];
+          const ids = [...new Set(match[0].match(ID) ?? [])];
           replacement.push({ type: 'element', tagName: 'span', properties: { dataFids: ids.join(',') }, children: [] });
           last = index + match[0].length;
         }

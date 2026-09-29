@@ -16,9 +16,15 @@ export default function SettingsPage(): ReactNode {
   const [toast, setToast] = useState<string | null>(null);
   const [dangerReview, setDangerReview] = useState<ReviewSummary | null>(null);
   const [dangerAll, setDangerAll] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async (): Promise<void> => {
-    setSettings(await api.getSettings().catch(() => null));
+    try {
+      setSettings(await api.getSettings());
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Settings could not be loaded.');
+    }
     setKeys((await api.listKeys().catch(() => ({ keys: [] }))).keys);
     setReviews((await api.listReviews().catch(() => ({ reviews: [] }))).reviews);
   };
@@ -41,10 +47,23 @@ export default function SettingsPage(): ReactNode {
     }
   };
 
+  const deleteKey = async (id: string): Promise<void> => {
+    try {
+      await api.deleteKey(id);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not delete the key');
+    }
+    await load();
+  };
+
   const savePassphrase = async (clear: boolean): Promise<void> => {
-    await api.putSettings({ passphrase: clear ? null : passphrase }).catch(() => null);
-    setPassphrase('');
-    flash(clear ? 'Passphrase cleared' : 'Passphrase set');
+    try {
+      await api.putSettings({ passphrase: clear ? null : passphrase });
+      setPassphrase('');
+      flash(clear ? 'Passphrase cleared' : 'Passphrase set');
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not update the passphrase');
+    }
     await load();
   };
 
@@ -56,9 +75,13 @@ export default function SettingsPage(): ReactNode {
     if (dangerReview === null) {
       return;
     }
-    await api.deleteReview(dangerReview.id).catch(() => null);
+    try {
+      await api.deleteReview(dangerReview.id);
+      flash('Review deleted');
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not delete the review');
+    }
     setDangerReview(null);
-    flash('Review deleted');
     await load();
   };
 
@@ -74,6 +97,9 @@ export default function SettingsPage(): ReactNode {
   };
 
   if (settings === null) {
+    if (loadError !== null) {
+      return <div role="alert"><Pill tone="fail" label={loadError} /></div>;
+    }
     return <div style={{ display: 'flex', gap: 10 }}><Spinner /> Loading settings</div>;
   }
 
@@ -96,8 +122,8 @@ export default function SettingsPage(): ReactNode {
                 <tr key={key.id}>
                   <td>{key.provider}</td>
                   <td className="num">{key.maskedKey}</td>
-                  <td><Pill tone="info" label="Verified" /></td>
-                  <td className="num"><button className="btn btn-ghost" onClick={() => api.deleteKey(key.id).then(load)} aria-label="Delete key"><Icon name="trash" /></button></td>
+                  <td><Pill tone="info" label={key.persist === 'disk' ? 'Stored' : 'Session'} /></td>
+                  <td className="num"><button className="btn btn-ghost" onClick={() => { void deleteKey(key.id); }} aria-label="Delete key"><Icon name="trash" /></button></td>
                 </tr>
               ))}
             </tbody>

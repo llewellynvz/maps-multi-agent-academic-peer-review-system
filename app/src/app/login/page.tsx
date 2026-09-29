@@ -5,9 +5,18 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Icon, Pill, Spinner } from '@/components/ui';
 
+// Only a same-origin path may be the post-login destination: `from` arrives in the URL, so an absolute,
+// protocol-relative or `javascript:` value would turn the login form into an open redirect or script sink.
+function safeRedirect(raw: string | null): string {
+  if (raw === null || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) {
+    return '/';
+  }
+  return raw;
+}
+
 function LoginForm(): ReactNode {
   const params = useSearchParams();
-  const from = params.get('from') ?? '/';
+  const from = safeRedirect(params.get('from'));
   const [passphrase, setPassphrase] = useState('');
   const [state, setState] = useState<'idle' | 'checking' | 'error'>('idle');
   const [message, setMessage] = useState('');

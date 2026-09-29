@@ -22,6 +22,27 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Web app hardening from a code review:
+  - The login page only redirects to a same-origin path after sign-in, so a
+    crafted `?from=javascript:…` or off-site link can no longer run script or
+    redirect away with a fresh session.
+  - State-changing API requests that a browser marks as cross-site are refused,
+    which closes CSRF against an instance with no passphrase set.
+  - Adding a corrected or rotated provider key now takes effect: the newest key
+    per provider wins instead of the first one ever stored. Setup's button says
+    "Save key" and Settings says "Stored", since neither checks the key with the
+    provider.
+  - Malformed JSON bodies for settings, new reviews and answers return 422
+    instead of 500, and uploads over the size cap are refused on their declared
+    length before the body is buffered.
+  - The event stream returns 404 for an unknown review instead of polling
+    forever.
+  - Pause, resume, cancel and retry show an error when the request fails rather
+    than assuming it worked; Settings no longer reports "Passphrase set" or
+    "Review deleted" after a failed request, and the results and settings pages
+    show a load error instead of spinning indefinitely.
+  - Repeated finding ids in one citation cluster no longer render duplicate
+    React keys in the results drawer.
 - Dependency audit is clean at the high level again: Next.js moves to 16.3.6
   (critical advisory) and overrides pin patched `fast-uri`, `sharp`,
   `ip-address`, `js-yaml`, `nanoid` and `@xmldom/xmldom`.

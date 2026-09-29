@@ -43,10 +43,17 @@ export default function ResultsPage(): ReactNode {
   const [tab, setTab] = useState<'report' | 'notes'>('report');
   const [drawerFindings, setDrawerFindings] = useState<string[] | null>(null);
   const [runStats, setRunStats] = useState<RunStats | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async (): Promise<void> => {
-      const detail = await api.getReview(id).catch(() => null);
+      let detail: ReviewDetail;
+      try {
+        detail = await api.getReview(id);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'This review could not be loaded.');
+        return;
+      }
       setReview(detail);
       const stats = await api.getRunStats(id).catch(() => null);
       setRunStats(stats);
@@ -82,6 +89,9 @@ export default function ResultsPage(): ReactNode {
   const reportReleased = deliverables.some((d) => d.kind === 'peer_review_report' && d.released);
 
   if (review === null) {
+    if (loadError !== null) {
+      return <div role="alert"><Pill tone="fail" label={loadError} /></div>;
+    }
     return <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Spinner /> Loading results</div>;
   }
 
