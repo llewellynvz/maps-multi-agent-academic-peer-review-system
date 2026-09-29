@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="assets/evidentia-cover.png" alt="Evidentia: the Evidence-Grounded Academic Peer-Review System, by Psynalytics" width="100%">
+<img src="assets/maps-cover.png" alt="MAPS: the Multi-Agent Academic Peer-Review System, by Psynalytics" width="100%">
 
-<h1>Evidentia</h1>
+<h1>MAPS</h1>
 
-<h3>The Evidence-Grounded Academic Peer-Review System</h3>
+<h3>The Multi-Agent Academic Peer-Review System</h3>
 
 **Evidence-grounded, confidential, multi-agent peer review for psychological and wellbeing science.**
 
@@ -40,14 +40,14 @@
 
 ## Executive summary
 
-Evidentia is a multi-agent system that produces rigorous, developmental peer review of psychology and wellbeing-science manuscripts. It reads a manuscript the way an expert third reviewer would: it establishes the field context, verifies every reference, examines the work through independent specialist lenses, recomputes the reported statistics, stress-tests its own conclusions, and delivers a publication-quality review letter together with confidential notes for the handling editor.
+MAPS is a multi-agent system that produces rigorous, developmental peer review of psychology and wellbeing-science manuscripts. It reads a manuscript the way an expert third reviewer would: it establishes the field context, verifies every reference, examines the work through independent specialist lenses, recomputes the reported statistics, stress-tests its own conclusions, and delivers a publication-quality review letter together with confidential notes for the handling editor.
 
 Three commitments define the system:
 
 | Commitment | What it means in practice |
 |---|---|
 | **Every claim is evidenced** | Each finding is anchored to a location in the manuscript and recorded in an append-only evidence ledger. A deterministic release gate refuses to ship any letter whose claims do not reconcile with that ledger. |
-| **Nothing confidential leaves the host** | Manuscript text, author identities, reviewer findings, and provider credentials stay on the machine that runs Evidentia. Outbound literature queries carry construct and method terms only, behind a signed, allowlisted, n-gram-guarded egress. |
+| **Nothing confidential leaves the host** | Manuscript text, author identities, reviewer findings, and provider credentials stay on the machine that runs MAPS. Outbound literature queries carry construct and method terms only, behind a signed, allowlisted, n-gram-guarded egress. |
 | **Severity is honest, voice is developmental** | Verdicts are stated plainly, and every major concern carries its leanest credible fix and the recommendation it hinges on. Integrity concerns are always editorial signals, never accusations. |
 
 ## Capabilities
@@ -122,10 +122,10 @@ The orchestrator is the only component that merges findings into the ledger, and
 
 ## System architecture
 
-Evidentia is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach only the services an operator configures.
+MAPS is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach only the services an operator configures.
 
 <div align="center">
-<img src="assets/evidentia-architecture.png" alt="Evidentia architecture: the nine-phase pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
+<img src="assets/maps-architecture.png" alt="MAPS architecture: the nine-phase pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
 </div>
 
 | Layer | Technology |
@@ -187,9 +187,9 @@ Deployment is available only to licensed parties under a written agreement with 
 
 ```bash
 cp .env.example .env
-# Set MARA_MASTER_KEY (openssl rand -hex 32) and the model-provider settings.
+# Set MAPS_MASTER_KEY (openssl rand -hex 32) and the model-provider settings.
 docker compose up -d
-docker compose ps          # the mara service reports healthy when ready
+docker compose ps          # the maps service reports healthy when ready
 ```
 
 The application is then available at `http://127.0.0.1:3100`. The first start builds the image, applies database migrations, and starts the web application, the review worker, and GROBID. All durable state is kept in `./data`.
@@ -200,13 +200,13 @@ All configuration is by environment variable, documented in full in [docs/CONFIG
 
 | Variable | Purpose |
 |---|---|
-| `MARA_MASTER_KEY` | 32-byte key for the provider-key vault. Required to store keys through the application. |
+| `MAPS_MASTER_KEY` | 32-byte key for the provider-key vault. Required to store keys through the application. |
 | `AZURE_*` | Azure OpenAI endpoint, certificate credentials, and the frontier and cheap deployments (the default provider). |
-| `MARA_FRONTIER_PROVIDER` / `MARA_CHEAP_PROVIDER` | Route a role to `openai`, `anthropic`, `google`, or `local` instead of Azure, with the matching `MARA_*_MODEL`. |
-| `MARA_BIND`, `MARA_PORT` | Host interface and port. Loopback by default. |
+| `MAPS_FRONTIER_PROVIDER` / `MAPS_CHEAP_PROVIDER` | Route a role to `openai`, `anthropic`, `google`, or `local` instead of Azure, with the matching `MAPS_*_MODEL`. |
+| `MAPS_BIND`, `MAPS_PORT` | Host interface and port. Loopback by default. |
 | `GROBID_URL` | PDF structure service. Provided by the bundled compose service. |
-| `MARA_CONTACT_EMAIL`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` | Polite-pool identification and higher rate limits for reference verification. |
-| `MARA_PRICING_<MODEL>` | Per-model price override used by cost accounting and the cost ceiling. |
+| `MAPS_CONTACT_EMAIL`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` | Polite-pool identification and higher rate limits for reference verification. |
+| `MAPS_PRICING_<MODEL>` | Per-model price override used by cost accounting and the cost ceiling. |
 | `LANGFUSE_*` | Optional local tracing. |
 
 ## Operations
@@ -246,7 +246,7 @@ Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 **Prof. Llewellyn E. van Zyl, PhD** is the Founder and Chief AI Solutions Architect of Psynalytics and works within Optentia at North-West University. His work sits at the intersection of data science, positive psychology, and the governance of artificial-intelligence systems.
 
-Evidentia is designed, developed, and maintained by Psynalytics B.V.
+MAPS is designed, developed, and maintained by Psynalytics B.V.
 
 ## Licence and legal
 
@@ -258,4 +258,4 @@ Licensing and permission enquiries: **hello@psynalytics.com**.
 
 ## Disclaimer
 
-Evidentia produces developmental, pre-submission editorial feedback. It is not affiliated with any journal or publisher, is not a certification of quality, and is not a substitute for human peer review or professional judgement. All outputs are advisory and must be verified by a qualified person before any reliance is placed on them.
+MAPS produces developmental, pre-submission editorial feedback. It is not affiliated with any journal or publisher, is not a certification of quality, and is not a substitute for human peer review or professional judgement. All outputs are advisory and must be verified by a qualified person before any reliance is placed on them.

@@ -19,7 +19,7 @@ import {
   runPhase7,
   runPhase8,
 } from '../src/engine';
-import { dataDir, fixturesDir, maraDbPath, mastraDbPath, repoRoot } from '../src/paths';
+import { dataDir, fixturesDir, mapsDbPath, mastraDbPath, repoRoot } from '../src/paths';
 import { createCitationClient } from '../src/citations';
 import { createDispatchRunner, createRegistry } from '../src/providers';
 import { initTracing, startRun, withPhase } from '../src/tracing';
@@ -99,7 +99,7 @@ async function pollLangfuse(session: string): Promise<TraceCheck | null> {
     return null;
   }
   const auth = langfuseAuthHeader();
-  const scoreKeys = ['mara.critic_verdict', 'mara.rubric_average', 'mara.recommendation', 'mara.composite'];
+  const scoreKeys = ['maps.critic_verdict', 'maps.rubric_average', 'maps.recommendation', 'maps.composite'];
   for (let attempt = 0; attempt < 15; attempt += 1) {
     try {
       const listResponse = await fetch(`${host}/api/public/traces?sessionId=${encodeURIComponent(session)}`, {
@@ -214,13 +214,13 @@ async function main(): Promise<void> {
   mkdirSync(dataDir(), { recursive: true });
   await ensurePdfFixture();
 
-  const { db, sqlite } = createDb(maraDbPath());
+  const { db, sqlite } = createDb(mapsDbPath());
   runMigrations(db);
   const registry = createRegistry({ env: process.env });
   const runDispatch = createDispatchRunner({ db, registry });
   const citationClient = createCitationClient({
     cachePath: resolve(dataDir(), 'citation-cache.db'),
-    ...(process.env.MARA_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MARA_CONTACT_EMAIL } : {}),
+    ...(process.env.MAPS_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MAPS_CONTACT_EMAIL } : {}),
   });
   const engineDeps: EngineDeps = { db, runDispatch, citationClient };
 

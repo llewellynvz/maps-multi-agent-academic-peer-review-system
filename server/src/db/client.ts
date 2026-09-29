@@ -2,14 +2,14 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import DatabaseConstructor from 'better-sqlite3';
 import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
-import { maraDbPath } from '../paths';
+import { mapsDbPath } from '../paths';
 import * as schema from './schema';
 
 export type Schema = typeof schema;
 export type MaraDatabase = BetterSQLite3Database<Schema>;
 export type SqliteConnection = DatabaseConstructor.Database;
 
-export const defaultDatabasePath = maraDbPath();
+export const defaultDatabasePath = mapsDbPath();
 
 export function openSqlite(databasePath: string): SqliteConnection {
   const connection = new DatabaseConstructor(databasePath);

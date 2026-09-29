@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { maraDbPath } from '../src/paths';
+import { mapsDbPath } from '../src/paths';
 
 const arg = process.argv[2];
 if (arg === undefined || arg === '') {
@@ -7,7 +7,7 @@ if (arg === undefined || arg === '') {
   process.exit(1);
 }
 
-const db = new Database(maraDbPath(), { readonly: true });
+const db = new Database(mapsDbPath(), { readonly: true });
 
 const review = db
   .prepare('SELECT * FROM reviews WHERE id = ? OR id LIKE ? LIMIT 1')

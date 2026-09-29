@@ -6,7 +6,7 @@ import { defaultFetch } from '../src/citations';
 import { createDb, type MaraDatabase, type SqliteConnection } from '../src/db/client';
 import { runMigrations } from '../src/db/migrate';
 import { referencesForVerification } from '../src/engine/context';
-import { dataDir, maraDbPath, repoRoot } from '../src/paths';
+import { dataDir, mapsDbPath, repoRoot } from '../src/paths';
 import {
   buildNgramIndex,
   canonicalQuery,
@@ -18,9 +18,9 @@ import {
   signQuery,
 } from '../src/security';
 import { insertEvent } from '../src/workflow/repo';
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 
-const PORT = process.env.MARA_PORT ?? '3100';
+const PORT = process.env.MAPS_PORT ?? '3100';
 const BASE = `http://127.0.0.1:${PORT}`;
 const SELIGMAN_DOI = '10.1037/0003-066X.55.1.5';
 const FAKE_OPENAI_KEY = `sk-fake-slice-f-${randomBytes(6).toString('hex')}-DO-NOT-USE`;
@@ -51,8 +51,8 @@ function loadEnv(): void {
   if (cert !== undefined && cert !== '' && !isAbsolute(cert)) {
     process.env.AZURE_CLIENT_CERT_PEM_PATH = resolve(repoRoot, cert);
   }
-  if (process.env.MARA_MASTER_KEY === undefined || process.env.MARA_MASTER_KEY === '') {
-    process.env.MARA_MASTER_KEY = randomBytes(32).toString('hex');
+  if (process.env.MAPS_MASTER_KEY === undefined || process.env.MAPS_MASTER_KEY === '') {
+    process.env.MAPS_MASTER_KEY = randomBytes(32).toString('hex');
     process.stdout.write('[slice-f] generated an ephemeral master key for this run (value not printed)\n');
   }
 }
@@ -263,7 +263,7 @@ async function exerciseEgress(db: MaraDatabase, sqlite: SqliteConnection): Promi
   check('egress.ngramBlocked', blockedNgram, 'a query carrying manuscript body text is refused by the n-gram guard');
 
   const doiUrl = `${CROSSREF}/works/${encodeURIComponent(SELIGMAN_DOI)}${
-    process.env.MARA_CONTACT_EMAIL ? `?mailto=${encodeURIComponent(process.env.MARA_CONTACT_EMAIL)}` : ''
+    process.env.MAPS_CONTACT_EMAIL ? `?mailto=${encodeURIComponent(process.env.MAPS_CONTACT_EMAIL)}` : ''
   }`;
   let doiOk = false;
   try {
@@ -351,7 +351,7 @@ async function main(): Promise<void> {
   loadEnv();
   mkdirSync(dataDir(), { recursive: true });
 
-  const { db, sqlite } = createDb(maraDbPath());
+  const { db, sqlite } = createDb(mapsDbPath());
   runMigrations(db);
 
   sweepPort(PORT);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 import type { DetectDispatch } from '../sanitize';
 import { mapManuscriptTypeToPaperType, PAPER_TYPES } from '../engine/options';
 

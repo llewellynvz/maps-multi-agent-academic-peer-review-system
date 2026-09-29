@@ -1,4 +1,4 @@
-import { findingSchema, type SectionMap } from '@mara/shared';
+import { findingSchema, type SectionMap } from '@maps/shared';
 import { describe, expect, it } from 'vitest';
 import {
   checkNhstTest,

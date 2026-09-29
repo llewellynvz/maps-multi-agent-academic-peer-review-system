@@ -2,17 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openKey, sealKey } from '../vault';
 
 describe('key vault suite (SEC-13/14/16/17, SEC-30)', () => {
-  const original = process.env.MARA_MASTER_KEY;
+  const original = process.env.MAPS_MASTER_KEY;
 
   beforeEach(() => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
   });
 
   afterEach(() => {
     if (original === undefined) {
-      delete process.env.MARA_MASTER_KEY;
+      delete process.env.MAPS_MASTER_KEY;
     } else {
-      process.env.MARA_MASTER_KEY = original;
+      process.env.MAPS_MASTER_KEY = original;
     }
   });
 
@@ -35,7 +35,7 @@ describe('key vault suite (SEC-13/14/16/17, SEC-30)', () => {
 
   it('fails closed under a wrong master key rather than returning corrupt plaintext', () => {
     const sealed = sealKey('sk-live-secret');
-    process.env.MARA_MASTER_KEY = '1'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '1'.repeat(64);
     expect(() => openKey(sealed)).toThrow();
   });
 

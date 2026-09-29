@@ -35,9 +35,9 @@ const rows: DispatchRow[] = [];
 
 function buildSharedPrefix(): string {
   const sentence =
-    'The Evidentia peer-review pipeline evaluates psychology and wellbeing-science manuscripts against a fifteen-criterion rubric, grounding every recommendation in an append-only evidence ledger anchored to the submitted text. ';
+    'The MAPS peer-review pipeline evaluates psychology and wellbeing-science manuscripts against a fifteen-criterion rubric, grounding every recommendation in an append-only evidence ledger anchored to the submitted text. ';
   let prefix =
-    'You are an Evidentia slice-A exercise fixture. Ignore the padding below; it exists only to build a cacheable prompt prefix.\n\n';
+    'You are a MAPS slice-A exercise fixture. Ignore the padding below; it exists only to build a cacheable prompt prefix.\n\n';
   while (prefix.length < 12000) {
     prefix += sentence;
   }
@@ -47,7 +47,7 @@ function buildSharedPrefix(): string {
 async function main(): Promise<void> {
   const tracing = initTracing({ env: process.env });
 
-  const dbPath = resolve(repoRoot, 'data', 'mara.db');
+  const dbPath = resolve(repoRoot, 'data', 'maps.db');
   const { db, sqlite } = createDb(dbPath);
   runMigrations(db);
   const now = new Date().toISOString();
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   const registry = createRegistry({ env: process.env });
   const runDispatch = createDispatchRunner({ db, registry });
 
-  const contactEmail = process.env.MARA_CONTACT_EMAIL;
+  const contactEmail = process.env.MAPS_CONTACT_EMAIL;
   const citations = createCitationClient({
     cachePath: resolve(repoRoot, 'data', 'citation-cache.db'),
     ...(contactEmail !== undefined ? { contactEmail } : {}),
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
         agent: 'exercise-frontier',
         promptVersion: 'v1',
         role: 'frontier',
-        parts: { system: sharedPrefix, prompt: 'Reply with exactly: Evidentia slice A frontier one.' },
+        parts: { system: sharedPrefix, prompt: 'Reply with exactly: MAPS slice A frontier one.' },
       });
       secondFrontier = await record('frontier-prefix-2', {
         reviewId: sessionId,
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
         agent: 'exercise-frontier',
         promptVersion: 'v1',
         role: 'frontier',
-        parts: { system: sharedPrefix, prompt: 'Reply with exactly: Evidentia slice A frontier two.' },
+        parts: { system: sharedPrefix, prompt: 'Reply with exactly: MAPS slice A frontier two.' },
       });
       await record('cheap', {
         reviewId: sessionId,

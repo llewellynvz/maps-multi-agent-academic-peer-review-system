@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Finding, PhaseCriticDefect, PhaseCriticOutput } from '@mara/shared';
+import type { Finding, PhaseCriticDefect, PhaseCriticOutput } from '@maps/shared';
 import { createDb, type MaraDatabase, type SqliteConnection } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
 import { getCurrentFindings, mergeFindings } from '../../ledger';
@@ -195,8 +195,8 @@ function seedRedispatchedEvent(seq: number, phase: string): void {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-pcrit-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-pcrit-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   db = client.db;
   sqlite = client.sqlite;
   runMigrations(db);

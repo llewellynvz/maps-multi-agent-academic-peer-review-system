@@ -4,7 +4,7 @@ import { readSetting } from '../data/settings-store';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { LibSQLStore } from '@mastra/libsql';
 import { z } from 'zod';
-import { type SectionMap, sectionMapSchema } from '@mara/shared';
+import { type SectionMap, sectionMapSchema } from '@maps/shared';
 import type { MaraDatabase } from '../db/client';
 import { grobidExtractor, type GrobidClient, type IngestDeps, ingestManuscript, kindFromMime, ParseHaltError } from '../ingest';
 import type { DispatchRunner } from '../providers';

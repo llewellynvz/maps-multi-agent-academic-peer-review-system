@@ -88,14 +88,14 @@ describe('createRegistry role resolution', () => {
 describe('role provider configuration', () => {
   it('defaults to the Azure deployments and can point a role at another provider', () => {
     expect(readRoleConfigs(env).frontier).toEqual({ provider: 'azure', model: 'gpt-5.1' });
-    const routed = readRoleConfigs({ ...env, MARA_FRONTIER_PROVIDER: 'anthropic', MARA_FRONTIER_MODEL: 'claude-opus-5-5' });
+    const routed = readRoleConfigs({ ...env, MAPS_FRONTIER_PROVIDER: 'anthropic', MAPS_FRONTIER_MODEL: 'claude-opus-5-5' });
     expect(routed.frontier).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
     expect(routed.cheap.provider).toBe('azure');
   });
 
   it('requires a model for a non-Azure role and rejects an unknown provider', () => {
-    expect(() => readRoleConfigs({ ...env, MARA_CHEAP_PROVIDER: 'openai' })).toThrow(/MARA_CHEAP_MODEL/);
-    expect(() => readRoleConfigs({ ...env, MARA_CHEAP_PROVIDER: 'bogus', MARA_CHEAP_MODEL: 'x' })).toThrow(/must be one of/);
+    expect(() => readRoleConfigs({ ...env, MAPS_CHEAP_PROVIDER: 'openai' })).toThrow(/MAPS_CHEAP_MODEL/);
+    expect(() => readRoleConfigs({ ...env, MAPS_CHEAP_PROVIDER: 'bogus', MAPS_CHEAP_MODEL: 'x' })).toThrow(/must be one of/);
   });
 
   it('rebuilds the registry only when its fingerprint changes', () => {

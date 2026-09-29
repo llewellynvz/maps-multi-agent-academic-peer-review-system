@@ -17,7 +17,7 @@ export function AppShell({ children }: { children: ReactNode }): ReactNode {
       <header className="topbar">
         <Link href="/" className="topbar-brand">
           <img src="/brand/psynalytics-logo-white.svg" alt="Psynalytics" />
-          <span>Evidentia</span>
+          <span>MAPS</span>
         </Link>
         <nav className="topbar-nav" aria-label="Primary">
           {NAV.map((item) => (

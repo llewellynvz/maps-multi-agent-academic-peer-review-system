@@ -1,6 +1,6 @@
 # Contributing
 
-Evidentia is proprietary software. Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V. All rights reserved.
+MAPS is proprietary software. Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V. All rights reserved.
 
 ## Who may contribute
 

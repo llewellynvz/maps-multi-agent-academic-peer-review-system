@@ -1,5 +1,5 @@
 import type { CurrentFinding } from '../ledger';
-import type { Recommendation } from '@mara/shared';
+import type { Recommendation } from '@maps/shared';
 
 export const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   accept: 'Accept',

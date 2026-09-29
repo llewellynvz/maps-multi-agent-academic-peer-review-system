@@ -177,7 +177,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
     ) {
       unpricedWarned.add(modelRef.model);
       console.warn(
-        `[dispatch] no pricing entry for model ${modelRef.model}; cost_usd recorded as 0 and the cost ceiling cannot see this spend. Set MARA_PRICING_${modelRef.model.toUpperCase().replace(/[^A-Z0-9]/g, '_')}=input,cached,output (USD per million tokens).`,
+        `[dispatch] no pricing entry for model ${modelRef.model}; cost_usd recorded as 0 and the cost ceiling cannot see this spend. Set MAPS_PRICING_${modelRef.model.toUpperCase().replace(/[^A-Z0-9]/g, '_')}=input,cached,output (USD per million tokens).`,
       );
     }
     db.insert(dispatches)

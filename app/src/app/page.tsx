@@ -269,7 +269,7 @@ export default function LibraryPage(): ReactNode {
       <PageHeader
         eyebrow="Library"
         title="Your reviews"
-        sub="Every manuscript you have put through Evidentia, with its status, findings, and outcome in one place."
+        sub="Every manuscript you have put through MAPS, with its status, findings, and outcome in one place."
         actions={
           <>
             <div className="field" style={{ margin: 0 }}>

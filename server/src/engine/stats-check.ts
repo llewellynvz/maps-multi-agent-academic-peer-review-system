@@ -1,4 +1,4 @@
-import type { Finding, SectionMap } from '@mara/shared';
+import type { Finding, SectionMap } from '@maps/shared';
 
 function logGamma(x: number): number {
   const coefficients = [

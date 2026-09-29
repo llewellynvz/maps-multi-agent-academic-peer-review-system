@@ -1,5 +1,5 @@
 import mammoth from 'mammoth';
-import type { ParseQuality, SectionMap } from '@mara/shared';
+import type { ParseQuality, SectionMap } from '@maps/shared';
 import { assembleSectionMap, type RawSection } from './assemble';
 import { splitReferences } from './plaintext';
 import { looksLikeStrongHeading, normalizeInline } from './text';

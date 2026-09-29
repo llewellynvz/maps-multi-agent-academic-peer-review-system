@@ -47,7 +47,7 @@ export function addKey(db: MaraDatabase, input: AddKeyInput): ProviderKeyView {
   if (input.persist === 'session') {
     throw new ApiError(
       'unprocessable',
-      'Session-only keys are not visible to the review worker. Save the key to disk (this needs MARA_MASTER_KEY), or set it in .env.',
+      'Session-only keys are not visible to the review worker. Save the key to disk (this needs MAPS_MASTER_KEY), or set it in .env.',
       { field: 'persist' },
     );
   }

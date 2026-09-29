@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { safeRedirect } from '../redirect';
 
-const origin = 'https://mara.example';
+const origin = 'https://maps.example';
 
 describe('safeRedirect', () => {
   it('keeps a same-origin path with its query and hash', () => {

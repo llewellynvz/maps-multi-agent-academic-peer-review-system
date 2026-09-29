@@ -55,8 +55,8 @@ function makeGate(reviewId: string): Gate {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-queue-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-queue-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
 });
 

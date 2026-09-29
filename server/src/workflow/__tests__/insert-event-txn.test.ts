@@ -28,8 +28,8 @@ function rawInsert(conn: SqliteConnection, seq: number): void {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-ev-txn-'));
-  dbPath = join(tempDir, 'mara.db');
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-ev-txn-'));
+  dbPath = join(tempDir, 'maps.db');
   seedReview();
 });
 

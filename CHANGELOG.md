@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Evidentia (formerly MARA and Collegia) are recorded here. The format follows
+All notable changes to MAPS (formerly MARA and Collegia) are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -73,7 +73,7 @@ All notable changes to Evidentia (formerly MARA and Collegia) are recorded here.
   - The recomputed p range reads "between .03 and .04" (or "of .04").
   - gpt-5.1 is priced at its list rate rather than the Batch/Flex rate, so the
     cost ceiling no longer under-counts frontier spend by half. Discounted
-    deployments can still set `MARA_PRICING_GPT_5_1`.
+    deployments can still set `MAPS_PRICING_GPT_5_1`.
   - Worker logs keep `inputTokens`, `outputTokens` and reasoning-token counts
     instead of redacting them as secrets.
 - Agent and knowledge consistency:
@@ -115,7 +115,7 @@ All notable changes to Evidentia (formerly MARA and Collegia) are recorded here.
     applied.
   - Provider keys saved in Settings reach the running worker without a restart,
     and each role can be routed to OpenAI, Anthropic, Google or a local model
-    with `MARA_<ROLE>_PROVIDER` / `MARA_<ROLE>_MODEL`. Session-only keys, which
+    with `MAPS_<ROLE>_PROVIDER` / `MAPS_<ROLE>_MODEL`. Session-only keys, which
     the worker could never read, are refused with an explanation.
   - The default tier chosen in Setup or Settings applies to new reviews without
     restarting the worker.
@@ -135,7 +135,7 @@ All notable changes to Evidentia (formerly MARA and Collegia) are recorded here.
     the live stream no longer skips or mislabels the new findings.
   - When the ingest snapshot is missing on resume, the restarted ingest reuses
     the answers already given instead of asking again.
-  - A blank `MARA_CONTACT_EMAIL` is no longer sent to the citation services.
+  - A blank `MAPS_CONTACT_EMAIL` is no longer sent to the citation services.
 - Review engine fixes from a code review:
   - A timed-out specialist or integrity dispatch now restarts its phase through
     the supervisor, as designed, instead of silently dropping that lens as a
@@ -282,10 +282,14 @@ All notable changes to Evidentia (formerly MARA and Collegia) are recorded here.
   instance. Server errors return a fixed message rather than internal paths.
 
 ### Changed
-- The platform is renamed **Evidentia: The Evidence-Grounded Academic
-  Peer-Review System** across the application, prompts, documentation, and
-  licence. Environment variables keep their `MARA_` prefix, and package scopes
-  and database file names are unchanged, so existing deployments keep working.
+- The platform is renamed **MAPS: the Multi-Agent Academic Peer-Review
+  System**, everywhere: the application, prompts, documentation, licence,
+  artwork, package scopes (`@maps/*`), Compose service and image, tracing
+  attributes (`maps.*`), and environment variables (`MAPS_*`). Existing
+  deployments keep working unchanged: every legacy `MARA_*` variable is still
+  honoured when its `MAPS_*` name is unset, including in Docker Compose; an
+  installation's existing `data/mara.db` keeps being used; and the key-vault
+  derivation is unchanged, so stored provider keys still decrypt.
 - New README cover artwork and a redrawn architecture diagram, with their HTML
   sources kept in `assets/source/` so they can be regenerated.
 - Repository governance: CODEOWNERS makes the owner the required reviewer of
@@ -311,7 +315,7 @@ All notable changes to Evidentia (formerly MARA and Collegia) are recorded here.
   assigned by the detector) halts a run. Previously the deterministic screen
   halted on instruction text, contradicting the governance module and the
   sanitiser agent's own contract.
-- Docker publishes the app on 127.0.0.1 by default (`MARA_BIND` to widen it),
+- Docker publishes the app on 127.0.0.1 by default (`MAPS_BIND` to widen it),
   and exemplar review letters are mounted at run time rather than copied into
   image layers.
 - CI now runs gitleaks over the full history, as the README already claimed,

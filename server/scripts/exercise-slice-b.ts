@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 import { blobDir, dataDir, fixturesDir, repoRoot } from '../src/paths';
 import { sanitizePhase } from '../src/workflow/sanitize-phase';
 import { buildIngestMastra, startIngest } from '../src/workflow/index';
@@ -15,7 +15,7 @@ const PLOS_DOI = '10.1371/journal.pone.0275925';
 const PLOS_PDF_URL = `https://journals.plos.org/plosone/article/file?id=${PLOS_DOI}&type=printable`;
 const PDF_FIXTURE = resolve(fixturesDir(), 'plos-0275925.pdf');
 const DOCX_FIXTURE = resolve(fixturesDir(), 'slice-b-sample.docx');
-const GROBID_CONTAINER = 'mara-grobid-preflight';
+const GROBID_CONTAINER = 'maps-grobid-preflight';
 const RESUME_SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), 'exercise-slice-b-resume.ts');
 
 const failures: string[] = [];

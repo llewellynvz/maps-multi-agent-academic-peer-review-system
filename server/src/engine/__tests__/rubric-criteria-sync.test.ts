@@ -1,4 +1,4 @@
-import { RUBRIC_CRITERIA } from '@mara/shared';
+import { RUBRIC_CRITERIA } from '@maps/shared';
 import { describe, expect, it } from 'vitest';
 import { readKnowledgeModule } from '../../prompts/knowledge';
 

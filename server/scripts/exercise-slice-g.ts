@@ -7,7 +7,7 @@ import { fixturesDir, repoRoot } from '../src/paths';
 
 const execFileAsync = promisify(execFile);
 
-const HOST_PORT = process.env.MARA_PORT ?? '3500';
+const HOST_PORT = process.env.MAPS_PORT ?? '3500';
 const BASE = `http://127.0.0.1:${HOST_PORT}`;
 const PLOS_DOI = '10.1371/journal.pone.0275925';
 const PLOS_PDF_URL = `https://journals.plos.org/plosone/article/file?id=${PLOS_DOI}&type=printable`;
@@ -62,7 +62,7 @@ function writeContainerEnv(): void {
   const lines: string[] = [];
   for (const line of raw.split(/\r?\n/)) {
     const key = line.split('=')[0]?.trim();
-    if (key === 'LANGFUSE_HOST' || key === 'GROBID_URL' || key === 'MARA_PORT') {
+    if (key === 'LANGFUSE_HOST' || key === 'GROBID_URL' || key === 'MAPS_PORT') {
       continue;
     }
     lines.push(line);
@@ -77,7 +77,7 @@ function writeContainerEnv(): void {
 }
 
 function composeEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, MARA_ENV_FILE: TEST_ENV_FILE, MARA_PORT: HOST_PORT };
+  return { ...process.env, MAPS_ENV_FILE: TEST_ENV_FILE, MAPS_PORT: HOST_PORT };
 }
 
 function compose(args: string[], inheritStdio = true): Promise<number> {
@@ -94,7 +94,7 @@ function compose(args: string[], inheritStdio = true): Promise<number> {
 }
 
 async function containerId(): Promise<string> {
-  const { stdout } = await execFileAsync('docker', ['compose', 'ps', '-q', 'mara'], {
+  const { stdout } = await execFileAsync('docker', ['compose', 'ps', '-q', 'maps'], {
     cwd: repoRoot,
     env: composeEnv(),
   });
@@ -109,7 +109,7 @@ interface DispatchTotals {
 
 async function dispatchTotals(cid: string, reviewId: string): Promise<DispatchTotals> {
   const script =
-    "const db=require('/app/server/node_modules/better-sqlite3')('/app/data/mara.db',{readonly:true});" +
+    "const db=require('/app/server/node_modules/better-sqlite3')('/app/data/maps.db',{readonly:true});" +
     "const r=db.prepare(\"SELECT count(*) c, coalesce(sum(tokens_in),0) ti, coalesce(sum(tokens_out),0) too FROM dispatches WHERE review_id=? AND status='success'\").get(process.argv[1]);" +
     'process.stdout.write(JSON.stringify(r));';
   const { stdout } = await execFileAsync('docker', ['exec', cid, 'node', '-e', script, reviewId]);

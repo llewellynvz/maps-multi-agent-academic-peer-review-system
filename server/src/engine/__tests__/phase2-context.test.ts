@@ -168,8 +168,8 @@ function checkpointStatus(): string | undefined {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-p2-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-p2-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   db = client.db;
   sqlite = client.sqlite;
   runMigrations(db);

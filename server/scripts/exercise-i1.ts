@@ -10,7 +10,7 @@ import {
   scanMachineTokens,
 } from '../src/engine/grounding';
 
-const BASE = `http://127.0.0.1:${process.env.MARA_PORT ?? '3500'}`;
+const BASE = `http://127.0.0.1:${process.env.MAPS_PORT ?? '3500'}`;
 const VOICE_SAMPLES = (process.env.I1_VOICE ?? '')
   .split(',')
   .map((entry) => entry.trim())

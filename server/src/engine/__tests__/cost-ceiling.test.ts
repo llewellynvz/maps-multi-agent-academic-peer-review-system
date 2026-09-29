@@ -106,8 +106,8 @@ function lensPhase(name: string, artefact: string): EnginePhaseStep<EngineDeps> 
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-cost-ceiling-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-cost-ceiling-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
 });
 

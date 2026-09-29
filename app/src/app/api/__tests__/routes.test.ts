@@ -21,14 +21,14 @@ function req(url: string, init?: NextInit): NextRequest {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-routes-'));
-  process.env.MARA_DB_PATH = join(tempDir, 'mara.db');
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-routes-'));
+  process.env.MAPS_DB_PATH = join(tempDir, 'maps.db');
   resetClient();
 });
 
 afterEach(() => {
   resetClient();
-  delete process.env.MARA_DB_PATH;
+  delete process.env.MAPS_DB_PATH;
   rmSync(tempDir, { recursive: true, force: true });
 });
 

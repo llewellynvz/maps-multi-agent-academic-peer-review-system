@@ -59,8 +59,8 @@ function insertFinding(
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-db-'));
-  dbPath = join(tempDir, 'mara.db');
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-db-'));
+  dbPath = join(tempDir, 'maps.db');
 });
 
 afterEach(() => {

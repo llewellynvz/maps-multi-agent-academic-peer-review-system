@@ -1,6 +1,6 @@
 # Operations runbook
 
-This runbook covers day-to-day operation of the Evidentia review platform: watching a
+This runbook covers day-to-day operation of the MAPS review platform: watching a
 review as it runs, recovering the failure classes the engine can produce, and backing up
 and restoring the durable state. Commands assume you are in the repository root on the
 host that runs the container, the same place you run `docker compose`.
@@ -10,7 +10,7 @@ unique prefix of it.
 
 ## 1. Overview
 
-Evidentia reviews a manuscript through a nine-phase pipeline (Phases 0 to 8). A single
+MAPS reviews a manuscript through a nine-phase pipeline (Phases 0 to 8). A single
 worker holds a lease and processes one review at a time. It leases a queued review,
 ingests the manuscript, then runs the engine phases in order: sanitisation and structured
 analysis, field context and citation audit, the specialist lenses with their challenge
@@ -127,7 +127,7 @@ For the underlying exception, read the worker log. In the container the worker w
 standard output and to a rotating log:
 
 ```bash
-docker compose logs mara | grep -i "engine error"
+docker compose logs maps | grep -i "engine error"
 ```
 
 **Recovery.** An `engine_error` run schedules its own background retry of the failing
@@ -187,7 +187,7 @@ error classes. The intake and new-review screens stop polling and show the reaso
 failed. For provider errors, read the worker log:
 
 ```bash
-docker compose logs mara | grep -iE "ingest|dispatch" | tail -50
+docker compose logs maps | grep -iE "ingest|dispatch" | tail -50
 ```
 
 **Recovery.** Fix the cause (start GROBID, correct provider credentials in `.env` or
@@ -247,7 +247,7 @@ the same dispatch.
 All durable state lives in one directory, `./data`, which the container mounts as
 `/app/data`. It holds:
 
-- `data/mara.db` (the primary review database, with its `mara.db-wal` and `mara.db-shm`
+- `data/maps.db` (the primary review database, with its `maps.db-wal` and `maps.db-shm`
   write-ahead-log sidecars).
 - `data/mastra.db` and `data/citation-cache.db` (the ingest and citation-cache databases,
   each with their own sidecars).
@@ -255,7 +255,7 @@ All durable state lives in one directory, `./data`, which the container mounts a
   and every engine artefact under `engine/`).
 
 The database file helpers resolve these paths from `server/src/paths.ts`
-(`maraDbPath()` returns `data/mara.db`, `blobDir(reviewId)` returns
+(`mapsDbPath()` returns `data/maps.db`, or `data/mara.db` on an installation created before the rename, `blobDir(reviewId)` returns
 `data/blobs/<reviewId>`), and the container maps them from the host through the `./data`
 volume declared in `docker-compose.yml`.
 
@@ -271,7 +271,7 @@ cp -a ./data "./backups/data-$(date +%Y%m%d-%H%M%S)"
 docker compose start
 ```
 
-Copying the whole directory keeps `mara.db` and its write-ahead-log sidecars together,
+Copying the whole directory keeps the database and its write-ahead-log sidecars together,
 which matters because the sidecar can hold recently committed rows. The evidence ledger is
 append-only: corrections supersede earlier findings by adding new rows rather than
 rewriting them, so a snapshot of the database is internally consistent and never captures
@@ -290,7 +290,7 @@ docker compose up -d
 
 On start, the container re-runs the database migrations against the restored database and
 brings up the web application and the worker. Confirm readiness with `docker compose ps`,
-where the `mara` service reports healthy. Once the restore is verified, remove the
+where the `maps` service reports healthy. Once the restore is verified, remove the
 `data-old-*` directory you set aside.
 
 ## 5. Retention of artefacts
@@ -324,12 +324,12 @@ If the passphrase is lost, stop the stack and clear it directly in the database:
 
 ```bash
 docker compose stop
-sqlite3 data/mara.db "DELETE FROM settings WHERE key = 'passphrase';"
+sqlite3 data/maps.db "DELETE FROM settings WHERE key = 'passphrase';"   # data/mara.db on older installs
 docker compose start
 ```
 
 ## 7. Network exposure
 
 The container publishes on `127.0.0.1` by default. To serve other machines, set a
-passphrase first, then set `MARA_BIND=0.0.0.0` (or a specific interface) and place a
+passphrase first, then set `MAPS_BIND=0.0.0.0` (or a specific interface) and place a
 TLS-terminating reverse proxy in front. See [SECURITY.md](SECURITY.md).

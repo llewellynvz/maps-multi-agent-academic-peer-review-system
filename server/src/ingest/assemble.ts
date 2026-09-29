@@ -1,4 +1,4 @@
-import type { ManuscriptParser, ManuscriptReference, ManuscriptSection, ParseQuality, SectionMap } from '@mara/shared';
+import type { ManuscriptParser, ManuscriptReference, ManuscriptSection, ParseQuality, SectionMap } from '@maps/shared';
 
 export interface RawSection {
   heading: string | null;

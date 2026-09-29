@@ -1,4 +1,4 @@
-# gitleaks configuration for the Evidentia platform.
+# gitleaks configuration for the MAPS platform.
 # Extends the default ruleset and allowlists a small, explicitly-synthetic set of
 # test fixtures. Every real credential is supplied at runtime through environment
 # variables and the encrypted provider-key vault; none is committed.

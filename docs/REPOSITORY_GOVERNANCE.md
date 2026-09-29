@@ -1,6 +1,6 @@
 # Repository governance
 
-This document records how the Evidentia repository is controlled, so that only the owner decides what reaches `main`. Settings marked **(GitHub setting)** are applied in the GitHub web interface by the repository owner. They cannot be set from files in the repository.
+This document records how the MAPS repository is controlled, so that only the owner decides what reaches `main`. Settings marked **(GitHub setting)** are applied in the GitHub web interface by the repository owner. They cannot be set from files in the repository.
 
 ## Control model
 
@@ -16,13 +16,13 @@ This document records how the Evidentia repository is controlled, so that only t
 ## 1. Rename the repository (GitHub setting)
 
 1. Open **Settings → General**.
-2. Under **Repository name**, enter `evidentia`, then select **Rename**.
-3. Under **Description**, enter: *Evidentia: the Evidence-Grounded Academic Peer-Review System. A proprietary Psynalytics AI system.*
+2. Under **Repository name**, enter `maps-academic-peer-review`, then select **Rename**.
+3. Under **Description**, enter: *MAPS: the Multi-Agent Academic Peer-Review System. A proprietary Psynalytics AI system.*
 
 GitHub redirects the old URL, but update every local clone:
 
 ```bash
-git remote set-url origin https://github.com/llewellynvz/evidentia.git
+git remote set-url origin https://github.com/llewellynvz/maps-academic-peer-review.git
 ```
 
 ## 2. Import the branch ruleset (GitHub setting)

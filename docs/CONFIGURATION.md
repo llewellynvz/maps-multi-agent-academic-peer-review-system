@@ -1,8 +1,8 @@
 # Configuration reference
 
-Evidentia is configured entirely through environment variables. In a container deployment they are read from `.env` (or the file named by `MARA_ENV_FILE`); a native worker reads the same file from the repository root. [`.env.example`](../.env.example) is the annotated template.
+MAPS is configured entirely through environment variables. In a container deployment they are read from `.env` (or the file named by `MAPS_ENV_FILE`); a native worker reads the same file from the repository root. [`.env.example`](../.env.example) is the annotated template.
 
-Variable names keep the `MARA_` prefix from the platform's earlier name. They are deliberately unchanged so existing `.env` files, containers, and databases keep working.
+Variables use the `MAPS_` prefix. Deployments configured before the rename may keep their `MARA_` names: each legacy `MARA_` variable is read as its `MAPS_` equivalent whenever the `MAPS_` name is unset, and an explicit `MAPS_` value always wins. Docker Compose applies the same fallback to `MAPS_BIND`, `MAPS_PORT`, and `MAPS_ENV_FILE`.
 
 Blank values are treated as unset. An empty `OPENAI_API_KEY=` line from a copied template never shadows a key stored through the application.
 
@@ -32,10 +32,10 @@ The engine dispatches to three roles:
 
 | Variable | Values | Purpose |
 |---|---|---|
-| `MARA_FRONTIER_PROVIDER` | `azure` (default), `openai`, `anthropic`, `google`, `local` | Provider for the frontier role |
-| `MARA_FRONTIER_MODEL` | Model name | Required when the frontier provider is not Azure |
-| `MARA_CHEAP_PROVIDER` | As above | Provider for the cheap role |
-| `MARA_CHEAP_MODEL` | Model name | Required when the cheap provider is not Azure |
+| `MAPS_FRONTIER_PROVIDER` | `azure` (default), `openai`, `anthropic`, `google`, `local` | Provider for the frontier role |
+| `MAPS_FRONTIER_MODEL` | Model name | Required when the frontier provider is not Azure |
+| `MAPS_CHEAP_PROVIDER` | As above | Provider for the cheap role |
+| `MAPS_CHEAP_MODEL` | Model name | Required when the cheap provider is not Azure |
 
 ### Provider credentials
 
@@ -57,9 +57,9 @@ For reasoning models (the `gpt-5` family and the `o` series), the dispatcher req
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MARA_MASTER_KEY` | none | 32-byte key (64 hex characters) for AES-256-GCM envelope encryption of stored provider keys. Generate with `openssl rand -hex 32`. Required only to store keys through the application. Never commit it. |
-| `MARA_BIND` | `127.0.0.1` | Host interface Docker publishes the application on. Set `0.0.0.0` only behind an instance passphrase and on a network you trust. |
-| `MARA_PORT` | `3100` | Host port for the web application |
+| `MAPS_MASTER_KEY` | none | 32-byte key (64 hex characters) for AES-256-GCM envelope encryption of stored provider keys. Generate with `openssl rand -hex 32`. Required only to store keys through the application. Never commit it. |
+| `MAPS_BIND` | `127.0.0.1` | Host interface Docker publishes the application on. Set `0.0.0.0` only behind an instance passphrase and on a network you trust. |
+| `MAPS_PORT` | `3100` | Host port for the web application |
 
 The instance passphrase itself is set in **Settings**, not in the environment.
 
@@ -75,7 +75,7 @@ GROBID is required for PDF manuscripts. When it is unreachable, the review stops
 
 | Variable | Purpose |
 |---|---|
-| `MARA_CONTACT_EMAIL` | Contact address sent to Crossref and OpenAlex for their polite pools. A blank value is not sent. |
+| `MAPS_CONTACT_EMAIL` | Contact address sent to Crossref and OpenAlex for their polite pools. A blank value is not sent. |
 | `OPENALEX_API_KEY` | Optional OpenAlex key for higher rate limits |
 | `SEMANTIC_SCHOLAR_API_KEY` | Optional Semantic Scholar key for higher rate limits |
 
@@ -85,7 +85,7 @@ Only `api.crossref.org`, `api.openalex.org`, and `api.semanticscholar.org` are r
 
 | Variable | Purpose |
 |---|---|
-| `MARA_PRICING_<MODEL>` | Per-model price override in US dollars per million tokens, as `input,cached,output`. The model name is upper-cased, with non-alphanumerics replaced by underscores. For example, `MARA_PRICING_GPT_5_1=0.625,0.0625,5.00` prices a Batch or Flex deployment. |
+| `MAPS_PRICING_<MODEL>` | Per-model price override in US dollars per million tokens, as `input,cached,output`. The model name is upper-cased, with non-alphanumerics replaced by underscores. For example, `MAPS_PRICING_GPT_5_1=0.625,0.0625,5.00` prices a Batch or Flex deployment. |
 
 Built-in prices use standard list rates. A model with neither a built-in price nor an override records a cost of zero and is invisible to the cost ceiling, so set an override for any custom deployment name.
 
@@ -95,12 +95,12 @@ The **cost ceiling** is set in **Settings** (global) or per run. Before every di
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MARA_DISPATCH_TIMEOUT_MS` | `300000` | Per-dispatch timeout. A timed-out dispatch restarts its phase, up to three times. On the last attempt, a unit that times out again is recorded as a coverage gap. |
-| `MARA_WORKER_POLL_MS` | `500` | Command and queue polling interval |
-| `MARA_AWAITING_INPUT_TIMEOUT_MS` | `86400000` (24 hours) | How long a review may wait for intake answers before it is paused |
-| `MARA_ROOT_DIR` | Repository root | Root for `data/`, `knowledge/`, and `agents/`. Set to `/app` in the container. |
-| `MARA_DB_PATH` | `data/mara.db` | Override for the primary database path |
-| `MARA_LOG_MAX_BYTES` | `5242880` | Size at which a rotating log file rolls over |
+| `MAPS_DISPATCH_TIMEOUT_MS` | `300000` | Per-dispatch timeout. A timed-out dispatch restarts its phase, up to three times. On the last attempt, a unit that times out again is recorded as a coverage gap. |
+| `MAPS_WORKER_POLL_MS` | `500` | Command and queue polling interval |
+| `MAPS_AWAITING_INPUT_TIMEOUT_MS` | `86400000` (24 hours) | How long a review may wait for intake answers before it is paused |
+| `MAPS_ROOT_DIR` | Repository root | Root for `data/`, `knowledge/`, and `agents/`. Set to `/app` in the container. |
+| `MAPS_DB_PATH` | `data/maps.db` | Override for the primary database path. An installation created before the rename keeps using its existing `data/mara.db`. |
+| `MAPS_LOG_MAX_BYTES` | `5242880` | Size at which a rotating log file rolls over |
 
 ## 7. Tracing (optional)
 

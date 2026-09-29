@@ -11,11 +11,11 @@ export interface SealedKey {
 }
 
 function masterKey(): Buffer {
-  const raw = process.env.MARA_MASTER_KEY;
+  const raw = process.env.MAPS_MASTER_KEY;
   if (raw === undefined || raw === '') {
     throw new ApiError(
       'master_key_missing',
-      'A master key is required to store a provider key on disk. Set MARA_MASTER_KEY or add the key with session persistence.',
+      'A master key is required to store a provider key on disk. Set MAPS_MASTER_KEY or add the key with session persistence.',
     );
   }
   if (/^[0-9a-fA-F]{64}$/.test(raw)) {

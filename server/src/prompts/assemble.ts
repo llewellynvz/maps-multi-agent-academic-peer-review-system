@@ -1,4 +1,4 @@
-import type { ParseQuality } from '@mara/shared';
+import type { ParseQuality } from '@maps/shared';
 import { CONSTITUTION_FRAME } from './constitution';
 import { readExemplars, readKnowledgeModules } from './knowledge';
 import { type AgentManifest, readManifest, readPrompt } from './manifest';

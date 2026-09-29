@@ -29,7 +29,7 @@
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
     "@langfuse/vercel-ai-sdk": "5.9.1",
-    "@mara/shared": "workspace:*",
+    "@maps/shared": "workspace:*",
     "@mastra/core": "1.51.0",
     "@mastra/libsql": "1.16.0",
     "@opentelemetry/api": "1.9.1",

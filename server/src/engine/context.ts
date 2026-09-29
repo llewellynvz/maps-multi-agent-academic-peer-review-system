@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { type ParseQuality, type SectionMap, sectionMapSchema } from '@mara/shared';
+import { type ParseQuality, type SectionMap, sectionMapSchema } from '@maps/shared';
 import type { Reference } from '../citations';
 import type { MaraDatabase } from '../db/client';
 import { isPublishedReference } from '../security';

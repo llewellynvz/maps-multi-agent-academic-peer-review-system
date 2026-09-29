@@ -9,7 +9,7 @@ import type {
   PhaseCriticDefect,
   PhaseCriticOutput,
   SpecialistReviewerOutput,
-} from '@mara/shared';
+} from '@maps/shared';
 import { getCurrentFindings } from '../ledger';
 import { getReviewOptions, insertEvent } from '../workflow/repo';
 import { readArtefact } from './artefacts';

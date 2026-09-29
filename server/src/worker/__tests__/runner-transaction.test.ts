@@ -75,8 +75,8 @@ function controlAckCount(reviewId: string): number {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-tx-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-tx-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
 });
 

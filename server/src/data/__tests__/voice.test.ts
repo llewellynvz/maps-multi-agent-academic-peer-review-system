@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type MaraClient } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
-import { scrubVoiceProfile, type VoiceProfile } from '@mara/shared';
+import { scrubVoiceProfile, type VoiceProfile } from '@maps/shared';
 import { hasSchema, schemaFor } from '../../prompts';
 import { createReview } from '../reviews';
 import { listVoiceSamples, MAX_VOICE_SAMPLES, readVoiceSampleTexts, uploadVoiceSample } from '../voice';
@@ -17,8 +17,8 @@ function textFile(name: string, body: string): { bytes: Uint8Array; filename: st
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-voice-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-voice-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
 });
 

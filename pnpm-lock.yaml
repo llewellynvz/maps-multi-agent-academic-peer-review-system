@@ -30,7 +30,7 @@ importers:
 
   app:
     dependencies:
-      '@mara/shared':
+      '@maps/shared':
         specifier: workspace:*
         version: link:../packages/shared
       better-sqlite3:
@@ -109,7 +109,7 @@ importers:
       '@langfuse/vercel-ai-sdk':
         specifier: 5.9.1
         version: 5.9.1(@opentelemetry/api@1.9.1)(ai@7.0.31(zod@4.4.3))(zod@4.4.3)
-      '@mara/shared':
+      '@maps/shared':
         specifier: workspace:*
         version: link:../packages/shared
       '@mastra/core':

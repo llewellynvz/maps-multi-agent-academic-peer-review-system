@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import type { ManuscriptReference, SectionMap } from '@mara/shared';
+import type { ManuscriptReference, SectionMap } from '@maps/shared';
 import { assembleSectionMap, type RawSection } from './assemble';
 import { normalizeInline } from './text';
 

@@ -7,14 +7,14 @@ RUN corepack enable && corepack prepare pnpm@10.30.1 --activate
 WORKDIR /build
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @mara/app build
+RUN pnpm --filter @maps/app build
 
 FROM node:22-bookworm-slim AS runtime
 RUN apt-get update \
   && apt-get install -y --no-install-recommends tini \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
-    MARA_ROOT_DIR=/app \
+    MAPS_ROOT_DIR=/app \
     PORT=3100 \
     HOSTNAME=0.0.0.0
 WORKDIR /app

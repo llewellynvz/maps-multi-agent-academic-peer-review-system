@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
-import { type Finding, findingSchema } from '@mara/shared';
+import { type Finding, findingSchema } from '@maps/shared';
 import type { MaraDatabase } from '../db/client';
 import { findings, mergeMarkers } from '../db/schema';
 

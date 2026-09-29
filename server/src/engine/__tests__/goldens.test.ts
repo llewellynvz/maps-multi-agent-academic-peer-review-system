@@ -25,8 +25,8 @@ import type {
   SwarmEvaluation,
   SwarmReportCritique,
   VoiceProfile,
-} from '@mara/shared';
-import { scrubVoiceProfile } from '@mara/shared';
+} from '@maps/shared';
+import { scrubVoiceProfile } from '@maps/shared';
 import {
   assemble,
   CONSTITUTION_FRAME,

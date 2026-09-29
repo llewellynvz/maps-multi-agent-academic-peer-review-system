@@ -1,4 +1,4 @@
-import type { ManuscriptParser, ParseQuality, SectionMap } from '@mara/shared';
+import type { ManuscriptParser, ParseQuality, SectionMap } from '@maps/shared';
 import { docxSectionMap } from './docx';
 import type { GrobidClient } from './grobid';
 import { extractPdfText } from './pdf';

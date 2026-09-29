@@ -11,7 +11,7 @@ import type {
   ScoutPlan,
   SpecialistReviewerOutput,
   SwarmEvaluation,
-} from '@mara/shared';
+} from '@maps/shared';
 import { randomBytes } from 'node:crypto';
 import type { MaraDatabase } from '../db/client';
 import {

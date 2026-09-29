@@ -13,8 +13,8 @@ let client: MaraClient;
 const reviewId = 'rev-sanitize-phase';
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-sanitize-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-sanitize-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
   const now = new Date().toISOString();
   client.sqlite

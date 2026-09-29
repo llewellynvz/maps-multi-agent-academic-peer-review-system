@@ -41,8 +41,8 @@ function insertFinding(id: string, reviewId: string, claim: string, supersedesId
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-ledger-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-ledger-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   sqlite = client.sqlite;
   runMigrations(client.db);
   insertReview('rev-1', 'ledger-suite');

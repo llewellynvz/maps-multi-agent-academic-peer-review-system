@@ -125,8 +125,8 @@ function seedReview(answers: Record<string, unknown>): void {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-intake-p4-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-intake-p4-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   db = client.db;
   sqlite = client.sqlite;
   runMigrations(db);

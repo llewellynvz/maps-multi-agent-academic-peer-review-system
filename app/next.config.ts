@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const config: NextConfig = {
   output: 'standalone',
-  transpilePackages: ['server', '@mara/shared'],
+  transpilePackages: ['server', '@maps/shared'],
   serverExternalPackages: ['better-sqlite3'],
 };
 

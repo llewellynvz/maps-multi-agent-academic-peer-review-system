@@ -22,7 +22,7 @@ import {
   swarmEvaluationSchema,
   swarmReportCritiqueSchema,
   voiceProfileSchema,
-} from '@mara/shared';
+} from '@maps/shared';
 
 export type SchemaResolver = (mode?: string) => z.ZodType;
 

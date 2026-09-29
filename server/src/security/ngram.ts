@@ -1,4 +1,4 @@
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 import { normalizeText } from '../citations/text';
 
 export const DEFAULT_NGRAM_SIZE = 8;

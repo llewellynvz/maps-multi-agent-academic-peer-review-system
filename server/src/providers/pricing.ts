@@ -8,7 +8,7 @@ interface ModelPricing {
 
 const PRICING_TABLE: Record<string, ModelPricing> = {
   // Standard list price. The table used the Batch/Flex rate (half), which let the cost ceiling trip late;
-  // a deployment billed at a discount can set MARA_PRICING_GPT_5_1 instead.
+  // a deployment billed at a discount can set MAPS_PRICING_GPT_5_1 instead.
   'gpt-5.1': { inputPerMillion: 1.25, cachedPerMillion: 0.125, outputPerMillion: 10.0 },
   'gpt-5.4-mini': { inputPerMillion: 0.75, cachedPerMillion: 0.075, outputPerMillion: 4.5 },
   'gpt-5-mini': { inputPerMillion: 0.25, cachedPerMillion: 0.025, outputPerMillion: 2.0 },
@@ -18,7 +18,7 @@ const PRICING_TABLE: Record<string, ModelPricing> = {
 };
 
 function pricingFor(model: string): ModelPricing | undefined {
-  const override = process.env[`MARA_PRICING_${model.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
+  const override = process.env[`MAPS_PRICING_${model.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
   if (override !== undefined) {
     const parts = override.split(',');
     if (parts.length === 3 && parts.every((part) => part.trim() !== '')) {

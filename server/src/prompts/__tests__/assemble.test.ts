@@ -95,7 +95,7 @@ describe('prompt assembler', () => {
 
 describe('voice exemplar corpus', () => {
   it('reads the letters in a corpus directory, sorted, skipping the README and empty files', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mara-exemplars-'));
+    const dir = mkdtempSync(join(tmpdir(), 'maps-exemplars-'));
     try {
       writeFileSync(join(dir, 'b-second.md'), 'SECOND_LETTER');
       writeFileSync(join(dir, 'a-first.md'), 'FIRST_LETTER');
@@ -109,7 +109,7 @@ describe('voice exemplar corpus', () => {
   });
 
   it('degrades to the default voice when the corpus directory is absent', () => {
-    expect(readExemplarsFrom(join(tmpdir(), 'mara-exemplars-absent-by-design'))).toEqual([]);
+    expect(readExemplarsFrom(join(tmpdir(), 'maps-exemplars-absent-by-design'))).toEqual([]);
   });
 
   it('frames the letters in order and forbids carrying their content across manuscripts', () => {

@@ -2,7 +2,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { createDb, type MaraDatabase, type SqliteConnection } from '../../src/db/client';
 import { runMigrations } from '../../src/db/migrate';
 import { createGrobidClient, type GrobidClient } from '../../src/ingest';
-import { dataDir, ensureDir, maraDbPath, mastraDbPath, repoRoot } from '../../src/paths';
+import { dataDir, ensureDir, mapsDbPath, mastraDbPath, repoRoot } from '../../src/paths';
 import { createDispatchRunner, createRegistry, type DispatchRunner } from '../../src/providers';
 
 export interface SliceBContext {
@@ -25,7 +25,7 @@ export function loadSliceBEnv(): void {
 export function buildSliceBContext(): SliceBContext {
   loadSliceBEnv();
   ensureDir(dataDir());
-  const { db, sqlite } = createDb(maraDbPath());
+  const { db, sqlite } = createDb(mapsDbPath());
   runMigrations(db);
   const registry = createRegistry({ env: process.env });
   const runDispatch = createDispatchRunner({ db, registry });

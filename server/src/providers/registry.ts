@@ -15,16 +15,16 @@ const DEFAULT_LOCAL_MODEL = 'qwen2:7b';
 
 const ROLE_PROVIDERS = new Set<DispatchProvider>(['azure', 'openai', 'anthropic', 'google', 'local']);
 
-// Azure stays the default, but a role can be pointed at any provider with MARA_<ROLE>_PROVIDER and
-// MARA_<ROLE>_MODEL, so a key added in Settings (OpenAI, Anthropic, Google) can actually carry a review.
+// Azure stays the default, but a role can be pointed at any provider with MAPS_<ROLE>_PROVIDER and
+// MAPS_<ROLE>_MODEL, so a key added in Settings (OpenAI, Anthropic, Google) can actually carry a review.
 function roleConfig(env: EnvSource, role: 'FRONTIER' | 'CHEAP'): RoleConfig {
-  const provider = (getEnv(env, `MARA_${role}_PROVIDER`) ?? 'azure').toLowerCase() as DispatchProvider;
+  const provider = (getEnv(env, `MAPS_${role}_PROVIDER`) ?? 'azure').toLowerCase() as DispatchProvider;
   if (!ROLE_PROVIDERS.has(provider)) {
-    throw new Error(`MARA_${role}_PROVIDER must be one of ${[...ROLE_PROVIDERS].join(', ')}; got ${provider}`);
+    throw new Error(`MAPS_${role}_PROVIDER must be one of ${[...ROLE_PROVIDERS].join(', ')}; got ${provider}`);
   }
   const model =
-    getEnv(env, `MARA_${role}_MODEL`) ??
-    (provider === 'azure' ? requireEnv(env, `AZURE_${role}_DEPLOYMENT`) : requireEnv(env, `MARA_${role}_MODEL`));
+    getEnv(env, `MAPS_${role}_MODEL`) ??
+    (provider === 'azure' ? requireEnv(env, `AZURE_${role}_DEPLOYMENT`) : requireEnv(env, `MAPS_${role}_MODEL`));
   return { provider, model };
 }
 

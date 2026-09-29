@@ -1,4 +1,4 @@
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 import { describe, expect, it } from 'vitest';
 import { manuscriptDigest } from '../context';
 

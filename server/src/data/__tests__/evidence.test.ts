@@ -46,8 +46,8 @@ function insertFinding(id: string, scope: string, claim: string): void {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-evidence-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-evidence-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
   insertReview(REVIEW_ID);
 });

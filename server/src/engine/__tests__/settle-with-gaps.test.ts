@@ -13,8 +13,8 @@ let sqlite: SqliteConnection;
 let reviewId: string;
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-settle-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-settle-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   db = client.db;
   sqlite = client.sqlite;
   runMigrations(db);

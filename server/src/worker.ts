@@ -1,11 +1,12 @@
 import { isAbsolute, resolve } from 'node:path';
+import { applyLegacyEnvAliases } from './env-aliases';
 import type { Mastra } from '@mastra/core';
 import { createCitationClient, defaultFetch } from './citations';
 import { createEgressController } from './security';
 import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { createRotatingLog } from './logging/rotating-log';
-import { citationCachePath, maraDbPath, mastraDbPath, repoRoot } from './paths';
+import { citationCachePath, mapsDbPath, mastraDbPath, repoRoot } from './paths';
 import {
   createCostCeilingGate,
   type EngineDeps,
@@ -44,6 +45,7 @@ function loadEnv(): void {
   try {
     process.loadEnvFile(resolve(repoRoot, '.env'));
   } catch {}
+  applyLegacyEnvAliases();
   const cert = process.env.AZURE_CLIENT_CERT_PEM_PATH;
   if (cert !== undefined && cert !== '' && !isAbsolute(cert)) {
     process.env.AZURE_CLIENT_CERT_PEM_PATH = resolve(repoRoot, cert);
@@ -59,7 +61,7 @@ function log(message: string): void {
 async function main(): Promise<void> {
   loadEnv();
   const tracing = initTracing({ env: process.env });
-  const { db, sqlite } = createDb(maraDbPath());
+  const { db, sqlite } = createDb(mapsDbPath());
   runMigrations(db);
 
   const registry = createRefreshingRegistry({
@@ -73,7 +75,7 @@ async function main(): Promise<void> {
       : 'Langfuse content capture is disabled; traces carry no prompt or completion text',
   );
   const baseDispatch = createDispatchRunner({ db, registry, contentCaptureAllowed: contentAllowed });
-  const dispatchTimeoutMs = Number.parseInt(process.env.MARA_DISPATCH_TIMEOUT_MS ?? '300000', 10);
+  const dispatchTimeoutMs = Number.parseInt(process.env.MAPS_DISPATCH_TIMEOUT_MS ?? '300000', 10);
   const runDispatch = superviseDispatch(baseDispatch, {
     timeoutMs: Number.isFinite(dispatchTimeoutMs) ? dispatchTimeoutMs : 300000,
     onStale: (reason) => log(`stale dispatch (${reason}), re-issuing from checkpoint`),
@@ -83,7 +85,7 @@ async function main(): Promise<void> {
   const openAlexApiKey = getEnv(process.env, 'OPENALEX_API_KEY');
   const semanticScholarApiKey = getEnv(process.env, 'SEMANTIC_SCHOLAR_API_KEY');
   // .env.example ships this blank; an empty mailto= is worse than none for the polite pools.
-  const contactEmail = getEnv(process.env, 'MARA_CONTACT_EMAIL');
+  const contactEmail = getEnv(process.env, 'MAPS_CONTACT_EMAIL');
   const citationClient = createCitationClient({
     fetchImpl: egress.fetch,
     cachePath: citationCachePath(),
@@ -108,10 +110,10 @@ async function main(): Promise<void> {
 
   const runner = new WorkerRunner({
     client: { db, sqlite },
-    pollMs: Number.parseInt(process.env.MARA_WORKER_POLL_MS ?? '500', 10),
-    ...(process.env.MARA_AWAITING_INPUT_TIMEOUT_MS !== undefined &&
-    Number.parseInt(process.env.MARA_AWAITING_INPUT_TIMEOUT_MS, 10) > 0
-      ? { awaitingInputTimeoutMs: Number.parseInt(process.env.MARA_AWAITING_INPUT_TIMEOUT_MS, 10) }
+    pollMs: Number.parseInt(process.env.MAPS_WORKER_POLL_MS ?? '500', 10),
+    ...(process.env.MAPS_AWAITING_INPUT_TIMEOUT_MS !== undefined &&
+    Number.parseInt(process.env.MAPS_AWAITING_INPUT_TIMEOUT_MS, 10) > 0
+      ? { awaitingInputTimeoutMs: Number.parseInt(process.env.MAPS_AWAITING_INPUT_TIMEOUT_MS, 10) }
       : {}),
     onLog: log,
     processors: {
@@ -208,7 +210,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 
   runner.start();
-  log(`worker started, polling ${maraDbPath()}`);
+  log(`worker started, polling ${mapsDbPath()}`);
 }
 
 void main();

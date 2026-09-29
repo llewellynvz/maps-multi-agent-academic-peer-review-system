@@ -46,8 +46,8 @@ function envInt(name: string, fallback: number): number {
 export function createRotatingLog(name: string): RotatingLog {
   const dir = resolve(dataDir(), 'logs');
   const file = resolve(dir, `${name}.log`);
-  const maxBytes = envInt('MARA_LOG_MAX_BYTES', 5 * 1024 * 1024);
-  const maxFiles = envInt('MARA_LOG_MAX_FILES', 14);
+  const maxBytes = envInt('MAPS_LOG_MAX_BYTES', 5 * 1024 * 1024);
+  const maxFiles = envInt('MAPS_LOG_MAX_FILES', 14);
   let ensured = false;
 
   function ensure(): void {

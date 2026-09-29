@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import JSZip from 'jszip';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Finding } from '@mara/shared';
+import type { Finding } from '@maps/shared';
 import { createDb, type MaraDatabase, type SqliteConnection } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
 import { mergeFindings } from '../../ledger';
@@ -148,8 +148,8 @@ function deps(): EngineDeps {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-p8-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-p8-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   db = client.db;
   sqlite = client.sqlite;
   runMigrations(db);

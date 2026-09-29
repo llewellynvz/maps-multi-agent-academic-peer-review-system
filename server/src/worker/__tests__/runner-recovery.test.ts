@@ -55,8 +55,8 @@ function completingProcessors(order: string[]): WorkerProcessors {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-recovery-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-recovery-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
 });
 

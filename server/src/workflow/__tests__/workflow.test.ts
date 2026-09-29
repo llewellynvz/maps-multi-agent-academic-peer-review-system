@@ -56,8 +56,8 @@ function insertReview(id: string): void {
 }
 
 beforeAll(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-wf-'));
-  dbPath = join(tempDir, 'mara.db');
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-wf-'));
+  dbPath = join(tempDir, 'maps.db');
   mastraPath = join(tempDir, 'mastra.db');
   pdfPath = join(tempDir, 'sample.pdf');
   writeFileSync(pdfPath, Buffer.from('%PDF-1.4 placeholder for a stubbed grobid extractor'));

@@ -1,5 +1,5 @@
 function main(): void {
-  process.stdout.write('mara-worker\n');
+  process.stdout.write('maps-worker\n');
 }
 
 main();

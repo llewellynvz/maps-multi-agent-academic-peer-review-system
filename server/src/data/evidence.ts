@@ -1,4 +1,4 @@
-import type { PriorStressTestOutput, ShippedReportEnvelope } from '@mara/shared';
+import type { PriorStressTestOutput, ShippedReportEnvelope } from '@maps/shared';
 import type { MaraDatabase } from '../db/client';
 import { artefactExists, readArtefact } from '../engine/artefacts';
 import { redactEditorOnlyIds } from '../engine/grounding';

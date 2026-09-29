@@ -3,22 +3,22 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const originalRoot = process.env.MARA_ROOT_DIR;
-const originalMax = process.env.MARA_LOG_MAX_BYTES;
+const originalRoot = process.env.MAPS_ROOT_DIR;
+const originalMax = process.env.MAPS_LOG_MAX_BYTES;
 let root: string;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'mara-log-'));
-  process.env.MARA_ROOT_DIR = root;
-  process.env.MARA_LOG_MAX_BYTES = '400';
+  root = mkdtempSync(join(tmpdir(), 'maps-log-'));
+  process.env.MAPS_ROOT_DIR = root;
+  process.env.MAPS_LOG_MAX_BYTES = '400';
   vi.resetModules();
 });
 
 afterEach(() => {
-  if (originalRoot === undefined) delete process.env.MARA_ROOT_DIR;
-  else process.env.MARA_ROOT_DIR = originalRoot;
-  if (originalMax === undefined) delete process.env.MARA_LOG_MAX_BYTES;
-  else process.env.MARA_LOG_MAX_BYTES = originalMax;
+  if (originalRoot === undefined) delete process.env.MAPS_ROOT_DIR;
+  else process.env.MAPS_ROOT_DIR = originalRoot;
+  if (originalMax === undefined) delete process.env.MAPS_LOG_MAX_BYTES;
+  else process.env.MAPS_LOG_MAX_BYTES = originalMax;
   vi.resetModules();
 });
 

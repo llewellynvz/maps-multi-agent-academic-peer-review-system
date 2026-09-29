@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { rubricCriterion } from '@mara/shared';
+import { rubricCriterion } from '@maps/shared';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { api, type DeliverableView, type EvidenceData, type ReviewDetail, type RunStats } from '@/lib/api';
 import {

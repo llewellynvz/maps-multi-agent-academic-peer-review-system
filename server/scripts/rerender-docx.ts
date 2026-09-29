@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { buildNotesJob, buildReportJob } from '../src/engine/deliverable-jobs';
 import { readArtefact } from '../src/engine/artefacts';
 import { renderDeliverableDocx } from '../src/engine/docx';
-import type { Recommendation, ShippedReportEnvelope } from '@mara/shared';
+import type { Recommendation, ShippedReportEnvelope } from '@maps/shared';
 
 async function main(): Promise<void> {
   const reviewId = process.argv[2];

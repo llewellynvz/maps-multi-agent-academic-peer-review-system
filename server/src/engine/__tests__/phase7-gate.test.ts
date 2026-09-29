@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Finding, ReviewFinalCriticOutput } from '@mara/shared';
+import type { Finding, ReviewFinalCriticOutput } from '@maps/shared';
 import { createDb, type MaraDatabase, type SqliteConnection } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
 import { mergeFindings } from '../../ledger';
@@ -281,8 +281,8 @@ function eventKinds(): string[] {
 }
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-p7-'));
-  const client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-p7-'));
+  const client = createDb(join(tempDir, 'maps.db'));
   db = client.db;
   sqlite = client.sqlite;
   runMigrations(db);

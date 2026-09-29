@@ -20,8 +20,8 @@ let tempDir: string;
 let client: MaraClient;
 
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), 'mara-data-'));
-  client = createDb(join(tempDir, 'mara.db'));
+  tempDir = mkdtempSync(join(tmpdir(), 'maps-data-'));
+  client = createDb(join(tempDir, 'maps.db'));
   runMigrations(client.db);
 });
 
@@ -56,17 +56,17 @@ describe('passphrase gate', () => {
 });
 
 describe('provider key envelope encryption (SEC-13/17)', () => {
-  const original = process.env.MARA_MASTER_KEY;
+  const original = process.env.MAPS_MASTER_KEY;
   afterEach(() => {
     if (original === undefined) {
-      delete process.env.MARA_MASTER_KEY;
+      delete process.env.MAPS_MASTER_KEY;
     } else {
-      process.env.MARA_MASTER_KEY = original;
+      process.env.MAPS_MASTER_KEY = original;
     }
   });
 
   it('round-trips a key and never stores the plaintext', () => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
     const secret = 'sk-test-abcd1234';
     const sealed = sealKey(secret);
     expect(openKey(sealed)).toBe(secret);
@@ -75,21 +75,21 @@ describe('provider key envelope encryption (SEC-13/17)', () => {
   });
 
   it('fails closed under a wrong master key', () => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
     const sealed = sealKey('sk-secret');
-    process.env.MARA_MASTER_KEY = '1'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '1'.repeat(64);
     expect(() => openKey(sealed)).toThrow();
   });
 
   it('surfaces a stored key to the provider environment so an added key is actually used', () => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
     addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-STOREDKEY', persist: 'disk' });
 
     expect(providerKeyEnv(client.db).OPENAI_API_KEY).toBe('sk-disk-STOREDKEY');
   });
 
   it('lets an explicit environment variable win over a stored key', () => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
     addKey(client.db, { provider: 'anthropic', apiKey: 'sk-disk-STOREDKEY', persist: 'disk' });
 
     const merged = mergeProviderKeyEnv({ ANTHROPIC_API_KEY: 'sk-env-WINS' }, providerKeyEnv(client.db));
@@ -97,7 +97,7 @@ describe('provider key envelope encryption (SEC-13/17)', () => {
   });
 
   it('does not let the blank placeholder from a copied .env shadow a stored key', () => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
     addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-STOREDKEY', persist: 'disk' });
 
     const merged = mergeProviderKeyEnv({ OPENAI_API_KEY: '' }, providerKeyEnv(client.db));
@@ -105,7 +105,7 @@ describe('provider key envelope encryption (SEC-13/17)', () => {
   });
 
   it('uses the newest stored key when a provider has several', () => {
-    process.env.MARA_MASTER_KEY = '0'.repeat(64);
+    process.env.MAPS_MASTER_KEY = '0'.repeat(64);
     addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-TYPO', persist: 'disk' });
     addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-FIXED', persist: 'disk' });
     const before = providerKeysFingerprint(client.db);

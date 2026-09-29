@@ -9,7 +9,7 @@ import type {
   ReviewMetaReviewerOutput,
   ShippedReportEnvelope,
   SwarmEvaluation,
-} from '@mara/shared';
+} from '@maps/shared';
 import { getCurrentFindings } from '../ledger';
 import { reviews } from '../db/schema';
 import { annotatePhase, recordRunScores, withPhase } from '../tracing';
@@ -354,10 +354,10 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
     writeManuscriptBlob(reviewId, 'memory/lessons.json', JSON.stringify(lessons, null, 2));
 
     annotatePhase({
-      'mara.composite': metrics.composite,
-      'mara.scope_fit': scope.score,
-      'mara.calibration_mode': calibration.mode,
-      'mara.recommendation': released ? (shippedRecommendation ?? 'not-released') : 'not-released',
+      'maps.composite': metrics.composite,
+      'maps.scope_fit': scope.score,
+      'maps.calibration_mode': calibration.mode,
+      'maps.recommendation': released ? (shippedRecommendation ?? 'not-released') : 'not-released',
     });
 
     recordRunScores([

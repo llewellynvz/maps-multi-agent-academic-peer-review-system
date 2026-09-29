@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { createDb, type SqliteConnection } from '../src/db/client';
-import { dataDir, fixturesDir, maraDbPath, repoRoot } from '../src/paths';
+import { dataDir, fixturesDir, mapsDbPath, repoRoot } from '../src/paths';
 
-const PORT = process.env.MARA_PORT ?? '3100';
+const PORT = process.env.MAPS_PORT ?? '3100';
 const BASE = `http://127.0.0.1:${PORT}`;
 const PLOS_DOI = '10.1371/journal.pone.0275925';
 const PLOS_PDF_URL = `https://journals.plos.org/plosone/article/file?id=${PLOS_DOI}&type=printable`;
@@ -298,7 +298,7 @@ async function main(): Promise<void> {
   await waitForWorker(30000);
   check('boot.worker', true, 'worker heartbeat up');
 
-  const { db, sqlite } = createDb(maraDbPath());
+  const { db, sqlite } = createDb(mapsDbPath());
   const startWall = Date.now();
 
   const created = await api<{ id: string }>('POST', '/api/reviews', { title: 'PLOS wellbeing study' });

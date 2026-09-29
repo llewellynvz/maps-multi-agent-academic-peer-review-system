@@ -2,13 +2,13 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createDb, type MaraClient } from '../db/client';
 import { runMigrations } from '../db/migrate';
-import { maraDbPath } from '../paths';
+import { mapsDbPath } from '../paths';
 
 let cached: MaraClient | null = null;
 
 function resolveDbPath(): string {
-  const override = process.env.MARA_DB_PATH;
-  return override !== undefined && override !== '' ? override : maraDbPath();
+  const override = process.env.MAPS_DB_PATH;
+  return override !== undefined && override !== '' ? override : mapsDbPath();
 }
 
 export function getClient(): MaraClient {

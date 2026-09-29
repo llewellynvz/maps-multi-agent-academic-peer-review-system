@@ -213,7 +213,7 @@ describe('verifyReference', () => {
   });
 
   it('purges rows older than the TTL when the cache is opened', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mara-cache-'));
+    const dir = mkdtempSync(join(tmpdir(), 'maps-cache-'));
     const path = join(dir, 'cache.db');
     const raw = new DatabaseConstructor(path);
     raw.exec(

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { rubricCriterionName } from '@mara/shared';
+import { rubricCriterionName } from '@maps/shared';
 import { and, eq } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { rubricScores } from '../db/schema';

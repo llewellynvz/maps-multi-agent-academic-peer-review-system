@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { estimateCostUsd, hasPricing } from '../pricing';
 
 afterEach(() => {
-  delete process.env.MARA_PRICING_GPT_5_1;
+  delete process.env.MAPS_PRICING_GPT_5_1;
 });
 
 describe('dispatch cost estimation', () => {
@@ -24,7 +24,7 @@ describe('dispatch cost estimation', () => {
   });
 
   it('honours an env pricing override', () => {
-    process.env.MARA_PRICING_GPT_5_1 = '1,0.1,10';
+    process.env.MAPS_PRICING_GPT_5_1 = '1,0.1,10';
     const cost = estimateCostUsd('gpt-5.1', {
       inputTokens: 1_000_000,
       outputTokens: 0,
@@ -35,7 +35,7 @@ describe('dispatch cost estimation', () => {
   });
 
   it('ignores a malformed override and falls back to the table', () => {
-    process.env.MARA_PRICING_GPT_5_1 = 'not,valid';
+    process.env.MAPS_PRICING_GPT_5_1 = 'not,valid';
     const cost = estimateCostUsd('gpt-5.1', {
       inputTokens: 1_000_000,
       outputTokens: 0,
@@ -47,11 +47,11 @@ describe('dispatch cost estimation', () => {
 
   it('rejects overrides without exactly three non-empty fields', () => {
     const tokens = { inputTokens: 0, outputTokens: 1_000_000, cachedTokens: 0, reasoningTokens: 0 };
-    process.env.MARA_PRICING_GPT_5_1 = '1,,3';
+    process.env.MAPS_PRICING_GPT_5_1 = '1,,3';
     expect(estimateCostUsd('gpt-5.1', tokens)).toBe(10);
-    process.env.MARA_PRICING_GPT_5_1 = '1,2,3,4';
+    process.env.MAPS_PRICING_GPT_5_1 = '1,2,3,4';
     expect(estimateCostUsd('gpt-5.1', tokens)).toBe(10);
-    process.env.MARA_PRICING_GPT_5_1 = '1,2,3';
+    process.env.MAPS_PRICING_GPT_5_1 = '1,2,3';
     expect(estimateCostUsd('gpt-5.1', tokens)).toBe(3);
   });
 

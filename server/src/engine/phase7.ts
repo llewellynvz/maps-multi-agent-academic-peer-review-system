@@ -11,8 +11,8 @@ import type {
   SwarmEvaluation,
   SwarmReportCritique,
   VoiceProfile,
-} from '@mara/shared';
-import { scrubVoiceProfile } from '@mara/shared';
+} from '@maps/shared';
+import { scrubVoiceProfile } from '@maps/shared';
 import { readVoiceSampleTexts } from '../data/voice';
 import type { CurrentFinding } from '../ledger';
 import { getCurrentFindings } from '../ledger';
@@ -922,9 +922,9 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         snapshot: { released: false, blocked: true, reason: blockReason, sections: blockSections, fixCycles, arbitration },
       });
       annotatePhase({
-        'mara.critic_verdict': releaseVerdict,
-        'mara.released': false,
-        'mara.fix_cycles': fixCycles,
+        'maps.critic_verdict': releaseVerdict,
+        'maps.released': false,
+        'maps.fix_cycles': fixCycles,
       });
       insertEvent(db, {
         reviewId,
@@ -1008,11 +1008,11 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     writeArtefact(reviewId, 'p7-gate-record', gateRecord);
 
     annotatePhase({
-      'mara.critic_verdict': releaseVerdict,
-      'mara.recommendation': finalRecommendation,
-      'mara.rubric_average': currentMeta.average,
-      'mara.fix_cycles': fixCycles,
-      'mara.released': true,
+      'maps.critic_verdict': releaseVerdict,
+      'maps.recommendation': finalRecommendation,
+      'maps.rubric_average': currentMeta.average,
+      'maps.fix_cycles': fixCycles,
+      'maps.released': true,
     });
 
     recordRunScores([

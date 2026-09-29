@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 import type { DispatchInput, DispatchResult } from '../../providers';
 import { detectInjection } from '../detector';
 import { type QuarantineItem, sanitizeManuscript, scrubSectionMap, scrubText } from '../index';

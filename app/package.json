@@ -1,5 +1,5 @@
 {
-  "name": "@mara/app",
+  "name": "@maps/app",
   "version": "1.3.0",
   "license": "UNLICENSED",
   "author": "Llewellyn E. van Zyl and Psynalytics B.V.",
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mara/shared": "workspace:*",
+    "@maps/shared": "workspace:*",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.6",

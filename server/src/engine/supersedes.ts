@@ -1,4 +1,4 @@
-import type { Finding } from '@mara/shared';
+import type { Finding } from '@maps/shared';
 
 export function sanitiseSupersedes(findings: Finding[], knownIds: Set<string>): Finding[] {
   return findings.map((finding) =>

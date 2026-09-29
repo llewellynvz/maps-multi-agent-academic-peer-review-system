@@ -1,4 +1,4 @@
-import type { SectionMap } from '@mara/shared';
+import type { SectionMap } from '@maps/shared';
 import { detectInjection, type DetectDispatch, type InjectionVerdict } from './detector';
 import { screenText, type QuarantineTier } from './patterns';
 

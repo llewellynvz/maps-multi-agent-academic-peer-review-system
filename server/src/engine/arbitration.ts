@@ -1,4 +1,4 @@
-import type { Recommendation } from '@mara/shared';
+import type { Recommendation } from '@maps/shared';
 import type { GroundingFailureKind } from './grounding';
 
 const NARROW_ORDER: Recommendation[] = [

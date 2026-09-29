@@ -18,7 +18,7 @@ import {
   runPhase7,
   runPhase8,
 } from '../src/engine';
-import { dataDir, fixturesDir, maraDbPath, mastraDbPath, repoRoot } from '../src/paths';
+import { dataDir, fixturesDir, mapsDbPath, mastraDbPath, repoRoot } from '../src/paths';
 import { createCitationClient } from '../src/citations';
 import { createDispatchRunner, createRegistry } from '../src/providers';
 import { initTracing, startRun, withPhase } from '../src/tracing';
@@ -167,13 +167,13 @@ async function main(): Promise<void> {
   mkdirSync(dataDir(), { recursive: true });
   await ensurePdfFixture();
 
-  const { db, sqlite } = createDb(maraDbPath());
+  const { db, sqlite } = createDb(mapsDbPath());
   runMigrations(db);
   const registry = createRegistry({ env: process.env });
   const runDispatch = createDispatchRunner({ db, registry });
   const citationClient = createCitationClient({
     cachePath: resolve(dataDir(), 'citation-cache.db'),
-    ...(process.env.MARA_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MARA_CONTACT_EMAIL } : {}),
+    ...(process.env.MAPS_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MAPS_CONTACT_EMAIL } : {}),
   });
 
   const grobid = createGrobidClient({ baseUrl: GROBID_URL });

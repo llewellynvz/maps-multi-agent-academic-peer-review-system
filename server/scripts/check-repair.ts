@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { blobDir } from '../src/paths';
 import { bodyHeadings, labelAppearsInBody, tokenOverlap } from '../src/engine/grounding';
 
 const id = process.argv[2] ?? '3353eaf5-c0ee-486d-8d3b-4aac330ddf5d';
 const artefact = process.argv[3] ?? 'p7-shipped-1';
 const shipped = JSON.parse(
-  readFileSync(`D:/GITHUB REPOS/MARA-PLATFORM/data/blobs/${id}/engine/${artefact}.json`, 'utf8'),
+  readFileSync(resolve(blobDir(id), 'engine', `${artefact}.json`), 'utf8'),
 ) as { bodyMarkdown: string; evidenceMap: Array<{ section: string; label: string }> };
 const headings = bodyHeadings(shipped.bodyMarkdown);
 let unrepaired = 0;
