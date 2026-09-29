@@ -282,6 +282,9 @@ All notable changes to MAPS (formerly MARA and Collegia) are recorded here. The 
   instance. Server errors return a fixed message rather than internal paths.
 
 ### Changed
+- The repository is renamed to `maps-multi-agent-academic-peer-review-system`, and a
+  `CLAUDE.md` records the product name, its history, and the rename's
+  compatibility rules for future work.
 - The platform is renamed **MAPS: the Multi-Agent Academic Peer-Review
   System**, everywhere: the application, prompts, documentation, licence,
   artwork, package scopes (`@maps/*`), Compose service and image, tracing

@@ -16,13 +16,13 @@ This document records how the MAPS repository is controlled, so that only the ow
 ## 1. Rename the repository (GitHub setting)
 
 1. Open **Settings → General**.
-2. Under **Repository name**, enter `maps-academic-peer-review`, then select **Rename**.
+2. Under **Repository name**, enter `maps-multi-agent-academic-peer-review-system`, then select **Rename**. (Done: the repository now lives at `llewellynvz/maps-multi-agent-academic-peer-review-system`.)
 3. Under **Description**, enter: *MAPS: the Multi-Agent Academic Peer-Review System. A proprietary Psynalytics AI system.*
 
 GitHub redirects the old URL, but update every local clone:
 
 ```bash
-git remote set-url origin https://github.com/llewellynvz/maps-academic-peer-review.git
+git remote set-url origin https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system.git
 ```
 
 ## 2. Import the branch ruleset (GitHub setting)
