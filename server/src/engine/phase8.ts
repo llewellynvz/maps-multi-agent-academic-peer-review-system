@@ -28,7 +28,7 @@ import { buildNotesJob, buildReportJob } from './deliverable-jobs';
 import { renderDeliverableDocx } from './docx';
 import { appendRunAudit } from './private-notes';
 import { writeManuscriptBlob } from '../workflow/storage';
-import type { EngineDeps } from './phases-shared';
+import { type EngineDeps, enterPhase } from './phases-shared';
 
 const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   accept: 'Accept',
@@ -165,8 +165,10 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
     : null;
 
   await withPhase('phase_8', async () => {
-    updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_8' });
+    enterPhase(db, reviewId, 'phase_8');
     const findings = getCurrentFindings(db, reviewId);
+    // What shipped, after any arbitration narrowing, not the meta-reviewer's pre-arbitration category.
+    let shippedRecommendation: string | null = null;
 
     if (released) {
       const shipped = readArtefact<ShippedReportEnvelope>(reviewId, 'p7-shipped-final');
@@ -175,6 +177,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
       const recommendation = (typeof gateRecord.recommendation === 'string'
         ? gateRecord.recommendation
         : shipped.recommendation) as Recommendation;
+      shippedRecommendation = recommendation;
       const confidence = typeof gateRecord.recommendationConfidence === 'number'
         ? gateRecord.recommendationConfidence
         : shipped.recommendationConfidence;
@@ -337,7 +340,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
 
     const lessons = {
       reviewId,
-      recommendation: released ? (meta?.recommendation ?? null) : null,
+      recommendation: released ? shippedRecommendation : null,
       rubricAverage: meta?.average ?? null,
       composite: metrics.composite,
       decisionStability: swarm.decisionStability,
@@ -354,7 +357,7 @@ export async function runPhase8(deps: EngineDeps, reviewId: string): Promise<voi
       'mara.composite': metrics.composite,
       'mara.scope_fit': scope.score,
       'mara.calibration_mode': calibration.mode,
-      'mara.recommendation': released ? (meta?.recommendation ?? 'not-released') : 'not-released',
+      'mara.recommendation': released ? (shippedRecommendation ?? 'not-released') : 'not-released',
     });
 
     recordRunScores([

@@ -7,53 +7,61 @@ export interface InjectionPattern {
   description: string;
 }
 
+// Every deterministic pattern is instructional text aimed at the reviewer, which knowledge/01 classes as
+// Tier 2: quarantine it, never execute it, and let the review continue with an editor-only warning.
+// Tier 3 is data-misrepresenting tampering (fabricated statistics, false retraction notices), which a
+// regex cannot recognise; only the detector assigns it, and only Tier 3 halts the run.
 export const injectionPatterns: InjectionPattern[] = [
   {
     id: 'override-previous-instructions',
-    tier: 3,
+    tier: 2,
     regex: /ignore\s+(all\s+|any\s+)?(previous|prior|above|earlier|the\s+system)\s+(instructions|prompts?|messages?|context)/i,
     description: 'Attempt to override prior instructions',
   },
   {
     id: 'disregard-reviewer-guidelines',
-    tier: 3,
+    tier: 2,
     regex: /disregard\s+(your|the|all|any)\s+(reviewer|review|system|previous|prior|editorial)\s+(guidelines?|instructions?|rules?|criteria)/i,
     description: 'Attempt to discard reviewer guidelines',
   },
   {
     id: 'role-reassignment',
-    tier: 3,
-    regex: /you\s+are\s+now\s+(an?\s+|the\s+)?[a-z]/i,
+    tier: 2,
+    // "You are now going to see…" is ordinary participant-instruction prose and must not halt a review, so
+    // a reassignment needs a role: an article plus up to four modifiers before a role noun ("a lenient and
+    // positive reviewer"), a named mode ("in developer mode"), or a jailbreak persona.
+    regex:
+      /you\s+are\s+now\s+(?:(?:an?|the|my|our|your)\s+(?:[\w-]+,?\s+){0,4}?(?:ai|assistant|author|advocate|editor|reviewer|referee|model|chatbot|bot|agent|system|evaluator|judge|critic|champion|supporter|expert|persona|character|dan)\b|in\s+(?:[\w-]+\s+){1,2}mode\b|(?:dan|jailbroken|unrestricted|unfiltered)\b)/i,
     description: 'Attempt to reassign the reviewer role',
   },
   {
     id: 'force-acceptance',
-    tier: 3,
+    tier: 2,
     regex: /recommend\s+(this|the)\s+(paper|manuscript|submission|article)\s+for\s+(immediate\s+)?accept/i,
     description: 'Attempt to force an acceptance recommendation',
   },
   {
     id: 'suppress-weaknesses',
-    tier: 3,
+    tier: 2,
     regex: /do\s+not\s+(report|mention|list|include)\s+(any\s+)?(weakness|weaknesses|flaws?|problems?|issues?|limitations?)/i,
     description: 'Attempt to suppress reported weaknesses',
   },
   {
     id: 'new-instructions-header',
-    tier: 3,
+    tier: 2,
     regex: /\bnew\s+instructions?\s*:/i,
     description: 'Injected new-instructions header',
   },
   {
     id: 'override-system',
-    tier: 3,
+    tier: 2,
     regex: /override\s+(your|the)\s+(instructions|guidelines|rules|system\s+prompt)/i,
     description: 'Attempt to override the system prompt',
   },
   {
     id: 'ai-address',
     tier: 2,
-    regex: /as\s+an?\s+ai(\s+(language\s+model|reviewer|assistant|system))?/i,
+    regex: /\bas\s+an?\s+ai\b(\s+(language\s+model|reviewer|assistant|system))?/i,
     description: 'Text addressed to an AI reviewer',
   },
   {

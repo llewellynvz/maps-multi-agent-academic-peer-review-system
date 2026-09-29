@@ -54,7 +54,7 @@ const PAGE = {
 
 const BODY_SIZE = 22;
 const HEADING_SIZE: Record<number, number> = { 1: 36, 2: 30, 3: 26, 4: 24 };
-const FINDING_ID_G = /REV-[A-Z]{3,4}-\d{4}/g;
+const FINDING_ID_G = /REV-[A-Z]{3,4}-\d{4,}/g;
 const BULLET_REF = 'bullet';
 
 function indent(level: number): { left: number; hanging: number } {

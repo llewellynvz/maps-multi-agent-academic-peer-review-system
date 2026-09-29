@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getClient, resetClient } from 'server/src/data';
 import { GET as healthGET } from '@/app/api/health/route';
 import { POST as sessionPOST } from '@/app/api/session/route';
@@ -102,6 +102,25 @@ describe('session failed-attempt throttle', () => {
     expect(afterReset1.status).toBe(401);
     expect(afterReset2.status).toBe(401);
   });
+  it('throttles guessing after a flood but lets the owner in once a check slot frees, instead of a 15-minute lockout', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-09-29T10:00:00Z'));
+      await settingsPUT(req('/api/settings', { method: 'PUT', body: JSON.stringify({ passphrase: 'letmein' }) }));
+      for (let i = 0; i < 25; i += 1) {
+        const headers = { 'x-forwarded-for': `198.51.100.${i}` };
+        await sessionPOST(req('/api/session', { method: 'POST', headers, body: JSON.stringify({ passphrase: 'wrong' }) }));
+      }
+      const owner = { 'x-forwarded-for': '192.0.2.10' };
+      const throttled = await sessionPOST(req('/api/session', { method: 'POST', headers: owner, body: JSON.stringify({ passphrase: 'wrong' }) }));
+      expect(throttled.status).toBe(429);
+      vi.setSystemTime(new Date('2026-09-29T10:00:46Z'));
+      const ownerLogin = await sessionPOST(req('/api/session', { method: 'POST', headers: owner, body: JSON.stringify({ passphrase: 'letmein' }) }));
+      expect(ownerLogin.status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('manuscript upload cap', () => {
@@ -139,5 +158,61 @@ describe('SSE events route (API-22)', () => {
 
     controller.abort();
     await reader!.cancel().catch(() => undefined);
+  });
+});
+
+describe('SSE events route for an unknown review', () => {
+  it('returns 404 instead of streaming an empty run', async () => {
+    const res = await eventsGET(req('/api/reviews/nope/events'), { params: Promise.resolve({ id: 'nope' }) });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('cross-site request guard', () => {
+  it('refuses a state-changing request a browser marks cross-site', async () => {
+    const res = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { 'sec-fetch-site': 'cross-site' } }),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('falls back to comparing Origin with Host', async () => {
+    const foreign = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'https://evil.example', host: '127.0.0.1' } }),
+    );
+    expect(foreign.status).toBe(403);
+    const same = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'http://127.0.0.1', host: '127.0.0.1' } }),
+    );
+    expect(same.status).toBe(201);
+  });
+
+  it('leaves reads alone', async () => {
+    const res = await reviewsGET(req('/api/reviews', { headers: { 'sec-fetch-site': 'cross-site' } }));
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('request body validation', () => {
+  it('rejects a mistyped settings patch with 422 instead of crashing', async () => {
+    const wrongType = await settingsPUT(req('/api/settings', { method: 'PUT', body: JSON.stringify({ passphrase: 123 }) }));
+    expect(wrongType.status).toBe(422);
+    const nullBody = await settingsPUT(req('/api/settings', { method: 'PUT', body: 'null' }));
+    expect(nullBody.status).toBe(422);
+  });
+
+  it('rejects a non-string review title', async () => {
+    const res = await reviewsPOST(req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 5 }) }));
+    expect(res.status).toBe(422);
+  });
+
+  it('refuses an upload whose declared length is over the cap before parsing it', async () => {
+    const created = await reviewsPOST(req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'Big' }) }));
+    const { id } = (await created.json()) as { id: string };
+    const res = await manuscriptPOST(
+      req(`/api/reviews/${id}/manuscript`, { method: 'POST', body: 'x', headers: { 'content-length': String(200 * 1024 * 1024) } }),
+      { params: Promise.resolve({ id }) },
+    );
+    expect(res.status).toBe(413);
   });
 });

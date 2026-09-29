@@ -7,7 +7,7 @@ import { dispatches } from '../db/schema';
 import { readSetting } from '../data/settings-store';
 import { activeTraceId as sharedActiveTraceId } from '../tracing/hierarchy';
 import { estimateCostUsd, hasPricing } from './pricing';
-import type { Registry } from './registry';
+import { maxReasoningEffort, type Registry } from './registry';
 import type { DispatchProvider, ModelRef, Role } from './types';
 
 export interface PromptParts {
@@ -247,7 +247,7 @@ export function createDispatchRunner(options: DispatchRunnerOptions): DispatchRu
       const openaiOptions = callOptions.providerOptions?.openai ?? {};
       callOptions.providerOptions = {
         ...callOptions.providerOptions,
-        openai: { reasoningEffort: 'xhigh', ...openaiOptions },
+        openai: { reasoningEffort: maxReasoningEffort(modelRef.model), ...openaiOptions },
       };
     }
 

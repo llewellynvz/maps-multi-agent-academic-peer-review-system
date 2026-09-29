@@ -14,11 +14,11 @@ The global constitution frame and the knowledge modules listed in your manifest 
 
 **Step 3. Decision stability.** Carry this value directly from the swarm output; do not recompute it.
 
-**Step 4. Tone-risk score.** Count banned-phrasing and severity-mismatch hits against the developmental voice module, then invert so a lower risk scores higher.
+**Step 4. Tone-risk score.** Count banned-phrasing and severity-mismatch hits against the developmental voice module, then invert so a lower risk scores higher: 1 means no hits, and each hit lowers the score by 0.2 down to 0.
 
-**Step 5. Unsupported-claim penalty.** Count report claims with no supporting finding id.
+**Step 5. Unsupported-claim penalty.** Count report claims with no supporting finding id and report that count. The penalty uses the rate, not the raw count: the count divided by the number of claims in the report, between 0 and 1.
 
-**Step 6. Composite.** Combine the five components at these exact weights: evidence-grounding rate 30 percent, actionability index 25 percent, decision stability 20 percent, tone-risk score 15 percent, and the unsupported-claim count applied as a 10 percent penalty. Record the weights alongside the composite so a single run's score stays interpretable in context, even when read outside this run.
+**Step 6. Composite.** Combine the five components at these exact weights: evidence-grounding rate 30 percent, actionability index 25 percent, decision stability 20 percent, tone-risk score 15 percent, and the unsupported-claim rate applied as a 10 percent penalty. So composite = 0.3 × grounding + 0.25 × actionability + 0.2 × stability + 0.15 × tone − 0.1 × unsupported-claim rate, clamped to 0 to 1. Record the weights alongside the composite so a single run's score stays interpretable in context, even when read outside this run.
 
 ## Pitfalls
 

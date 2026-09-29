@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
-import { deriveEphemeral, getClient, maxSeq, replayEvents } from 'server/src/data';
-import { authDenied } from '@/lib/server';
+import { deriveEphemeral, getClient, maxSeq, replayEvents, requireReview } from 'server/src/data';
+import { authDenied, jsonError } from '@/lib/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,13 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
     return denied;
   }
   const { id } = await context.params;
+  const { db } = getClient();
+  // An unknown id would otherwise stream an empty run and poll the database until the client leaves.
+  try {
+    requireReview(db, id);
+  } catch (error) {
+    return jsonError(error);
+  }
 
   const lastEventHeader = req.headers.get('last-event-id');
   const lastEventQuery = new URL(req.url).searchParams.get('lastEventId');
@@ -25,7 +32,6 @@ export async function GET(req: NextRequest, context: Context): Promise<Response>
   let lastSeq = Number.isFinite(startFrom) ? startFrom : 0;
 
   const encoder = new TextEncoder();
-  const { db } = getClient();
   let close: () => void = () => undefined;
 
   const stream = new ReadableStream<Uint8Array>({

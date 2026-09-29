@@ -192,13 +192,13 @@ const TEST_PATTERNS: Array<{ kind: TestKind; pattern: RegExp; dfCount: 0 | 1 | 2
     kind: 'chi2',
     pattern: new RegExp(
       String.raw`(?<![A-Za-z])(?:χ2|χ²|chi[- ]?squared?|chi\s?2|[Xx]2|x²)\s*\(\s*(\d+(?:\.\d+)?)\s*(?:,\s*N\s*=\s*[\d,\s]+)?\)\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`,
-      'g',
+      'gi',
     ),
     dfCount: 1,
   },
   {
     kind: 'z',
-    pattern: new RegExp(String.raw`\b[zZ]\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`, 'g'),
+    pattern: new RegExp(String.raw`\b[zZ]\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`, 'gi'),
     dfCount: 0,
   },
 ];
@@ -333,7 +333,9 @@ export interface GrimCandidate {
 
 const PARENTHETICAL = /\(([^()]{1,200})\)/g;
 const MEAN_IN_GROUP = /\bM\s*=\s*(\d+\.(\d+))/;
-const N_IN_GROUP = /\b[nN]\s*=\s*(\d{1,5})\b/;
+// A thousands separator ("N = 1,234", "N = 1 234") belongs to the number: stopping at it read n = 1 and
+// raised a granularity finding against a perfectly ordinary mean.
+const N_IN_GROUP = /\b[nN]\s*=\s*(\d{1,3}(?:[,\u00a0\u2009 ]\d{3})+|\d{1,6})(?!\d|[.,]\d)/;
 
 export function extractGrimCandidates(text: string): GrimCandidate[] {
   const candidates: GrimCandidate[] = [];
@@ -347,7 +349,7 @@ export function extractGrimCandidates(text: string): GrimCandidate[] {
       candidates.push({
         mean: Number.parseFloat(meanMatch[1] as string),
         decimals: (meanMatch[2] as string).length,
-        n: Number.parseInt(nMatch[1] as string, 10),
+        n: Number.parseInt((nMatch[1] as string).replace(/[^\d]/g, ''), 10),
         source: `(${group.replace(/\s+/g, ' ').trim()})`,
       });
     }
@@ -383,7 +385,10 @@ const CAVEAT =
 
 function inconsistencyFinding(verdict: StatVerdict, anchorLabel: string): Finding {
   const { test } = verdict;
-  const range = `${formatP(verdict.pLow)} to ${formatP(verdict.pHigh)}`;
+  const range =
+    formatP(verdict.pLow) === formatP(verdict.pHigh)
+      ? `of ${formatP(verdict.pLow)}`
+      : `between ${formatP(verdict.pLow)} and ${formatP(verdict.pHigh)}`;
   const severity = verdict.decisionError ? 'major' : 'minor';
   const oneTailed = verdict.oneTailedExplains
     ? ' A one-tailed reading of the test would make the reported value consistent, which is worth confirming with the authors.'
@@ -393,8 +398,8 @@ function inconsistencyFinding(verdict: StatVerdict, anchorLabel: string): Findin
     lens: 'STAT',
     phase: 4,
     claim: verdict.decisionError
-      ? `The reported result "${test.source}" recomputes to p between ${range}, which sits on the other side of the .05 boundary from the reported value, so the stated significance does not follow from the reported statistic and degrees of freedom.${oneTailed} ${CAVEAT}`
-      : `The reported result "${test.source}" recomputes to p between ${range} from its test statistic and degrees of freedom, which does not match the reported p value at the reported precision.${oneTailed} ${CAVEAT}`,
+      ? `The reported result "${test.source}" recomputes to p ${range}, which sits on the other side of the .05 boundary from the reported value, so the stated significance does not follow from the reported statistic and degrees of freedom.${oneTailed} ${CAVEAT}`
+      : `The reported result "${test.source}" recomputes to p ${range} from its test statistic and degrees of freedom, which does not match the reported p value at the reported precision.${oneTailed} ${CAVEAT}`,
     anchor: `${anchorLabel}: ${test.source}`,
     epistemic: 'Known',
     confidence: 0.98,
@@ -406,6 +411,27 @@ function inconsistencyFinding(verdict: StatVerdict, anchorLabel: string): Findin
       'A reader who recomputes the p value from the reported statistic reaches a different conclusion about the test than the manuscript states.',
     leanestFix:
       'Recompute the test from the source output, correct whichever value was mistranscribed, and state the tail convention explicitly.',
+    supersedes: null,
+  };
+}
+
+// knowledge/02 (consistency rubric): a correlation above 1 in absolute value is an impossible result. It is
+// at least major, editor-only until the authors confirm it, and always enters the ledger.
+function impossibleCorrelationFinding(test: NhstTest, anchorLabel: string): Finding {
+  return {
+    id: PLACEHOLDER_ID,
+    lens: 'STAT',
+    phase: 4,
+    claim: `The reported correlation "${test.source}" has an absolute value above 1, which no correlation coefficient can take, so the value or its label is mistranscribed. ${CAVEAT}`,
+    anchor: `${anchorLabel}: ${test.source}`,
+    epistemic: 'Known',
+    confidence: 0.98,
+    band: 'Green',
+    severity: 'major',
+    fixability: 'easy',
+    scope: 'editor-only',
+    failureScenario: 'A reader who relies on the reported association is relying on a value that cannot exist.',
+    leanestFix: 'Check the source output and report the correct coefficient, or relabel the statistic if it is not a correlation.',
     supersedes: null,
   };
 }
@@ -435,6 +461,14 @@ export function deterministicStatsFindings(sectionMap: SectionMap): Finding[] {
   const seen = new Set<string>();
   for (const { label, text } of sectionAnchors(sectionMap)) {
     for (const test of extractNhstTests(text)) {
+      if (test.kind === 'r' && Math.abs(test.statistic) > 1) {
+        const key = `${label}|${test.source}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          findings.push(impossibleCorrelationFinding(test, label));
+        }
+        continue;
+      }
       const verdict = checkNhstTest(test);
       if (verdict === null || verdict.consistent) {
         continue;

@@ -81,7 +81,7 @@ export async function ingestManuscript(input: IngestInput, deps: IngestDeps = {}
     const tei = await deps.grobidExtract(input.bytes);
     const sectionMap = parseTei(tei);
     const teiPath = deps.persistTei !== undefined ? await deps.persistTei(tei) : null;
-    const decision: ParseDecision = { parser: 'grobid', parseQuality: 'good', fallbackReason: null };
+    const decision: ParseDecision = { parser: 'grobid', parseQuality: sectionMap.parseQuality, fallbackReason: null };
     deps.onDecision?.(decision);
     return { sectionMap, teiPath, decision };
   } catch (error) {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { MaraDatabase } from '../db/client';
 import { phaseCheckpoints, reviewEvents, reviews, runCommands } from '../db/schema';
 import { nowIso } from './db';
@@ -75,6 +75,31 @@ export function submitRunControl(
 ): RunControlResult {
   const review = requireReview(db, reviewId);
 
+  // Intake has no engine checkpoint to reset: a review that failed before ingest completed (a parse halt,
+  // a provider error in lite-parse) is retried by running ingest again from the stored manuscript.
+  if (command === 'retry_phase' && ingestRetryApplies(db, reviewId, args, review.status)) {
+    if (pendingCommandExists(db, reviewId, 'run')) {
+      return { accepted: true, command, noop: true, status: review.status };
+    }
+    // Queued (not left as failed) so the retry reads as live: cancel applies, delete waits, a restart
+    // re-queues it, and the intake page keeps polling. Failed ingest checkpoints are cleared so the steps
+    // run again: a cached failed sanitize would otherwise re-halt without re-screening the manuscript.
+    db.transaction((tx) => {
+      tx.update(reviews).set({ status: 'queued', errorClass: null, updatedAt: nowIso() }).where(eq(reviews.id, reviewId)).run();
+      tx.delete(phaseCheckpoints)
+        .where(
+          and(
+            eq(phaseCheckpoints.reviewId, reviewId),
+            eq(phaseCheckpoints.status, 'failed'),
+            inArray(phaseCheckpoints.phase, ['parse', 'sanitize', 'phase_1']),
+          ),
+        )
+        .run();
+      insertRunCommand(tx, reviewId, 'run', {});
+    });
+    return { accepted: true, command, status: review.status };
+  }
+
   if (command === 'retry_phase') {
     validateRetryPhase(db, reviewId, args, review.status);
   }
@@ -127,6 +152,20 @@ export function submitAutoRetryPhase(db: MaraDatabase, reviewId: string, phase: 
   return { noop: false };
 }
 
+function ingestRetryApplies(db: MaraDatabase, reviewId: string, args: Record<string, unknown>, reviewStatus: string): boolean {
+  const phase = typeof args.phase === 'string' ? args.phase : '';
+  if ((phase !== 'phase_0' && phase !== 'phase_1') || reviewStatus !== 'failed') {
+    return false;
+  }
+  const ingest = db
+    .select({ status: phaseCheckpoints.status })
+    .from(phaseCheckpoints)
+    .where(and(eq(phaseCheckpoints.reviewId, reviewId), eq(phaseCheckpoints.phase, 'phase_1')))
+    .limit(1)
+    .all()[0];
+  return ingest?.status !== 'completed';
+}
+
 function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<string, unknown>, reviewStatus: string): void {
   const phase = typeof args.phase === 'string' ? args.phase : '';
   if (phase === '') {
@@ -134,6 +173,11 @@ function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<str
   }
   if (!/^phase_\d+$/.test(phase)) {
     throw new ApiError('unprocessable', `Phase ${phase} is not a retryable engine phase.`, { field: 'phase' });
+  }
+  // Retrying under a live run would reset checkpoints (and, after a gate block, delete findings) while
+  // the engine is still using them, and queue a second engine pass behind the first.
+  if (ACTIVE_STATUSES.has(reviewStatus) || reviewStatus === 'queued') {
+    throw new ApiError('conflict', 'This review is still running. Wait for it to finish or cancel it before retrying a phase.');
   }
   const candidates = [phase, `engine_${phase}`];
   const rows = db.select().from(phaseCheckpoints).where(eq(phaseCheckpoints.reviewId, reviewId)).all();

@@ -3,11 +3,12 @@
 import { type ReactNode, Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { safeRedirect } from '@/lib/redirect';
 import { Icon, Pill, Spinner } from '@/components/ui';
 
 function LoginForm(): ReactNode {
   const params = useSearchParams();
-  const from = params.get('from') ?? '/';
+  const from = params.get('from');
   const [passphrase, setPassphrase] = useState('');
   const [state, setState] = useState<'idle' | 'checking' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -17,7 +18,7 @@ function LoginForm(): ReactNode {
     setState('checking');
     try {
       await api.login(passphrase);
-      window.location.href = from;
+      window.location.href = safeRedirect(from, window.location.origin);
     } catch (err) {
       setState('error');
       setMessage(err instanceof Error ? err.message : 'The passphrase does not match.');

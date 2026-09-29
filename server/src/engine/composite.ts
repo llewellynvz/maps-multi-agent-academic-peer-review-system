@@ -18,20 +18,31 @@ export function loadBannedPhrases(): string[] {
     return bannedCache;
   }
   const module = readKnowledgeModule('04_DEVELOPMENTAL_VOICE.md');
+  // Only the first column of the banned table counts. The second column holds the recommended
+  // replacements, and the sections after the table quote required voice ("I have read the manuscript",
+  // "you"), so harvesting every quote penalised a report for following the guide.
   const start = module.indexOf('## Banned destructive phrasing');
-  const region = start >= 0 ? module.slice(start) : module;
+  const afterStart = start >= 0 ? module.slice(start) : module;
+  const nextHeading = afterStart.indexOf('\n## ', 1);
+  const region = nextHeading >= 0 ? afterStart.slice(0, nextHeading) : afterStart;
   const phrases = new Set<string>();
-  const pattern = /"([^"]{3,})"/g;
-  let match = pattern.exec(region);
-  while (match !== null) {
-    const phrase = (match[1] ?? '').trim().toLowerCase();
-    if (phrase.length >= 3) {
-      phrases.add(phrase);
+  for (const line of region.split('\n')) {
+    const firstCell = /^\|([^|]*)\|/.exec(line.trim())?.[1] ?? '';
+    for (const match of firstCell.matchAll(/"([^"]{3,})"/g)) {
+      // A placeholder such as "the authors ignore [X]" is matched on the fixed wording before it.
+      const phrase = (match[1] ?? '').split('[')[0]!.trim().toLowerCase();
+      if (phrase.length >= 3) {
+        phrases.add(phrase);
+      }
     }
-    match = pattern.exec(region);
   }
   bannedCache = [...phrases];
   return bannedCache;
+}
+
+function bannedPhrasePattern(phrase: string): RegExp {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`);
 }
 
 function clamp01(value: number): number {
@@ -44,7 +55,7 @@ function clamp01(value: number): number {
   return value;
 }
 
-const FINDING_ID_TOKEN = /REV-[A-Z]{3,4}-\d{4}/;
+const FINDING_ID_TOKEN = /REV-[A-Z]{3,4}-\d{4,}/;
 
 function countUncitedClaims(body: string): { total: number; uncited: number } {
   const sentences = body
@@ -100,7 +111,7 @@ export function computeComposite(input: CompositeInput): CompositeResult {
   const body = input.bodyMarkdown.toLowerCase();
   let toneRiskHits = 0;
   for (const phrase of loadBannedPhrases()) {
-    if (body.includes(phrase)) {
+    if (bannedPhrasePattern(phrase).test(body)) {
       toneRiskHits += 1;
     }
   }

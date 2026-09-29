@@ -245,7 +245,7 @@ describe('injection fixtures quarantine at each tier within the release gate (SE
     expect(result.halted).toBe(false);
   });
 
-  it('raises the model-directed injection fixture to tier 3 and halts', async () => {
+  it('quarantines the model-directed injection fixture at tier 2 and continues (knowledge/01)', async () => {
     const result = await sanitizeManuscript({
       text: tier3Fixture,
       runDispatch: async () => {
@@ -254,8 +254,9 @@ describe('injection fixtures quarantine at each tier within the release gate (SE
       reviewId: 'rev-tier3',
       detect: neutralDetect,
     });
-    expect(result.tier).toBe(3);
-    expect(result.status).toBe('halted');
-    expect(result.halted).toBe(true);
+    expect(result.tier).toBe(2);
+    expect(result.status).toBe('quarantined');
+    expect(result.halted).toBe(false);
+    expect(result.quarantineLog.length).toBeGreaterThan(0);
   });
 });

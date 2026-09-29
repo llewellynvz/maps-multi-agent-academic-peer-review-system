@@ -13,7 +13,7 @@ describe('dispatch cost estimation', () => {
       cachedTokens: 1900,
       reasoningTokens: 0,
     });
-    const raw = (100 * 0.625 + 1900 * 0.0625 + 100 * 5.0) / 1_000_000;
+    const raw = (100 * 1.25 + 1900 * 0.125 + 100 * 10.0) / 1_000_000;
     expect(cost).toBe(Math.round(raw * 1_000_000) / 1_000_000);
   });
 
@@ -42,15 +42,15 @@ describe('dispatch cost estimation', () => {
       cachedTokens: 0,
       reasoningTokens: 0,
     });
-    expect(cost).toBeCloseTo(0.625, 6);
+    expect(cost).toBeCloseTo(1.25, 6);
   });
 
   it('rejects overrides without exactly three non-empty fields', () => {
     const tokens = { inputTokens: 0, outputTokens: 1_000_000, cachedTokens: 0, reasoningTokens: 0 };
     process.env.MARA_PRICING_GPT_5_1 = '1,,3';
-    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(5);
+    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(10);
     process.env.MARA_PRICING_GPT_5_1 = '1,2,3,4';
-    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(5);
+    expect(estimateCostUsd('gpt-5.1', tokens)).toBe(10);
     process.env.MARA_PRICING_GPT_5_1 = '1,2,3';
     expect(estimateCostUsd('gpt-5.1', tokens)).toBe(3);
   });

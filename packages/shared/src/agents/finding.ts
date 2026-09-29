@@ -16,7 +16,7 @@ export const fixabilitySchema = z.enum([
 
 export const findingScopeSchema = z.enum(['author-facing', 'editor-only', 'both']);
 
-export const findingIdSchema = z.string().regex(/^REV-[A-Z]{3,4}-\d{4}$/);
+export const findingIdSchema = z.string().regex(/^REV-[A-Z]{3,4}-\d{4,}$/);
 
 function bandMatchesConfidence(band: z.infer<typeof bandSchema>, confidence: number): boolean {
   if (band === 'Green') {

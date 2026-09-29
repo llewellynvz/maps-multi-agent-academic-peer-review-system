@@ -68,6 +68,9 @@ export function resolveAnswer(question: Question, answers: Record<string, string
 export interface SubmitContext {
   answers: Record<string, string>;
   preset: string;
+  // Whether the user picked a depth. Without a preset question an untouched chip is only the screen's
+  // placeholder, and sending it would override the default tier saved in Settings.
+  presetTouched?: boolean;
   journal: string;
   focus: string[];
   notes: string;
@@ -82,7 +85,9 @@ export function buildAnswersPayload(
     if (question.id === 'preset') {
       payload.push({ questionId: 'preset', value: context.preset });
     } else if (question.id === 'journal') {
-      payload.push({ questionId: 'journal', value: context.journal.length > 0 ? context.journal : 'None' });
+      if (context.journal.trim().length > 0) {
+        payload.push({ questionId: 'journal', value: context.journal.trim() });
+      }
     } else if (NEW_INTAKE_IDS.has(question.id)) {
       const resolved = resolveAnswer(question, context.answers);
       if (resolved.length > 0) {
@@ -91,6 +96,11 @@ export function buildAnswersPayload(
     } else if (context.answers[question.id] !== undefined) {
       payload.push({ questionId: question.id, value: context.answers[question.id] ?? '' });
     }
+  }
+  // The depth chips are always on screen, so a depth the user picked is sent even when the lite-parse
+  // asked no preset question; otherwise that pick was silently dropped.
+  if (context.presetTouched === true && !questions.some((question) => question.id === 'preset')) {
+    payload.unshift({ questionId: 'preset', value: context.preset });
   }
   payload.push({ questionId: 'feedback_focus', value: context.focus });
   if (context.notes.length > 0) {
@@ -124,7 +134,8 @@ export function parseQualitySentence(quality: 'good' | 'degraded'): string {
 }
 
 export function alignmentSentence(alignment: string): string {
-  const key = alignment.trim().replace(/\s+/g, '-').toLowerCase();
+  // The server sends snake_case (partially_supported); accept spaces and hyphens too.
+  const key = alignment.trim().replace(/[\s_]+/g, '-').toLowerCase();
   if (key === 'supported') {
     return 'The review evidence supports your preliminary assessment.';
   }

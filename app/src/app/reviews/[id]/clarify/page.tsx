@@ -10,12 +10,8 @@ import { Section } from '@/components/Section';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { CheckChips } from '@/components/CheckChips';
 import { DetectedSummary } from '@/components/DetectedSummary';
+import { PRESET_TIME } from '@/lib/format';
 
-const PRESET_TIME: Record<string, string> = {
-  fast: '~7 min',
-  balanced: '~12-16 min',
-  thorough: '~20-28 min',
-};
 
 const FOCUS_OPTIONS = ['Statistics', 'Methods', 'Theory', 'Writing', 'Ethics'];
 
@@ -29,12 +25,16 @@ export default function ClarifyPage(): ReactNode {
   const [notes, setNotes] = useState('');
   const [journal, setJournal] = useState('');
   const [preset, setPreset] = useState('balanced');
+  const [presetTouched, setPresetTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Poll right away, then every two seconds, one request at a time: a slow response must not stack up
+    // overlapping requests, and the page should not sit empty for the first interval.
     let cancelled = false;
-    const poll = setInterval(async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const poll = async (): Promise<void> => {
       try {
         const result = await api.getQuestions(id);
         if (cancelled) {
@@ -45,23 +45,32 @@ export default function ClarifyPage(): ReactNode {
         if (presetQ !== undefined) {
           setPreset((current) => (current === 'balanced' ? presetQ.default : current));
         }
-        clearInterval(poll);
       } catch (err) {
-        const code = (err as { code?: string }).code;
-        if (code !== 'parse_incomplete' && !cancelled) {
-          setError(err instanceof Error ? err.message : 'The manuscript could not be read.');
-          clearInterval(poll);
+        if (cancelled) {
+          return;
         }
+        const code = (err as { code?: string }).code;
+        if (code !== 'parse_incomplete') {
+          setError(err instanceof Error ? err.message : 'The manuscript could not be read.');
+          return;
+        }
+        timer = setTimeout(() => void poll(), 2000);
       }
-    }, 2000);
-    return () => { cancelled = true; clearInterval(poll); };
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
+    };
   }, [id]);
 
   const submit = async (useDefaults: boolean): Promise<void> => {
     setSubmitting(true);
     try {
       const payload = !useDefaults && data !== null
-        ? buildAnswersPayload(data.questions, { answers, preset, journal, focus, notes })
+        ? buildAnswersPayload(data.questions, { answers, preset, presetTouched, journal, focus, notes })
         : [];
       await api.submitAnswers(id, { answers: payload, useDefaults });
       router.push(`/reviews/${id}/run`);
@@ -127,8 +136,9 @@ export default function ClarifyPage(): ReactNode {
           ))}
           {layout.reviewTitle !== null ? (
             <div className="field">
-              <label>The name this review will carry</label>
+              <label htmlFor="review-title">The name this review will carry</label>
               <input
+                id="review-title"
                 value={resolveAnswer(layout.reviewTitle, answers)}
                 onChange={(event) => setAnswers((prev) => ({ ...prev, [layout.reviewTitle!.id]: event.target.value }))}
               />
@@ -157,13 +167,13 @@ export default function ClarifyPage(): ReactNode {
               ...(PRESET_TIME[option] !== undefined ? { hint: PRESET_TIME[option] } : {}),
             }))}
             value={preset}
-            onChange={(value) => setPreset(value as string)}
+            onChange={(value) => { setPreset(value as string); setPresetTouched(true); }}
           />
         </div>
         {layout.journal !== null ? (
           <div className="field">
-            <label>Target journal</label>
-            <input value={journal} onChange={(event) => setJournal(event.target.value)} placeholder="None" />
+            <label htmlFor="target-journal">Target journal</label>
+            <input id="target-journal" value={journal} onChange={(event) => setJournal(event.target.value)} placeholder="None" />
           </div>
         ) : null}
         <div className="field">

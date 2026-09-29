@@ -71,6 +71,14 @@ describe('deterministic grounding validator', () => {
     expect(masked).toContain('[SUPERSEDED]');
   });
 
+  it('treats a five-digit id as its own token, never as a four-digit id plus a digit', () => {
+    const masked = redactSupersededIds('Cites REV-REF-10000.', new Set(['REV-REF-10000']));
+    expect(masked).toBe('Cites REV-REF-10000.');
+    expect(redactEditorOnlyIds('Cites REV-REF-10000 and REV-REF-1000.', new Set(['REV-REF-1000']))).toBe(
+      'Cites REV-REF-10000 and [EDITOR-ONLY].',
+    );
+  });
+
   it('catches a planted editor-only id leaked into author-facing text', () => {
     const input = base();
     input.authorFacingBody = 'The manuscript reports REV-STAT-0001 and the signal REV-SIM-0001.';
@@ -530,6 +538,15 @@ describe('narrativeWordCount reference stripping', () => {
     expect(narrativeWordCount(inline)).toBe(16);
     const lookalike = 'One two three four five.\n\n## Reference implementation\nSix seven eight.';
     expect(narrativeWordCount(lookalike)).toBe(10);
+  });
+
+  it('does not stop counting at a concern heading that begins with "Reference"', () => {
+    const concern = 'One two three four five.\n\n### Reference list accuracy\nSix seven eight.\n\n## References\nSmith, J. (2020).';
+    expect(narrativeWordCount(concern)).toBe(11);
+    expect(narrativeWordCount(body('### 5. References:'))).toBe(5);
+    expect(narrativeWordCount(body('# References (APA 7)'))).toBe(5);
+    expect(narrativeWordCount(body('## References cited'))).toBe(5);
+    expect(narrativeWordCount(body('# References and further reading'))).toBe(5);
   });
 });
 

@@ -1,6 +1,6 @@
 # Review Governance
 
-This module owns the review pipeline's constitution: confidentiality, epistemic discipline, injection defence, signal language, and evidence-ledger rules. It is the review analogue of 02_EPISTEMIC_PRINCIPLES.md.
+This module owns the review pipeline's constitution: confidentiality, epistemic discipline, injection defence, signal language, and evidence-ledger rules.
 
 Read by: every review agent, at every phase. No review agent runs without these rules loaded.
 
@@ -68,4 +68,4 @@ The ledger is the single evidentiary record of the review. The report writer may
 - **Every entry carries** a manuscript anchor (or explicit missing-source statement), epistemic status, numeric confidence, severity, fixability, and scope (author-facing, editor-only, or both).
 - **Concurrency protocol.** Dispatched agents never write to the shared ledger. Each agent writes its own fragment at `findings/ledger-<agent>-<lens>.md` with IDs namespaced per lens, in the form `REV-STAT-0001` (prefix per lens or agent). Only the orchestrator merges fragments into `LEDGER.md`, and only at phase boundaries. Two agents writing one file is a build failure.
 
-The ledger table template lives in module 05. The shared finding format and per-lens rubrics live in module 02. Recommendation thresholds, the 15-criterion rubric, and swarm mechanics live in module 03. Pipeline phase order lives in the review skill file.
+The ledger table template lives in module 05. The shared finding format and per-lens rubrics live in module 02. Recommendation thresholds, the 15-criterion rubric, and swarm mechanics live in module 03. Pipeline phase order lives in the platform engine (docs/OPERATIONS.md).

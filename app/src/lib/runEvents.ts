@@ -51,3 +51,21 @@ export function retryLogMessage(signal: RetrySignal): string {
   const label = retryPillLabel(signal);
   return signal.reason !== null ? `${label}. Reason: ${signal.reason}` : label;
 }
+
+// The release gate reports its cycle zero-based and spells its verdicts as the critic and arbitration do:
+// revise, revise-specialist, block, arbitrated, and the post-arbitration aligned or aligned-fallback. A
+// pass or a completed alignment needs no pill.
+export function gatePillLabel(verdict: string, cycle: number): string | null {
+  const key = verdict.trim().toLowerCase().replace(/_/g, '-');
+  const shown = cycle + 1;
+  if (key === 'pass' || key === 'aligned' || key === 'aligned-fallback') {
+    return null;
+  }
+  if (key === 'revise' || key === 'revise-specialist') {
+    return `Release gate requested revisions, cycle ${shown} of 2`;
+  }
+  if (key === 'block') {
+    return `Release gate blocked the draft, cycle ${shown} of 2`;
+  }
+  return 'Release gate escalated to arbitration';
+}

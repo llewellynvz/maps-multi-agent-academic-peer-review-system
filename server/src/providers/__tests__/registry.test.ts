@@ -4,7 +4,7 @@ import { createAnthropicProvider } from '../anthropic';
 import { createGoogleProvider } from '../google';
 import { createOllamaProvider } from '../ollama';
 import { createOpenAiProvider } from '../openai';
-import { createRegistry, isReasoningModel, type ProviderFactories } from '../registry';
+import { createRefreshingRegistry, createRegistry, isReasoningModel, maxReasoningEffort, readRoleConfigs, type ProviderFactories } from '../registry';
 import type { DispatchProvider } from '../types';
 
 function sentinelModel(id: string): LanguageModel {
@@ -85,6 +85,36 @@ describe('createRegistry role resolution', () => {
   });
 });
 
+describe('role provider configuration', () => {
+  it('defaults to the Azure deployments and can point a role at another provider', () => {
+    expect(readRoleConfigs(env).frontier).toEqual({ provider: 'azure', model: 'gpt-5.1' });
+    const routed = readRoleConfigs({ ...env, MARA_FRONTIER_PROVIDER: 'anthropic', MARA_FRONTIER_MODEL: 'claude-opus-5-5' });
+    expect(routed.frontier).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
+    expect(routed.cheap.provider).toBe('azure');
+  });
+
+  it('requires a model for a non-Azure role and rejects an unknown provider', () => {
+    expect(() => readRoleConfigs({ ...env, MARA_CHEAP_PROVIDER: 'openai' })).toThrow(/MARA_CHEAP_MODEL/);
+    expect(() => readRoleConfigs({ ...env, MARA_CHEAP_PROVIDER: 'bogus', MARA_CHEAP_MODEL: 'x' })).toThrow(/must be one of/);
+  });
+
+  it('rebuilds the registry only when its fingerprint changes', () => {
+    let fingerprint = 'a';
+    let builds = 0;
+    const registry = createRefreshingRegistry({
+      fingerprint: () => fingerprint,
+      env: () => {
+        builds += 1;
+        return { ...env, OLLAMA_BASE_URL: 'http://127.0.0.1:11434', OLLAMA_MODEL: `model-${builds}` };
+      },
+    });
+    expect(registry.resolveRole('local').model).toBe('model-1');
+    expect(registry.resolveRole('local').model).toBe('model-1');
+    fingerprint = 'b';
+    expect(registry.resolveRole('local').model).toBe('model-2');
+  });
+});
+
 describe('isReasoningModel', () => {
   it('flags the frontier gpt-5 family and o-series but not mini variants', () => {
     expect(isReasoningModel('azure', 'gpt-5.1')).toBe(true);
@@ -92,6 +122,17 @@ describe('isReasoningModel', () => {
     expect(isReasoningModel('openai', 'o3')).toBe(true);
     expect(isReasoningModel('azure', 'gpt-4o')).toBe(false);
     expect(isReasoningModel('local', 'qwen2:7b')).toBe(false);
+  });
+});
+
+describe('maxReasoningEffort', () => {
+  it('sends xhigh only to models that accept it', () => {
+    expect(maxReasoningEffort('gpt-5.6-sol')).toBe('xhigh');
+    expect(maxReasoningEffort('gpt-5.2')).toBe('xhigh');
+    expect(maxReasoningEffort('gpt-5.1-codex-max')).toBe('xhigh');
+    expect(maxReasoningEffort('gpt-5.1')).toBe('high');
+    expect(maxReasoningEffort('gpt-5')).toBe('high');
+    expect(maxReasoningEffort('o3')).toBe('high');
   });
 });
 

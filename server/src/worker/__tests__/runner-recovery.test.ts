@@ -186,14 +186,15 @@ describe('WorkerRunner lease heartbeat throttling (F10)', () => {
 });
 
 describe('WorkerRunner ingest resume reconciliation (F11)', () => {
-  it('falls back to a fresh ingest when the stored ingest snapshot is missing', async () => {
+  it('falls back to a fresh ingest when the stored ingest snapshot is missing, then replays the saved answers', async () => {
     insertReview('rev-missing', '2026-07-14T00:00:00.000Z');
     insertManuscript('rev-missing', 'application/pdf', 'study.pdf', 'data/blobs/rev-missing/manuscript/original.pdf');
     client.sqlite.prepare("UPDATE reviews SET status = 'awaiting_input' WHERE id = 'rev-missing'").run();
-    insertRunCommand('rev-missing', 'resume', { answers: { field: 'wellbeing' } });
+    insertRunCommand('rev-missing', 'resume', { trigger: 'clarify', answers: { field: 'wellbeing' } });
 
     const calls = { start: 0, resume: 0 };
     const seenArgs: Array<Record<string, unknown>> = [];
+    const seenAnswers: Array<Record<string, string>> = [];
     const processors: WorkerProcessors = {
       startIngest: async (_reviewId, args) => {
         calls.start += 1;
@@ -201,8 +202,9 @@ describe('WorkerRunner ingest resume reconciliation (F11)', () => {
         updateReview(client.db, 'rev-missing', { status: 'awaiting_input' });
         return 'suspended';
       },
-      resumeIngest: async () => {
+      resumeIngest: async (_reviewId, answers) => {
         calls.resume += 1;
+        seenAnswers.push(answers);
         return 'ingested';
       },
       runEngine: async () => 'completed',
@@ -214,8 +216,9 @@ describe('WorkerRunner ingest resume reconciliation (F11)', () => {
     await runner.runOnce();
     await runner.settle();
 
-    expect(calls.resume).toBe(0);
     expect(calls.start).toBe(1);
+    expect(calls.resume).toBe(1);
+    expect(seenAnswers[0]).toEqual({ field: 'wellbeing' });
     expect(seenArgs[0]?.filePath).toBe('data/blobs/rev-missing/manuscript/original.pdf');
     const fallbackEvents = client.sqlite
       .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = 'rev-missing' AND kind = 'error'")
@@ -394,4 +397,49 @@ describe('WorkerRunner durable apply-then-ack recovery', () => {
     expect(terminal).toHaveLength(1);
     expect((JSON.parse(terminal[0]!.payload_json) as { outcome: string }).outcome).toBe('complete');
   });
+});
+
+describe('WorkerRunner durable pause and cancel of the review in flight', () => {
+  for (const command of ['cancel', 'pause'] as const) {
+    it(`honours a ${command} acknowledged mid-phase after a crash, instead of resuming the run`, async () => {
+      insertReview('rev-live', '2026-07-14T00:00:00.000Z');
+      completeIngest('rev-live');
+      insertRunCommand('rev-live', 'run');
+
+      let markStarted: () => void = () => undefined;
+      const engineStarted = new Promise<void>((resolve) => {
+        markStarted = resolve;
+      });
+      let release: () => void = () => undefined;
+      const engineReleased = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const processors: WorkerProcessors = {
+        startIngest: async () => 'ingested',
+        resumeIngest: async () => 'ingested',
+        runEngine: async (reviewId) => {
+          updateReview(client.db, reviewId, { status: 'running' });
+          markStarted();
+          await engineReleased;
+          return 'stopped';
+        },
+      };
+      const runnerA = new WorkerRunner({ client, processors });
+      runnerA.pollCommands();
+      void runnerA.runOnce();
+      await engineStarted;
+
+      insertRunCommand('rev-live', command);
+      runnerA.pollCommands();
+
+      // The worker dies before the phase boundary: runnerA never reaches its stopping point.
+      expect(reviewStatus('rev-live')).toBe('running');
+      const runnerB = new WorkerRunner({ client, processors: completingProcessors([]) });
+      runnerB.recover();
+      expect(reviewStatus('rev-live')).toBe(command === 'cancel' ? 'cancelled' : 'paused');
+      await runnerB.runOnce();
+      expect(reviewStatus('rev-live')).toBe(command === 'cancel' ? 'cancelled' : 'paused');
+      release();
+    });
+  }
 });

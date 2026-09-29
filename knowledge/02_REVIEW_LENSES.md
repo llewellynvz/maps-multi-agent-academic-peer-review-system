@@ -110,7 +110,7 @@ Examines analyses, assumptions, uncertainty, and alignment between analyses and 
 5. Run the Statcheck-style screen: reported test statistics, degrees of freedom, and p-values must be mutually consistent. Any hit against the impossible-results definition (owned by the consistency rubric below) escalates there and to the ledger.
 6. Benchmark effect sizes against field norms from the field-benchmark packet. Cohen's psychology conventions are not exported: medical work uses NNT, ARR, and NNH, education treats d of 0.20 or more as policy-relevant, computational work uses task-specific baselines.
 
-Decision rules: **code-unavailable fallback:** when analysis code is absent, evaluate internal consistency of reported results, list the diagnostics that cannot be checked (residual plots, influence statistics, VIF, fit indices), cap confidence at 0.85 until they are provided, and band any finding that depends on unavailable diagnostics Red. Estimation and Bayesian approaches are not forced into null-hypothesis testing. Raw-data errors are never inferred without the data.
+Decision rules: **code-unavailable fallback:** when analysis code is absent, evaluate internal consistency of reported results, list the diagnostics that cannot be checked (residual plots, influence statistics, VIF, fit indices), cap confidence at 0.85 (Yellow) until they are provided; a finding that rests on a diagnostic you cannot check stays below 0.70 and is banded Red, because the band always follows the confidence (knowledge/01). Estimation and Bayesian approaches are not forced into null-hypothesis testing. Raw-data errors are never inferred without the data.
 
 ### 6. Measurement and psychometrics (REV-MEAS)
 

@@ -117,7 +117,7 @@ A compact packet: a manuscript card (design, sample, claims, journal scope), the
 
 ### Population
 
-24 to 48 reviewer profiles, stratified by expertise (domain, methods, statistics, measurement, theory, qualitative where relevant, editorial) and epistemic style (skeptical through charitable, balanced). Each profile declares exactly one blind spot from this list, never a vague or invented one:
+24 to 48 reviewer profiles (the fast preset runs a reduced population of 12 over rounds 0 to 2, and its stability figure is reported as such), stratified by expertise (domain, methods, statistics, measurement, theory, qualitative where relevant, editorial) and epistemic style (skeptical through charitable, balanced). Each profile declares exactly one blind spot from this list, never a vague or invented one:
 
 1. Dismissing unconventional methods as underpowered or unvalidated.
 2. Approving familiar methods despite assumption violations.
@@ -156,4 +156,4 @@ All revise and revise-specialist iterations count against the same 2-cycle gate 
 
 ## Ownership boundaries
 
-The review constitution, confidence bands, signal language, and ledger mechanics live in module 01. Per-lens rubrics, the shared finding format, and the impossible-results definition live in module 02. Report voice lives in module 04. All output templates, including the swarm summary table, live in module 05. Pipeline phase order lives in the review skill file. Any conflict resolves to the owning module.
+The review constitution, confidence bands, signal language, and ledger mechanics live in module 01. Per-lens rubrics, the shared finding format, and the impossible-results definition live in module 02. Report voice lives in module 04. All output templates, including the swarm summary table, live in module 05. Pipeline phase order lives in the platform engine (docs/OPERATIONS.md). Any conflict resolves to the owning module.

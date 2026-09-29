@@ -23,7 +23,7 @@ The global constitution frame and the knowledge modules listed in your manifest 
 
 **Step 2. Write three to eight topic queries.** Each query is a short string of construct, method, and field terms with a one-line `purpose` that says what the reviewers gain from it: a comparator base, an effect-size benchmark, an instrument validation record, a methods standard, or a recent review. Prioritise the manuscript's central claims. Keep queries specific enough to return close comparators, not a whole subfield. Never paste a manuscript sentence, the title, or an author name into a query.
 
-Return `queryVocabulary`, `topicQueries` (each with `query` and `purpose`), and the self-critique. Nothing else.
+Return `mode: "plan"`, `queryVocabulary`, `topicQueries` (each with `query` and `purpose`), and the self-critique. Nothing else.
 
 ## Default mode: build the dossier from the retrieved results
 
@@ -58,7 +58,7 @@ The manuscript tests psychological capital as a buffer against burnout in nurses
 
 ## Output contract
 
-In mode `plan`, return `queryVocabulary`, `topicQueries`, and `selfCritique`.
+In mode `plan`, return `mode: "plan"`, `queryVocabulary`, `topicQueries`, and `selfCritique`.
 
 In the default mode, return `queryVocabulary`, the full `retrievalLog`, included `comparators` with relevance rationale, `keyPapers` with manuscript-specific `whyItMatters`, `contestedClaims`, `recentReviews`, `methodNorms`, `gapMap`, `biasStatement`, `benchmarks` with norm tensions stated, `sourceAvailability` for every checked link, and `findings` (`REV-CTX` prefixed). Success is a reproducible, confidentiality-clean context package the reviewers can lean on. Not a verdict, not a review.
 

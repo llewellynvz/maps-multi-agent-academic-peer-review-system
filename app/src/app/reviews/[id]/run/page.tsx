@@ -3,9 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type EvidenceData } from '@/lib/api';
-import { PHASE_DESCRIPTIONS, PHASES, phaseIndex, phaseLabel } from '@/lib/format';
+import { formatDuration, PHASE_DESCRIPTIONS, PHASES, phaseIndex, phaseLabel } from '@/lib/format';
 import { LENS_FALLBACK, LENS_INFO, prefixOf } from '@/lib/lenses';
-import { parseRetrySignal, retryLogMessage, retryPillLabel, type RetrySignal } from '@/lib/runEvents';
+import { gatePillLabel, parseRetrySignal, retryLogMessage, retryPillLabel, type RetrySignal } from '@/lib/runEvents';
 import type { RunDrawerState } from '@/lib/runDrawer';
 import { Icon, Meter, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
@@ -55,6 +55,23 @@ export default function RunPage(): ReactNode {
   const [drawer, setDrawer] = useState<RunDrawerState | null>(null);
   const [evidence, setEvidence] = useState<EvidenceData | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [controlError, setControlError] = useState<string | null>(null);
+
+  // Run controls report their failures instead of assuming success: a rejected pause must not leave the
+  // badge claiming the run is paused while it carries on.
+  const control = async (action: () => Promise<unknown>, onSuccess?: () => void): Promise<void> => {
+    setControlError(null);
+    try {
+      const result = await action();
+      if (typeof result === 'object' && result !== null && (result as { noop?: boolean }).noop === true) {
+        setControlError(`Nothing to change: the review is ${(result as { status?: string }).status ?? 'not active'}.`);
+        return;
+      }
+      onSuccess?.();
+    } catch (err) {
+      setControlError(err instanceof Error ? err.message : 'The request did not go through.');
+    }
+  };
   const evidenceStale = useRef(true);
   const notified = useRef(false);
   const phaseRef = useRef('phase_0');
@@ -92,12 +109,28 @@ export default function RunPage(): ReactNode {
   }, [terminal]);
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      void Notification.requestPermission();
-    }
+    // Browsers ignore a permission prompt that no user gesture triggered, so ask on the first interaction.
+    const askNotify = (): void => {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        void Notification.requestPermission();
+      }
+    };
+    window.addEventListener('pointerdown', askNotify, { once: true });
+
     const source = new EventSource(`/api/reviews/${id}/events`, { withCredentials: true });
     source.onopen = () => setConnected(true);
-    source.onerror = () => setConnected(false);
+    // EventSource hides the HTTP status, so a lapsed session looks like a dropped connection and retries
+    // forever. Probe with an ordinary request, which redirects to sign-in on a 401.
+    let lastProbe = 0;
+    source.onerror = () => {
+      setConnected(false);
+      const now = Date.now();
+      if (now - lastProbe > 10_000) {
+        lastProbe = now;
+        void api.getReview(id).catch(() => undefined);
+      }
+    };
+    const seenPhases = new Set<string>();
 
     const LOG_CAP = 400;
     const addLog = (key: string, ts: string | undefined, message: string, phase: string): void => {
@@ -137,9 +170,13 @@ export default function RunPage(): ReactNode {
         } else {
           setCurrentPhase((prev) => (phaseIndex(data.phase) >= phaseIndex(prev) ? (data.phase as string) : prev));
         }
-        if (retry === null) {
+        // Phases announce themselves when they start ({started: true}) and again when they finish, with
+        // results. Only the start (or, for older runs, the first sighting) is a "Started" entry.
+        const started = (data as { started?: boolean }).started === true;
+        if (retry === null && (started || !seenPhases.has(data.phase))) {
           addLog(`phase-${data.phase}-${data.ts ?? ''}`, data.ts, `Started ${phaseLabel(data.phase)}`, data.phase);
         }
+        seenPhases.add(data.phase);
       }
     });
     source.addEventListener('run_paused', (event) => {
@@ -189,14 +226,14 @@ export default function RunPage(): ReactNode {
     });
     source.addEventListener('gate_verdict', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { verdict: string; cycle: number; source?: string; ts?: string; phase?: string };
-      setGate(data.verdict === 'pass' ? null : { verdict: data.verdict, cycle: data.cycle });
+      setGate(gatePillLabel(data.verdict, data.cycle) === null ? null : { verdict: data.verdict, cycle: data.cycle });
       if (data.verdict !== 'pass') {
         evidenceStale.current = true;
       }
       addLog(
         `gate-${data.cycle}-${data.source ?? 'gate'}-${data.verdict}`,
         data.ts,
-        `Release gate ${data.verdict}${data.source !== undefined ? ` (${data.source}, cycle ${data.cycle})` : ` (cycle ${data.cycle})`}`,
+        `Release gate ${data.verdict}${data.source !== undefined ? ` (${data.source}, cycle ${data.cycle + 1})` : ` (cycle ${data.cycle + 1})`}`,
         data.phase ?? phaseRef.current,
       );
     });
@@ -231,7 +268,10 @@ export default function RunPage(): ReactNode {
       setFailedPhase(data.phase ?? phaseRef.current);
     });
 
-    return () => source.close();
+    return () => {
+      source.close();
+      window.removeEventListener('pointerdown', askNotify);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -287,7 +327,8 @@ export default function RunPage(): ReactNode {
       .map((prefix) => {
         const info = LENS_INFO[prefix] ?? LENS_FALLBACK;
         const reported = lenses[prefix]?.status;
-        const count = findings.filter((f) => f.lensPrefix === prefix).length;
+        // The headline list is capped for display, so the server's per-lens count is the true figure.
+        const count = lenses[prefix]?.count ?? findings.filter((f) => f.lensPrefix === prefix).length;
         const status: LensStatus =
           reported === 'done' ? 'done' : reported === 'active' || reported === 'running' ? 'running' : count > 0 ? 'running' : 'pending';
         return { prefix, display: info.display, purpose: info.purpose, status, count };
@@ -318,17 +359,9 @@ export default function RunPage(): ReactNode {
             {paused && terminal === null ? <Pill tone="warn" label="Paused" icon="pause" /> : null}
             {retrying !== null && terminal === null ? <Pill tone="warn" icon="clock" label={retryPillLabel(retrying)} /> : null}
             {gate !== null && terminal === null ? (
-              <Pill
-                tone="neutral"
-                label={
-                  gate.verdict === 'revise' || gate.verdict === 'revise_specialist'
-                    ? `Release gate requested revisions, cycle ${gate.cycle} of 2`
-                    : `Release gate escalated to arbitration, cycle ${gate.cycle}`
-                }
-                icon="clock"
-              />
+              <Pill tone="neutral" label={gatePillLabel(gate.verdict, gate.cycle) ?? ''} icon="clock" />
             ) : null}
-            {terminal === 'complete' ? <Pill tone="info" label="Complete" /> : null}
+            {terminal === 'complete' ? <Pill tone="success" label="Complete" /> : null}
             {terminal === 'failed' ? <Pill tone="fail" label="Halted" /> : null}
           </>
         }
@@ -338,7 +371,7 @@ export default function RunPage(): ReactNode {
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           <StatTile label="Cost" value={cost !== null ? `$${cost.total.toFixed(4)}` : '--'} />
           <StatTile label="Tokens in / out" value={cost !== null ? `${cost.tokensIn} / ${cost.tokensOut}` : '--'} />
-          <StatTile label="Estimated remaining" value={eta !== null && terminal === null ? `~${eta.seconds}s` : '--'} />
+          <StatTile label="Estimated remaining" value={eta !== null && terminal === null ? `~${formatDuration(eta.seconds * 1000)}` : '--'} />
           <div style={{ flex: 1, minWidth: 180 }}>
             <Meter value={pct / 100} error={terminal === 'failed'} />
           </div>
@@ -429,7 +462,7 @@ export default function RunPage(): ReactNode {
                   <button
                     className="btn btn-secondary"
                     onClick={() => {
-                      void api.retryPhase(id, failedPhase).then(() => window.location.reload());
+                      void control(() => api.retryPhase(id, failedPhase), () => window.location.reload());
                     }}
                   >
                     Retry from {phaseLabel(failedPhase)}
@@ -437,16 +470,18 @@ export default function RunPage(): ReactNode {
                 ) : null}
                 <button className="btn btn-ghost" onClick={() => router.push(`/reviews/${id}/results`)}>View partial results</button>
               </div>
+              {controlError !== null ? <div role="alert" style={{ marginTop: 12 }}><Pill tone="fail" label={controlError} /></div> : null}
             </div>
           ) : null}
 
           {terminal === null ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-ghost" onClick={() => { setPaused(true); void api.pause(id); }}><Icon name="pause" /> Pause</button>
-                <button className="btn btn-ghost" onClick={() => { setPaused(false); void api.resume(id); }}><Icon name="play" /> Resume</button>
-                <button className="btn btn-ghost" onClick={() => void api.cancel(id)}>Cancel</button>
+                <button className="btn btn-ghost" onClick={() => { void control(() => api.pause(id), () => setPaused(true)); }}><Icon name="pause" /> Pause</button>
+                <button className="btn btn-ghost" onClick={() => { void control(() => api.resume(id), () => setPaused(false)); }}><Icon name="play" /> Resume</button>
+                <button className="btn btn-ghost" onClick={() => { void control(() => api.cancel(id)); }}>Cancel</button>
               </div>
+              {controlError !== null ? <div role="alert" style={{ marginTop: 12 }}><Pill tone="fail" label={controlError} /></div> : null}
             </div>
           ) : null}
 

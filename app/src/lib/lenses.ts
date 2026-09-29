@@ -30,9 +30,10 @@ export const LENS_INFO: Record<string, LensInfo> = {
 
 export const LENS_FALLBACK: LensInfo = { display: 'Review', purpose: 'General review finding' };
 
+// Real ids are REV-<PREFIX>-<NNNN>; the leading REV- is the namespace, not the lens.
 export function prefixOf(findingId: string): string {
-  const match = /^[A-Za-z]+/.exec(findingId.trim());
-  return (match?.[0] ?? '').toUpperCase();
+  const match = /^(?:REV-)?([A-Za-z]+)/i.exec(findingId.trim());
+  return (match?.[1] ?? '').toUpperCase();
 }
 
 export function lensInfo(findingId: string): LensInfo {

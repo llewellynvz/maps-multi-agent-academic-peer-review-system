@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { api, type ProviderKeyView, type PublicSettings, type ReviewSummary } from '@/lib/api';
 import { Icon, Pill, Spinner } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
@@ -13,22 +13,38 @@ export default function SettingsPage(): ReactNode {
   const [newProvider, setNewProvider] = useState('anthropic');
   const [newKey, setNewKey] = useState('');
   const [passphrase, setPassphrase] = useState('');
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'fail' } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dangerReview, setDangerReview] = useState<ReviewSummary | null>(null);
   const [dangerAll, setDangerAll] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async (): Promise<void> => {
-    setSettings(await api.getSettings().catch(() => null));
+    try {
+      setSettings(await api.getSettings());
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Settings could not be loaded.');
+    }
     setKeys((await api.listKeys().catch(() => ({ keys: [] }))).keys);
     setReviews((await api.listReviews().catch(() => ({ reviews: [] }))).reviews);
   };
 
   useEffect(() => { void load(); }, []);
 
-  const flash = (message: string): void => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
+  const flash = (message: string, tone: 'success' | 'fail' = 'success'): void => {
+    if (toastTimer.current !== null) {
+      clearTimeout(toastTimer.current);
+    }
+    setToast({ message, tone });
+    toastTimer.current = setTimeout(() => setToast(null), tone === 'fail' ? 6000 : 3000);
   };
+
+  useEffect(() => () => {
+    if (toastTimer.current !== null) {
+      clearTimeout(toastTimer.current);
+    }
+  }, []);
 
   const addKey = async (): Promise<void> => {
     try {
@@ -37,14 +53,27 @@ export default function SettingsPage(): ReactNode {
       flash('Key added');
       await load();
     } catch (err) {
-      flash(err instanceof Error ? err.message : 'Could not add the key');
+      flash(err instanceof Error ? err.message : 'Could not add the key', 'fail');
     }
   };
 
+  const deleteKey = async (id: string): Promise<void> => {
+    try {
+      await api.deleteKey(id);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not delete the key', 'fail');
+    }
+    await load();
+  };
+
   const savePassphrase = async (clear: boolean): Promise<void> => {
-    await api.putSettings({ passphrase: clear ? null : passphrase }).catch(() => null);
-    setPassphrase('');
-    flash(clear ? 'Passphrase cleared' : 'Passphrase set');
+    try {
+      await api.putSettings({ passphrase: clear ? null : passphrase });
+      setPassphrase('');
+      flash(clear ? 'Passphrase cleared' : 'Passphrase set');
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not update the passphrase', 'fail');
+    }
     await load();
   };
 
@@ -56,9 +85,13 @@ export default function SettingsPage(): ReactNode {
     if (dangerReview === null) {
       return;
     }
-    await api.deleteReview(dangerReview.id).catch(() => null);
+    try {
+      await api.deleteReview(dangerReview.id);
+      flash('Review deleted');
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Could not delete the review', 'fail');
+    }
     setDangerReview(null);
-    flash('Review deleted');
     await load();
   };
 
@@ -68,12 +101,15 @@ export default function SettingsPage(): ReactNode {
       setDangerAll(false);
       flash(`Deleted ${result.purged} review${result.purged === 1 ? '' : 's'}`);
     } catch (err) {
-      flash(err instanceof Error ? err.message : 'Could not delete all reviews');
+      flash(err instanceof Error ? err.message : 'Could not delete all reviews', 'fail');
     }
     await load();
   };
 
   if (settings === null) {
+    if (loadError !== null) {
+      return <div role="alert"><Pill tone="fail" label={loadError} /></div>;
+    }
     return <div style={{ display: 'flex', gap: 10 }}><Spinner /> Loading settings</div>;
   }
 
@@ -96,8 +132,8 @@ export default function SettingsPage(): ReactNode {
                 <tr key={key.id}>
                   <td>{key.provider}</td>
                   <td className="num">{key.maskedKey}</td>
-                  <td><Pill tone="info" label="Verified" /></td>
-                  <td className="num"><button className="btn btn-ghost" onClick={() => api.deleteKey(key.id).then(load)} aria-label="Delete key"><Icon name="trash" /></button></td>
+                  <td><Pill tone="info" label={key.persist === 'disk' ? 'Stored' : 'Session'} /></td>
+                  <td className="num"><button className="btn btn-ghost" onClick={() => { void deleteKey(key.id); }} aria-label="Delete key"><Icon name="trash" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -105,8 +141,8 @@ export default function SettingsPage(): ReactNode {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="field" style={{ margin: 0 }}>
-            <label>Provider</label>
-            <select value={newProvider} onChange={(event) => setNewProvider(event.target.value)}>
+            <label htmlFor="key-provider">Provider</label>
+            <select id="key-provider" value={newProvider} onChange={(event) => setNewProvider(event.target.value)}>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
               <option value="google">Google</option>
@@ -114,8 +150,8 @@ export default function SettingsPage(): ReactNode {
             </select>
           </div>
           <div className="field" style={{ margin: 0, flex: 1, minWidth: 200 }}>
-            <label>API key</label>
-            <input type="password" value={newKey} onChange={(event) => setNewKey(event.target.value)} />
+            <label htmlFor="key-value">API key</label>
+            <input id="key-value" type="password" value={newKey} onChange={(event) => setNewKey(event.target.value)} />
           </div>
           <button className="btn btn-secondary" onClick={addKey} disabled={newKey.length === 0}><Icon name="plus" /> Add</button>
         </div>
@@ -127,8 +163,8 @@ export default function SettingsPage(): ReactNode {
           <p className="sub" style={{ marginBottom: 12 }}>When set, every screen requires this passphrase. It is stored only as a salted hash.</p>
           <Pill tone={settings.passphraseSet ? 'info' : 'neutral'} label={settings.passphraseSet ? 'Passphrase set' : 'Open instance'} />
           <div className="field" style={{ marginTop: 16 }}>
-            <label>New passphrase</label>
-            <input type="password" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
+            <label htmlFor="new-passphrase">New passphrase</label>
+            <input id="new-passphrase" type="password" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-secondary" onClick={() => savePassphrase(false)} disabled={passphrase.length === 0}>Set</button>
@@ -199,7 +235,13 @@ export default function SettingsPage(): ReactNode {
         onClose={() => setDangerAll(false)}
       />
 
-      {toast !== null ? <div className="toast-wrap"><div className="toast toast-info"><Icon name="check" /> {toast}</div></div> : null}
+      {toast !== null ? (
+        <div className="toast-wrap">
+          <div className={`toast toast-${toast.tone}`} role={toast.tone === 'fail' ? 'alert' : 'status'}>
+            <Icon name={toast.tone === 'fail' ? 'octagon' : 'check'} /> {toast.message}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

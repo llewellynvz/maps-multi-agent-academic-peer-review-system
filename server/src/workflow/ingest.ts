@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { Mastra } from '@mastra/core';
+import { readSetting } from '../data/settings-store';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { LibSQLStore } from '@mastra/libsql';
 import { z } from 'zod';
@@ -55,6 +56,12 @@ const SANITIZED_SECTION_MAP_BLOB = 'parse/section-map.sanitized.json';
 const LITE_PARSE_BLOB = 'parse/lite-parse.json';
 
 export function createIngestWorkflow(deps: IngestWorkflowDeps) {
+  // Read per run: the default tier chosen in Setup or Settings must apply without restarting the worker.
+  // The injected value is only the fallback when nothing has been saved.
+  const currentPresetDefault = (): string | undefined => {
+    const saved = readSetting<string>(deps.db, 'preset_default');
+    return typeof saved === 'string' && saved.length > 0 ? saved : deps.presetDefault;
+  };
   const { db } = deps;
 
   const loadSanitizedSectionMap = (reviewId: string): SectionMap => {
@@ -130,6 +137,7 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
       const haltParse = (reason: string): z.infer<typeof parseOutputSchema> => {
         const output = { reviewId: inputData.reviewId, halted: true, parser: 'unpdf' as const, parseQuality: 'degraded' as const };
         upsertCheckpoint(db, { reviewId: inputData.reviewId, phase: 'parse', status: 'failed', snapshot: { ...output, haltReason: reason } });
+        updateReview(db, inputData.reviewId, { status: 'failed', errorClass: 'parse_failed' });
         insertEvent(db, {
           reviewId: inputData.reviewId,
           kind: 'error',
@@ -230,7 +238,7 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
 
       const sectionMap = loadSanitizedSectionMap(inputData.reviewId);
       const options = getReviewOptions(db, inputData.reviewId);
-      const presetDefault = typeof options.preset === 'string' ? options.preset : deps.presetDefault;
+      const presetDefault = typeof options.preset === 'string' ? options.preset : currentPresetDefault();
       const journalProvided = typeof options.journal === 'string' && options.journal.length > 0;
 
       const lite = await liteParse({
@@ -287,7 +295,7 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
         >;
       }
 
-      const preset = resumeData.preset ?? resumeData.answers.preset ?? deps.presetDefault ?? 'balanced';
+      const preset = resumeData.preset ?? resumeData.answers.preset ?? currentPresetDefault() ?? 'balanced';
       mergeReviewOptions(db, inputData.reviewId, { preset, answers: resumeData.answers });
       updateReview(db, inputData.reviewId, { status: 'running' });
       insertEvent(db, {
@@ -312,7 +320,9 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
       if (done?.status === 'completed') {
         return { reviewId: inputData.reviewId, halted: false, status: 'ingested' };
       }
-      if (done?.status === 'failed' || inputData.halted) {
+      // Only this run's halt counts. A phase_1 'failed' left by an earlier halt (GROBID down, say) would
+      // otherwise re-halt every later run even after parse and sanitize succeed.
+      if (inputData.halted) {
         upsertCheckpoint(db, { reviewId: inputData.reviewId, phase: 'phase_1', status: 'failed', snapshot: { ingestComplete: false } });
         return { reviewId: inputData.reviewId, halted: true, status: 'halted' };
       }

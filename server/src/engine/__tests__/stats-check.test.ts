@@ -22,6 +22,11 @@ describe('distribution recomputation', () => {
 });
 
 describe('extractNhstTests', () => {
+  it('reads chi-square and z tests reported with an uppercase P, as t, F and r already are', () => {
+    const kinds = extractNhstTests('χ2(1) = 3.84, P = .05 and Z = 2.5, P = .01.').map((test) => test.kind).sort();
+    expect(kinds).toEqual(['chi2', 'z']);
+  });
+
   it('parses the five APA test forms', () => {
     const text =
       'We found t(28) = 2.20, p = .036 and F(2, 60) = 3.15, p = .049. ' +
@@ -118,6 +123,22 @@ describe('extractGrimCandidates', () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]?.mean).toBeCloseTo(5.19, 10);
     expect(candidates[0]?.n).toBe(28);
+  });
+
+  it('reads a sample size written with a thousands separator as one number', () => {
+    expect(extractGrimCandidates('(M = 3.47, SD = 1.2, N = 1,234)')[0]?.n).toBe(1234);
+    expect(extractGrimCandidates('(M = 3.47, SD = 1.2, N = 1 234)')[0]?.n).toBe(1234);
+    expect(extractGrimCandidates('(n = 25, M = 3.47, SD = 1.1)')[0]?.n).toBe(25);
+    expect(extractGrimCandidates('(M = 3.47, n = 25.5)')).toEqual([]);
+    expect(deterministicStatsFindings(sectionMapWith('Scores were stable (M = 3.47, SD = 1.2, N = 1,234).'))).toEqual([]);
+  });
+
+  it('flags a correlation above 1 as an impossible result instead of skipping it', () => {
+    const findings = deterministicStatsFindings(sectionMapWith('The scales correlated, r(30) = 1.20, p = .04.'));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.severity).toBe('major');
+    expect(findings[0]?.scope).toBe('editor-only');
+    expect(findingSchema.safeParse(findings[0]).success).toBe(true);
   });
 });
 

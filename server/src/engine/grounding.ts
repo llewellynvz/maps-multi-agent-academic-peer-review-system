@@ -1,6 +1,6 @@
 import { readKnowledgeModule } from '../prompts';
 
-const FINDING_ID_TOKEN = /REV-[A-Z]{3,4}-\d{4}/g;
+const FINDING_ID_TOKEN = /REV-[A-Z]{3,4}-\d{4,}/g;
 
 let bannedVerdictCache: string[] | null = null;
 
@@ -140,12 +140,10 @@ export function unknownCitations(references: string[], knownCitations: string[])
   return unknown;
 }
 
+// Whole-token replacement: a plain split/join would also rewrite the head of a longer id that merely
+// starts with an editor-only one (REV-REF-1000 inside REV-REF-10000).
 export function redactEditorOnlyIds(content: string, editorOnlyIds: Set<string>): string {
-  let result = content;
-  for (const id of editorOnlyIds) {
-    result = result.split(id).join('[EDITOR-ONLY]');
-  }
-  return result;
+  return content.replace(FINDING_ID_TOKEN, (id) => (editorOnlyIds.has(id) ? '[EDITOR-ONLY]' : id));
 }
 
 export function redactSupersededIds(content: string, currentIds: Set<string>): string {
@@ -298,10 +296,13 @@ export function labelAppearsInBody(body: string, label: string): boolean {
 
 const TABLE_LINE = /^\s*\|/;
 const REFERENCE_WORDS = 'references|reference list|bibliography|works cited';
-// A references section opens either as a heading or as a standalone bold label line. The bold arm is
-// anchored to end of line so an inline "**References** to prior work are thin" is not mistaken for one.
+// A references section opens either as a heading or as a standalone bold label line. The heading may
+// carry a qualifier ("# References (APA 7)", "## References cited", "# References and further reading"),
+// but nothing else: a concern heading such as "### Reference list accuracy" is body, and so is an inline
+// "**References** to prior work are thin".
+const REFERENCE_QUALIFIER = String.raw`(?:\s+(?:cited|and\s+further\s+reading|and\s+notes))?(?:\s*\([^)\n]*\))?`;
 const REFERENCES_HEADING = new RegExp(
-  `^(?:#{1,6}\\s*(?:\\d+[.)]\\s*)?(?:${REFERENCE_WORDS})\\b.*|\\*\\*\\s*(?:${REFERENCE_WORDS})\\s*\\*\\*[.:]?\\s*)$`,
+  String.raw`^(?:#{1,6}\s*(?:\d+[.)]\s*)?(?:\*\*)?\s*(?:${REFERENCE_WORDS})${REFERENCE_QUALIFIER}\s*(?:\*\*)?[.:]?|\*\*\s*(?:${REFERENCE_WORDS})${REFERENCE_QUALIFIER}\s*\*\*[.:]?)\s*$`,
   'im',
 );
 const PROSE_WORD = /[A-Za-z0-9][A-Za-z0-9'-]*/g;

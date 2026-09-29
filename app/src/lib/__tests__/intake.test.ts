@@ -92,10 +92,9 @@ describe('resolveIntake', () => {
 describe('buildAnswersPayload', () => {
   const untouched = { answers: {}, preset: 'balanced', journal: '', focus: [], notes: '' };
 
-  it('posts the same shape as before on the legacy payload', () => {
+  it('omits a blank journal rather than naming a journal "None"', () => {
     expect(buildAnswersPayload(TODAY, untouched)).toEqual([
       { questionId: 'preset', value: 'balanced' },
-      { questionId: 'journal', value: 'None' },
       { questionId: 'feedback_focus', value: [] },
     ]);
   });
@@ -115,6 +114,14 @@ describe('buildAnswersPayload', () => {
       { questionId: 'feedback_focus', value: ['Methods'] },
       { questionId: 'notes', value: 'Check the mediation model.' },
     ]);
+  });
+
+  it('sends the chosen depth even when the lite-parse asked no preset question', () => {
+    const noPreset = TODAY.filter((question) => question.id !== 'preset');
+    const payload = buildAnswersPayload(noPreset, { ...untouched, preset: 'thorough', presetTouched: true });
+    expect(payload[0]).toEqual({ questionId: 'preset', value: 'thorough' });
+    const untouchedPayload = buildAnswersPayload(noPreset, { ...untouched, preset: 'balanced' });
+    expect(untouchedPayload.some((entry) => entry.questionId === 'preset')).toBe(false);
   });
 
   it('records the detected or default value for every new id even when untouched', () => {
@@ -193,6 +200,7 @@ describe('alignmentSentence', () => {
     expect(alignmentSentence('supported')).toMatch(/supports/);
     expect(alignmentSentence('partially-supported')).toMatch(/partly supports/);
     expect(alignmentSentence('partially supported')).toMatch(/partly supports/);
+    expect(alignmentSentence('partially_supported')).toMatch(/partly supports/);
     expect(alignmentSentence('Contradicted')).toMatch(/runs against/);
     expect(alignmentSentence('unknown-label')).toMatch(/weighed against/);
   });

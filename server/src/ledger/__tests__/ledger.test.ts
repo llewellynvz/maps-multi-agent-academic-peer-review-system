@@ -77,6 +77,17 @@ describe('ledger merge', () => {
     expect(other.map((f) => f.id)).toEqual(['REV-NOV-0001']);
   });
 
+  it('never reissues an id after the newest findings are purged for a gate retry', () => {
+    const merge = () =>
+      mergeFindings(db, { reviewId: REVIEW, lensPrefix: 'STAT', phase: 'phase_3', agent: 'specialist-reviewer', fragments: [finding()] });
+    expect(merge().map((f) => f.id)).toEqual(['REV-STAT-0001']);
+    expect(merge().map((f) => f.id)).toEqual(['REV-STAT-0002']);
+    sqlite.exec('CREATE TEMP TABLE IF NOT EXISTS _mara_purge (marker INTEGER)');
+    sqlite.prepare("DELETE FROM findings WHERE id = 'REV-STAT-0002'").run();
+    sqlite.exec('DROP TABLE IF EXISTS _mara_purge');
+    expect(merge().map((f) => f.id)).toEqual(['REV-STAT-0003']);
+  });
+
   it('rejects a batch when any fragment has a blank anchor and inserts nothing', () => {
     expect(() =>
       mergeFindings(db, {

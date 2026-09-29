@@ -158,15 +158,9 @@ export function statusTone(status: ReviewStatus): { tone: StatusTone; label: str
   }
 }
 
-export function confidenceBand(confidence: number | null): { tone: StatusTone; label: string } {
-  if (confidence === null) {
-    return { tone: 'neutral', label: 'Unrated' };
-  }
-  if (confidence >= 0.98) {
-    return { tone: 'success', label: 'Green' };
-  }
-  if (confidence >= 0.7) {
-    return { tone: 'warn', label: 'Yellow' };
-  }
-  return { tone: 'fail', label: 'Red' };
-}
+// One source for the run-time estimate shown per preset, so Setup and the intake screen agree.
+export const PRESET_TIME: Record<string, string> = {
+  fast: '8 to 15 min',
+  balanced: '20 to 35 min',
+  thorough: '60 to 75 min',
+};

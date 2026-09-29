@@ -1,9 +1,12 @@
 {
   "name": "voice-profiler",
-  "promptVersion": "1.0.1",
-  "phase": [7],
+  "promptVersion": "1.0.2",
+  "phase": [
+    7
+  ],
   "role": "cheap",
   "knowledge": [
+    "01_REVIEW_GOVERNANCE.md",
     "04_DEVELOPMENTAL_VOICE.md",
     "06_WRITING_CRAFT.md"
   ]

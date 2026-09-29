@@ -3,7 +3,7 @@ import type { MaraDatabase } from '../db/client';
 import { getCheckpoint } from '../workflow/repo';
 import { manuscriptBlobPath, readManuscriptBlobText } from '../workflow/storage';
 import { ApiError } from './errors';
-import { requireReview } from './reviews';
+import { getReviewRow, requireReview } from './reviews';
 import type { Detected, Question, QuestionsResponse } from './types';
 
 interface RawQuestion {
@@ -52,11 +52,27 @@ function mapQuestion(raw: RawQuestion, detectedField: string): Question {
   return { id: raw.id, kind: 'text', prompt: raw.prompt, default: fallbackDefault };
 }
 
+const INGEST_FAILURE_MESSAGE: Record<string, string> = {
+  parse_failed: 'The manuscript could not be structured (the PDF parser may be unavailable). Retry once it is running.',
+  tier_3_tampering: 'The manuscript was stopped because it appears to contain misrepresented data or results planted to skew the review. See the editor note.',
+  ingest_failed: 'Reading the manuscript failed. Retry the review to try again.',
+};
+
 export function getQuestions(db: MaraDatabase, reviewId: string): QuestionsResponse {
   requireReview(db, reviewId);
   const liteDone = getCheckpoint(db, reviewId, 'lite-parse')?.status === 'completed';
   const blobPath = manuscriptBlobPath(reviewId, LITE_PARSE_BLOB);
   if (!liteDone || !existsSync(blobPath)) {
+    // A review that ended before its questions were written will never produce them: stop the polling.
+    const review = getReviewRow(db, reviewId);
+    if (review !== undefined && (review.status === 'failed' || review.status === 'cancelled')) {
+      throw new ApiError(
+        'conflict',
+        (review.errorClass !== null ? INGEST_FAILURE_MESSAGE[review.errorClass] : undefined) ??
+          `This review ${review.status === 'cancelled' ? 'was cancelled' : 'failed'} before its questions were ready.`,
+        { status: review.status, errorClass: review.errorClass },
+      );
+    }
     throw new ApiError('parse_incomplete', 'The manuscript is still being read. Questions are not ready yet.');
   }
 

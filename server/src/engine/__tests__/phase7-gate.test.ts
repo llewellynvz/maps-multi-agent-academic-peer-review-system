@@ -410,6 +410,23 @@ describe('phase 7 release gate routing', () => {
     expect(writerInput).toContain('Executing Psychobiography');
   });
 
+  it('hands the final critic the manuscript reference list it is told to check named works against', async () => {
+    writeManuscriptBlob(reviewId, 'parse/section-map.json', JSON.stringify({
+      title: 'A brief wellbeing trial',
+      abstract: 'Abstract text.',
+      sections: [{ index: 0, heading: 'Results', text: 'The mean was 8.40.', lineStart: 1, lineEnd: 3 }],
+      references: [{ index: 0, raw: 'Suleiman-Martos, N., et al. (2020). Burnout in nursing.', title: 'Burnout in nursing', doi: null, year: 2020, venue: null, authors: [] }],
+      fullText: 'The mean was 8.40.',
+      parser: 'grobid',
+      parseQuality: 'good',
+    }));
+    const harness = mockDeps([critic('pass')]);
+    await runPhase7(harness.deps, reviewId);
+    const criticInput = harness.criticInputs[0] ?? '';
+    expect(criticInput).toContain('Manuscript reference list');
+    expect(criticInput).toContain('Suleiman-Martos');
+  });
+
   it('routes back a reference found in neither the dossier nor the manuscript, then releases the corrected draft', async () => {
     writeManuscriptBlob(reviewId, 'parse/section-map.json', JSON.stringify({
       title: 'A brief wellbeing trial',
@@ -850,6 +867,22 @@ describe('phase 7 release gate routing', () => {
       .all(reviewId)
       .map((row) => JSON.parse((row as { payload_json: string }).payload_json) as { source: string; verdict: string });
     expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'aligned')).toBe(true);
+  });
+
+  it('states the shipped recommendation in the private notes when arbitration narrows to what the writer already shipped', async () => {
+    const shippedNarrow = { ...shippedObject(), recommendation: 'reject_and_resubmit' };
+    const harness = mockDeps(
+      [critic('revise'), critic('revise')],
+      undefined,
+      undefined,
+      [shippedNarrow, shippedNarrow, shippedNarrow, shippedNarrow],
+    );
+    await runPhase7(harness.deps, reviewId);
+    const review = sqlite.prepare('SELECT recommendation FROM reviews WHERE id = ?').get(reviewId) as { recommendation: string };
+    expect(review.recommendation).toBe('reject_and_resubmit');
+    const notes = readArtefact<{ markdown: string }>(reviewId, 'p7-private-notes-final');
+    expect(notes.markdown.toLowerCase()).toContain('reject and resubmit');
+    expect(notes.markdown.toLowerCase()).not.toContain('major revision');
   });
 
   it('propagates a cost-ceiling pause at the alignment dispatch instead of blocking the release', async () => {

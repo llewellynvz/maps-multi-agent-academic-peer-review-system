@@ -9,3 +9,5 @@ data
 STATE.md
 scratch
 docs/preview
+knowledge/exemplars/*
+!knowledge/exemplars/README.md

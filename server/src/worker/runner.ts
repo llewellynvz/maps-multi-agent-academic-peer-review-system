@@ -9,14 +9,33 @@ import { deleteArtefactsByPrefix, readArtefactsByPrefix } from '../engine/artefa
 import { writeHeartbeat } from '../data/heartbeat';
 import type { StopSignal } from './supervisor';
 
-export type IngestOutcome = 'suspended' | 'ingested' | 'halted';
+export type IngestOutcome = 'suspended' | 'ingested' | 'halted' | 'failed';
 export type EngineResult = 'completed' | 'paused' | 'cancelled' | 'stopped' | 'failed';
 
 const WORKER_LEASE_KEY = 'worker_lease';
 const QUEUEABLE_STATUSES = new Set(['created', 'awaiting_input', 'paused']);
 const RESUMABLE_STATUSES = new Set(['awaiting_input', 'paused']);
+// Statuses in which the worker owns the review: a stop intent is still pending until it leaves them.
+const IN_FLIGHT_STATUSES = new Set(['queued', 'sanitizing', 'running']);
 const MAX_AUTO_RETRIES = 2;
 const AUTO_RETRY_CLASSES = new Set(['release_gate_block', 'engine_error']);
+
+// Only a successful run with an unhalted result is an ingest. A failed workflow (a provider error in
+// lite-parse, say) returns a null result and must not be read as success, or the engine runs on an
+// intake that never happened and the user is never asked the clarifying questions.
+export function mapIngest(summary: { status: string; result: unknown }): IngestOutcome {
+  if (summary.status === 'suspended') {
+    return 'suspended';
+  }
+  if (summary.status !== 'success') {
+    return 'failed';
+  }
+  const result = summary.result as { halted?: boolean } | null;
+  if (result === null || result === undefined) {
+    return 'failed';
+  }
+  return result.halted === true ? 'halted' : 'ingested';
+}
 
 interface WorkerLease {
   workerId: string;
@@ -144,6 +163,10 @@ export class WorkerRunner {
         continue;
       }
       const args = safeArgs(command.argsJson);
+      if (command.command === 'retry_phase' && command.reviewId === this.activeReviewId) {
+        // Applied once the current run finishes; resetting phases under the running engine would corrupt it.
+        continue;
+      }
       if (command.command === 'run' || command.command === 'resume' || command.command === 'retry_phase') {
         let retryStart: number | null = null;
         try {
@@ -183,13 +206,33 @@ export class WorkerRunner {
         }
         this.applyMemory(command.reviewId, command.command, args, command.createdAt);
       } else {
+        try {
+          // A pause or cancel for the review in flight only takes effect at the next phase boundary. Record
+          // the intent in the same transaction as the ack, so a restart before that boundary (a SIGKILL,
+          // a crash) honours it instead of resuming the run the user stopped.
+          this.db.transaction(
+            (tx) => {
+              if (
+                (command.command === 'pause' || command.command === 'cancel') &&
+                command.reviewId === this.activeReviewId
+              ) {
+                mergeReviewOptions(tx, command.reviewId, { pendingStop: command.command });
+              }
+              insertEvent(tx, {
+                reviewId: command.reviewId,
+                kind: 'control_ack',
+                payload: { commandId: command.id, command: command.command },
+              });
+              tx.delete(runCommands).where(eq(runCommands.id, command.id)).run();
+            },
+            { behavior: 'immediate' },
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.log(`could not acknowledge ${command.command} for ${command.reviewId}: ${message}`);
+          continue;
+        }
         this.applyCommand(command.reviewId, command.command);
-        insertEvent(this.db, {
-          reviewId: command.reviewId,
-          kind: 'control_ack',
-          payload: { commandId: command.id, command: command.command },
-        });
-        this.db.delete(runCommands).where(eq(runCommands.id, command.id)).run();
       }
       this.ackedCommands.add(command.id);
       this.log(`command ${command.command} for ${command.reviewId}`);
@@ -197,10 +240,17 @@ export class WorkerRunner {
   }
 
   private applyDurable(tx: MaraDatabase, reviewId: string, command: string, args: Record<string, unknown>): void {
+    mergeReviewOptions(tx, reviewId, { pendingStop: null });
     if (command === 'resume') {
       const answers = (args.answers as Record<string, string> | undefined) ?? {};
       const preset = typeof args.preset === 'string' ? args.preset : undefined;
-      mergeReviewOptions(tx, reviewId, { pendingResume: { answers, ...(preset !== undefined ? { preset } : {}) } });
+      mergeReviewOptions(tx, reviewId, {
+        pendingResume: {
+          answers,
+          ...(preset !== undefined ? { preset } : {}),
+          ...(args.trigger === 'clarify' ? { trigger: 'clarify' } : {}),
+        },
+      });
       if (RESUMABLE_STATUSES.has(this.currentStatus(tx, reviewId) ?? '')) {
         updateReview(tx, reviewId, { status: 'queued' });
       }
@@ -441,6 +491,15 @@ export class WorkerRunner {
     }
   }
 
+  private pendingStop(optionsJson: string): 'pause' | 'cancel' | null {
+    try {
+      const value = (JSON.parse(optionsJson) as { pendingStop?: unknown }).pendingStop;
+      return value === 'pause' || value === 'cancel' ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
   private pendingInvalidateFrom(optionsJson: string): number | null {
     try {
       const options = JSON.parse(optionsJson) as { pendingInvalidateFrom?: unknown };
@@ -451,16 +510,19 @@ export class WorkerRunner {
     return null;
   }
 
-  private pendingResume(optionsJson: string): { answers: Record<string, string>; preset?: string } | undefined {
+  private pendingResume(
+    optionsJson: string,
+  ): { answers: Record<string, string>; preset?: string; trigger?: string } | undefined {
     try {
       const options = JSON.parse(optionsJson) as { pendingResume?: unknown };
       const marker = options.pendingResume;
       if (marker !== null && typeof marker === 'object') {
-        const { answers, preset } = marker as { answers?: unknown; preset?: unknown };
+        const { answers, preset, trigger } = marker as { answers?: unknown; preset?: unknown; trigger?: unknown };
         if (answers !== null && typeof answers === 'object') {
           return {
             answers: answers as Record<string, string>,
             ...(typeof preset === 'string' ? { preset } : {}),
+            ...(typeof trigger === 'string' ? { trigger } : {}),
           };
         }
       }
@@ -542,10 +604,21 @@ export class WorkerRunner {
               payload: { reason: 'ingest_snapshot_missing', action: 'restart_ingest' },
             });
             outcome = await this.processors.startIngest(reviewId, this.recoveredArgs(reviewId));
+            // The restarted run suspends at the same questions; feed it the answers the user already gave
+            // rather than asking again.
+            // Only answers from the clarify form are replayed; a plain Resume carries none, and replaying an
+            // empty set would skip the questions the user has not yet answered.
+            if (outcome === 'suspended' && !this.cancelRequested.has(reviewId) && intent.args.trigger === 'clarify') {
+              outcome = await this.processors.resumeIngest(reviewId, intent.answers ?? {}, intent.preset);
+            }
           }
           this.clearPendingResume(reviewId);
         } else {
-          outcome = await this.processors.startIngest(reviewId, intent.args);
+          // A retried or recovered ingest carries no upload args; take the stored manuscript's name and type
+          // rather than letting a DOCX default to application/pdf.
+          const args = typeof intent.args.filePath === 'string' ? intent.args : this.recoveredArgs(reviewId);
+          updateReview(this.db, reviewId, { status: 'sanitizing' });
+          outcome = await this.processors.startIngest(reviewId, args);
         }
         if (outcome === 'suspended') {
           if (this.cancelRequested.has(reviewId)) {
@@ -554,8 +627,17 @@ export class WorkerRunner {
           }
           return;
         }
+        if (outcome === 'failed') {
+          updateReview(this.db, reviewId, { status: 'failed', errorClass: 'ingest_failed' });
+          this.emitTerminal(reviewId, 'failed', { errorClass: 'ingest_failed', phase: 'phase_0' });
+          return;
+        }
         if (outcome === 'halted') {
-          this.emitTerminal(reviewId, 'failed', { errorClass: 'quarantine_tier_3', phase: 'phase_0' });
+          // The halting step records its own class (tier_3_tampering, parse_failed); make sure the review is
+          // terminal so it is not left looking active, which would block a re-run and purge-all.
+          const errorClass = this.reviewErrorClass(reviewId) ?? 'ingest_halted';
+          updateReview(this.db, reviewId, { status: 'failed', errorClass });
+          this.emitTerminal(reviewId, 'failed', { errorClass, phase: 'phase_0' });
           return;
         }
       }
@@ -586,6 +668,16 @@ export class WorkerRunner {
     } finally {
       this.pauseRequested.delete(reviewId);
       this.activeReviewId = null;
+      // Once the review has left the running states the stop it carried was honoured or overtaken. A
+      // shutdown mid-run leaves it running, and then the intent must survive for recover() to apply.
+      try {
+        const status = this.currentStatus(this.db, reviewId);
+        if (status !== undefined && !IN_FLIGHT_STATUSES.has(status)) {
+          mergeReviewOptions(this.db, reviewId, { pendingStop: null });
+        }
+      } catch {
+        // The review may have been deleted mid-run; nothing to clear.
+      }
     }
   }
 
@@ -792,6 +884,18 @@ export class WorkerRunner {
           this.log(`review ${row.id}: artefact invalidation incomplete, will retry on next recovery: ${message}`);
         }
       }
+      const pendingStop = this.pendingStop(row.optionsJson);
+      if (pendingStop !== null && IN_FLIGHT_STATUSES.has(row.status)) {
+        mergeReviewOptions(this.db, row.id, { pendingStop: null });
+        if (pendingStop === 'cancel') {
+          updateReview(this.db, row.id, { status: 'cancelled' });
+          this.emitTerminal(row.id, 'cancelled', {});
+        } else {
+          pauseReview(this.db, row.id, { reason: 'user_pause' });
+        }
+        this.log(`review ${row.id}: honoured a ${pendingStop} acknowledged before the restart`);
+        continue;
+      }
       if (row.status === 'running' || row.status === 'sanitizing') {
         this.intents.set(row.id, { kind: 'run', args: this.recoveredArgs(row.id), createdAt: row.createdAt ?? ts, recovered: true });
       } else if (row.status === 'queued') {
@@ -799,7 +903,7 @@ export class WorkerRunner {
         if (resume !== undefined) {
           this.intents.set(row.id, {
             kind: 'resume',
-            args: {},
+            args: resume.trigger !== undefined ? { trigger: resume.trigger } : {},
             answers: resume.answers,
             ...(resume.preset !== undefined ? { preset: resume.preset } : {}),
             createdAt: row.createdAt ?? ts,
@@ -831,9 +935,18 @@ export class WorkerRunner {
     if (!this.ensureLease()) {
       this.log('another worker holds the lease; standing by until it goes stale');
     }
+    // A transient failure in one poll (SQLITE_BUSY past the busy timeout, a full disk on the heartbeat)
+    // must not become an unhandled rejection: Node would exit and take the container down mid-phase.
     this.loopTimer = setInterval(() => {
-      writeHeartbeat();
-      void this.tick();
+      const report = (error: unknown): void => {
+        this.log(`poll failed, retrying next tick: ${error instanceof Error ? error.message : String(error)}`);
+      };
+      try {
+        writeHeartbeat();
+      } catch (error) {
+        report(error);
+      }
+      this.tick().catch(report);
     }, this.pollMs);
   }
 

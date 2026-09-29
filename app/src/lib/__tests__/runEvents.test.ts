@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRetrySignal, retryLogMessage, retryPillLabel } from '@/lib/runEvents';
+import { gatePillLabel, parseRetrySignal, retryLogMessage, retryPillLabel } from '@/lib/runEvents';
 
 describe('parseRetrySignal', () => {
   it('parses a full retry announcement', () => {
@@ -32,5 +32,21 @@ describe('parseRetrySignal', () => {
     expect(parseRetrySignal({ retry: false, attempt: 1 })).toBeNull();
     expect(parseRetrySignal(null)).toBeNull();
     expect(parseRetrySignal('retry')).toBeNull();
+  });
+});
+
+describe('gatePillLabel', () => {
+  it('shows cycles one-based and names each verdict the gate actually sends', () => {
+    expect(gatePillLabel('revise', 0)).toBe('Release gate requested revisions, cycle 1 of 2');
+    expect(gatePillLabel('revise-specialist', 1)).toBe('Release gate requested revisions, cycle 2 of 2');
+    expect(gatePillLabel('revise_specialist', 0)).toContain('requested revisions');
+    expect(gatePillLabel('block', 0)).toContain('blocked');
+    expect(gatePillLabel('arbitrated', 2)).toBe('Release gate escalated to arbitration');
+  });
+
+  it('clears the pill on a pass or a completed alignment', () => {
+    expect(gatePillLabel('pass', 0)).toBeNull();
+    expect(gatePillLabel('aligned', 2)).toBeNull();
+    expect(gatePillLabel('aligned-fallback', 2)).toBeNull();
   });
 });

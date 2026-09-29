@@ -44,7 +44,7 @@ const TONE_CLASS: Record<StatusTone, string> = {
 };
 
 const TONE_ICON: Record<StatusTone, string> = {
-  info: 'check',
+  info: 'dot',
   success: 'check',
   warn: 'triangle',
   fail: 'octagon',

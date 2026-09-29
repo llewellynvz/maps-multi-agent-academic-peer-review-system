@@ -74,6 +74,29 @@ function maxSequenceForPrefix(db: MaraDatabase, prefix: string): number {
   return max;
 }
 
+// Ids are never reissued. A gate retry deletes the invalidated cycle's findings, which lowers the live
+// maximum; reusing those numbers would collide with the ids already announced on the event stream, so the
+// highest number ever issued per prefix is kept alongside the live maximum.
+function highWaterKey(prefix: string): string {
+  return `ledger_high_water_${prefix}`;
+}
+
+function highWaterForPrefix(db: MaraDatabase, prefix: string): number {
+  const rows = db.all(sql`SELECT value_json FROM settings WHERE key = ${highWaterKey(prefix)}`) as Array<{
+    value_json: string;
+  }>;
+  const value = Number(rows[0]?.value_json ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function writeHighWater(db: MaraDatabase, prefix: string, seq: number): void {
+  const now = new Date().toISOString();
+  db.run(
+    sql`INSERT INTO settings (key, value_json, updated_at) VALUES (${highWaterKey(prefix)}, ${JSON.stringify(seq)}, ${now})
+        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+  );
+}
+
 function existingIds(db: MaraDatabase, reviewId: string): Set<string> {
   const rows = db.all(sql`SELECT id FROM findings WHERE review_id = ${reviewId}`) as Array<{ id: string }>;
   return new Set(rows.map((row) => row.id));
@@ -106,7 +129,7 @@ export function mergeFindings(db: MaraDatabase, input: MergeFindingsInput): Merg
       }
     }
     const known = existingIds(tx, input.reviewId);
-    let seq = maxSequenceForPrefix(tx, input.lensPrefix);
+    let seq = Math.max(maxSequenceForPrefix(tx, input.lensPrefix), highWaterForPrefix(tx, input.lensPrefix));
     const merged: MergedFinding[] = [];
     const createdAt = new Date().toISOString();
 
@@ -148,6 +171,9 @@ export function mergeFindings(db: MaraDatabase, input: MergeFindingsInput): Merg
 
       known.add(id);
       merged.push({ id, supersedesId });
+    }
+    if (merged.length > 0) {
+      writeHighWater(tx, input.lensPrefix, seq);
     }
 
     if (input.marker !== undefined) {

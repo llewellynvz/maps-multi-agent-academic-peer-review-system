@@ -5,10 +5,15 @@ services:
       dockerfile: docker/Dockerfile
     image: mara-platform:local
     ports:
-      - "${MARA_PORT:-3100}:3100"
+      # Loopback by default, like GROBID and the native dev server. Set MARA_BIND=0.0.0.0 only behind a
+      # passphrase and a network you trust: this exposes manuscripts and reviews to the whole LAN.
+      - "${MARA_BIND:-127.0.0.1}:${MARA_PORT:-3100}:3100"
     volumes:
       # the container runs as the non-root node user (uid 1000); ensure ./data is writable by it
       - ./data:/app/data
+      # Exemplar review letters are confidential third-party material, so they are mounted at run time
+      # rather than baked into image layers (.dockerignore keeps them out of the build context).
+      - ./knowledge/exemplars:/app/knowledge/exemplars:ro
     env_file:
       - ${MARA_ENV_FILE:-.env}
     environment:

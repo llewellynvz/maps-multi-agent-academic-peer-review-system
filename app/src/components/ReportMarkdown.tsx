@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ID = /REV-[A-Z]{3,4}-\d{4}/g;
-const CLUSTER = /REV-[A-Z]{3,4}-\d{4}(?:[,;\s]+REV-[A-Z]{3,4}-\d{4})*/g;
+const ID = /REV-[A-Z]{3,4}-\d{4,}/g;
+const CLUSTER = /REV-[A-Z]{3,4}-\d{4,}(?:[,;\s]+REV-[A-Z]{3,4}-\d{4,})*/g;
 
 interface HastNode {
   type: string;
@@ -29,7 +29,7 @@ function collapseFindingIds() {
           if (index > last) {
             replacement.push({ type: 'text', value: value.slice(last, index) });
           }
-          const ids = match[0].match(ID) ?? [];
+          const ids = [...new Set(match[0].match(ID) ?? [])];
           replacement.push({ type: 'element', tagName: 'span', properties: { dataFids: ids.join(',') }, children: [] });
           last = index + match[0].length;
         }

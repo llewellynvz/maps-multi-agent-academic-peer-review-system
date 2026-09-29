@@ -3,15 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { api } from '@/lib/api';
+import { PRESET_TIME } from '@/lib/format';
 import { Icon, Pill, Spinner, Stepper } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
 
 const STEPS = ['Provider and key', 'Tier preset', 'Defaults', 'Telemetry', 'Review'];
 
 const TIERS = [
-  { id: 'fast', name: 'Fast', mix: 'Cheap tier throughout', cost: '$0.10 to $0.40', time: '8 to 15 min' },
-  { id: 'balanced', name: 'Balanced', mix: 'Frontier for synthesis', cost: '$0.40 to $1.20', time: '20 to 35 min' },
-  { id: 'thorough', name: 'Thorough', mix: 'Frontier and full swarm', cost: '$1.20 to $3.00', time: '60 to 75 min' },
+  { id: 'fast', name: 'Fast', mix: 'Cheap tier throughout', cost: '$0.10 to $0.40', time: PRESET_TIME.fast as string },
+  { id: 'balanced', name: 'Balanced', mix: 'Frontier for synthesis', cost: '$0.40 to $1.20', time: PRESET_TIME.balanced as string },
+  { id: 'thorough', name: 'Thorough', mix: 'Frontier and full swarm', cost: '$1.20 to $3.00', time: PRESET_TIME.thorough as string },
 ];
 
 type KeyState = 'idle' | 'checking' | 'verified' | 'failed';
@@ -34,7 +35,7 @@ export default function SetupPage(): ReactNode {
       setKeyState('verified');
     } catch (err) {
       setKeyState('failed');
-      setKeyMessage(err instanceof Error ? err.message : 'The key could not be verified.');
+      setKeyMessage(err instanceof Error ? err.message : 'The key could not be saved.');
     }
   };
 
@@ -78,11 +79,11 @@ export default function SetupPage(): ReactNode {
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <button className="btn btn-secondary" onClick={verifyKey} disabled={apiKey.length === 0 || keyState === 'checking'}>
-                {keyState === 'checking' ? <Spinner /> : null} Verify key
+                {keyState === 'checking' ? <Spinner /> : null} Save key
               </button>
-              {keyState === 'checking' ? <Pill tone="neutral" label="Checking" icon="clock" /> : null}
-              {keyState === 'verified' ? <Pill tone="info" label="Verified" icon="check" /> : null}
-              {keyState === 'failed' ? <Pill tone="fail" label="Not verified" /> : null}
+              {keyState === 'checking' ? <Pill tone="neutral" label="Saving" icon="clock" /> : null}
+              {keyState === 'verified' ? <Pill tone="info" label="Saved" icon="check" /> : null}
+              {keyState === 'failed' ? <Pill tone="fail" label="Not saved" /> : null}
             </div>
             {keyState === 'failed' ? <p className="sub" style={{ marginTop: 10 }}>{keyMessage}</p> : null}
             {apiKey.length === 0 ? <p className="sub muted" style={{ marginTop: 10 }}>A key is optional here. You can add one later in settings.</p> : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapManuscriptTypeToPaperType, readIntakeOptions } from '../options';
+import { mapManuscriptTypeToPaperType, readIntakeOptions, requesterGuidanceNote } from '../options';
 
 function withAnswers(answers: Record<string, unknown>): Record<string, unknown> {
   return { preset: 'balanced', answers };
@@ -24,6 +24,8 @@ describe('readIntakeOptions', () => {
       claimCheck: true,
       aiDetection: false,
       userPrior: 'major-revision',
+      focus: [],
+      notes: null,
     });
   });
 
@@ -35,7 +37,19 @@ describe('readIntakeOptions', () => {
       claimCheck: false,
       aiDetection: true,
       userPrior: null,
+      focus: [],
+      notes: null,
     });
+  });
+
+  it('reads the clarify focus chips and notes, and frames them as emphasis only', () => {
+    const intake = readIntakeOptions(withAnswers({ feedback_focus: 'Statistics, Methods', notes: '  Check the mediation model.  ' }));
+    expect(intake.focus).toEqual(['Statistics', 'Methods']);
+    expect(intake.notes).toBe('Check the mediation model.');
+    const note = requesterGuidanceNote(intake) ?? '';
+    expect(note).toContain('Statistics, Methods');
+    expect(note).toContain('never override the rubric');
+    expect(requesterGuidanceNote(readIntakeOptions({}))).toBeNull();
   });
 
   it('falls back tolerantly on junk input', () => {

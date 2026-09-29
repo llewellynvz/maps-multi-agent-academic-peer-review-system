@@ -25,7 +25,7 @@ import {
   updateReview,
   upsertCheckpoint,
 } from '../workflow/repo';
-import { DispatchPauseError, type EngineDeps } from './phases-shared';
+import { DispatchPauseError, type EngineDeps, enterPhase } from './phases-shared';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest, SYNTHESIS_DIGEST_CHARS } from './context';
 import { runAgent } from './dispatch-agent';
@@ -44,9 +44,9 @@ import {
   validateGrounding,
   type GroundingFailureKind,
 } from './grounding';
-import { matchLens, paperTypeNote } from './lenses';
+import { matchLens, paperTypeNote, SEVERITY_WEIGHT } from './lenses';
 import { mergeFindingsOnce } from './merge';
-import { readIntakeOptions } from './options';
+import { readIntakeOptions, requesterGuidanceNote } from './options';
 import { assemblePrivateNotes, RECOMMENDATION_LABEL } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
@@ -395,6 +395,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   const options = getReviewOptions(db, reviewId);
   const intake = readIntakeOptions(options);
   const typeNote = paperTypeNote(intake.paperType);
+  const guidanceNote = requesterGuidanceNote(intake);
   const report = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
   const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
   const dossierContent = fieldDossierContent(reviewId);
@@ -402,7 +403,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     ctx.sectionMap.references.length > 0 ? knownCitationsFor(reviewId, ctx.sectionMap.references) : [];
 
   await withPhase('phase_7', async () => {
-    updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
+    enterPhase(db, reviewId, 'phase_7');
 
     const voiceProfileContent = await deriveVoiceProfile(deps, reviewId);
 
@@ -455,6 +456,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     let priorDefect = '';
     let lastShipped: ShippedReportEnvelope | null = null;
     let lastPrivateNotes = '';
+    let lastPrivateNotesRecommendation: Recommendation = currentMeta.recommendation;
 
     const priorCheckpoint = getCheckpoint(db, reviewId, checkpointKey('phase_7'));
     if (priorCheckpoint?.status === 'pending') {
@@ -507,7 +509,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               : []),
           ],
           routingNote:
-            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
+            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${guidanceNote !== null ? ` ${guidanceNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
 
@@ -535,6 +537,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       writeArtefact(reviewId, `p7-private-notes-${cycle}`, privateNotes);
       lastShipped = shipped;
       lastPrivateNotes = privateNotes.markdown;
+      lastPrivateNotesRecommendation = currentMeta.recommendation;
 
       const grounding = validateGrounding({
         authorFacingBody: shipped.bodyMarkdown,
@@ -621,6 +624,17 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               ? [{
                   label: 'Field dossier (the only literature the writer may name; audit named works against this and the manuscript references)',
                   content: dossierContent,
+                }]
+              : []),
+            // The critic is told a named work found in neither the dossier nor the manuscript's own reference
+            // list is fabricated, so it must actually see that list or it blocks legitimate citations.
+            ...(ctx.sectionMap.references.length > 0
+              ? [{
+                  label: 'Manuscript reference list (a work named here is not fabricated)',
+                  content: ctx.sectionMap.references
+                    .map((reference) => (reference.title === null ? reference.raw : `${reference.raw} ${reference.title}`))
+                    .join('\n')
+                    .slice(0, 60000),
                 }]
               : []),
             {
@@ -859,6 +873,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         if (alignedGrounding.ok || !groundingKindsForceHalt(alignedGrounding.kinds)) {
           lastShipped = aligned;
           lastPrivateNotes = alignedNotes.markdown;
+          lastPrivateNotesRecommendation = narrowed;
         } else {
           alignmentFallbackDetail = `the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
         }
@@ -925,6 +940,23 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       recommendation: finalRecommendation,
       recommendationConfidence: finalConfidence,
     });
+
+    // Arbitration can narrow to the category the writer already shipped, which skips alignment and
+    // leaves the notes stating the meta-reviewer's category. The editor's notes follow what shipped.
+    if (lastPrivateNotesRecommendation !== finalRecommendation) {
+      const notesFindings = getCurrentFindings(db, reviewId);
+      lastPrivateNotes = assemblePrivateNotes({
+        recommendation: finalRecommendation,
+        recommendationConfidence: finalConfidence,
+        currentFindings: notesFindings,
+        strongestMinorityReport: swarm.strongestMinorityReport,
+        editorSummaryMarkdown: redactSupersededIds(
+          currentMeta.editorSummaryMarkdown,
+          new Set(notesFindings.map((finding) => finding.id)),
+        ),
+      }).markdown;
+      lastPrivateNotesRecommendation = finalRecommendation;
+    }
 
     if (intake.userPrior !== null) {
       const priorFindings = getCurrentFindings(db, reviewId);
@@ -1018,7 +1050,6 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   });
 }
 
-const PRIOR_SEVERITY_WEIGHT: Record<string, number> = { none: 0, minor: 1, moderate: 2, major: 3, fatal: 4 };
 
 async function runPriorStressTest(
   deps: EngineDeps,
@@ -1034,7 +1065,7 @@ async function runPriorStressTest(
 ): Promise<PriorStressTestOutput | null> {
   try {
     const topFindings = [...input.findings]
-      .sort((a, b) => (PRIOR_SEVERITY_WEIGHT[b.severity] ?? 0) - (PRIOR_SEVERITY_WEIGHT[a.severity] ?? 0))
+      .sort((a, b) => (SEVERITY_WEIGHT[b.severity] ?? 0) - (SEVERITY_WEIGHT[a.severity] ?? 0))
       .slice(0, 20)
       .map((finding) => ({
         id: finding.id,

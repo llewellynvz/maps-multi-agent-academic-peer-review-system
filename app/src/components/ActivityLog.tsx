@@ -22,6 +22,14 @@ function groupByPhase(entries: LogEntry[]): Array<[string, LogEntry[]]> {
     .map(([phase, rows]) => [phase, [...rows].sort((a, b) => (a.ts < b.ts ? 1 : -1))] as [string, LogEntry[]]);
 }
 
+// Timestamps arrive as UTC ISO strings; show them in the reader's own clock.
+function localTime(ts: string): string {
+  const date = new Date(ts);
+  return Number.isNaN(date.getTime())
+    ? ts.slice(11, 19)
+    : date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
 export function ActivityLog({ entries }: { entries: LogEntry[] }): ReactNode {
   const ref = useRef<HTMLDivElement>(null);
   const atLiveEdge = useRef(true);
@@ -64,7 +72,7 @@ export function ActivityLog({ entries }: { entries: LogEntry[] }): ReactNode {
           </p>
           {rows.map((entry) => (
             <div key={entry.key}>
-              <span className="ts">{entry.ts.slice(11, 19)}</span>
+              <span className="ts">{localTime(entry.ts)}</span>
               <span className="msg">{entry.message}</span>
             </div>
           ))}

@@ -135,6 +135,32 @@ describe('verifyReference', () => {
     cache.close();
   });
 
+  it('does not cache a mismatch found while another backend was down', async () => {
+    const reference: Reference = { title: 'The quantum mechanics of team flourishing', authors: ['Researcher'], year: 2019 };
+    let mode: 'partial' | 'ok' = 'partial';
+    const fetchImpl: FetchLike = async (url) => {
+      if (url.includes('api.crossref.org/works?')) {
+        if (mode === 'partial') {
+          return json({
+            message: { items: [{ title: ['The quantum mechanics of flourishing teams and groups'], published: { 'date-parts': [[2019]] } }] },
+          });
+        }
+        return json({ message: { items: [{ title: ['The quantum mechanics of team flourishing'], published: { 'date-parts': [[2019]] } }] } });
+      }
+      if (mode === 'partial') {
+        throw new Error('network down');
+      }
+      return empty;
+    };
+    const cache = openCitationCache({ path: ':memory:' });
+    const client = createCitationClient({ fetchImpl, cache, rateLimiter: fastLimiter });
+
+    expect((await client.verifyReference(reference)).status).toBe('mismatch');
+    mode = 'ok';
+    expect((await client.verifyReference(reference)).status).toBe('verified');
+    cache.close();
+  });
+
   it('does not cache a not_found produced by rate-limited backends that answered with 429', async () => {
     let mode: 'throttled' | 'ok' = 'throttled';
     const throttled: HttpResponse = { ok: false, status: 429, json: async (): Promise<unknown> => ({}) };

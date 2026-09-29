@@ -112,6 +112,40 @@ function ReviewCard({
     );
   }
 
+  // An upload that never finished leaves a review with no manuscript: it cannot run, so offer removal.
+  if (review.status === 'created') {
+    return (
+      <article className="card card-enter" style={style}>
+        <CardTop review={review} />
+        <CardBody review={review} />
+        <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
+          <Link href="/reviews/new" className="btn btn-secondary">Upload again</Link>
+          <button type="button" className="btn btn-ghost" aria-label={`Delete ${review.title ?? 'review'}`} onClick={() => onDelete(review)}>
+            <Icon name="trash" /> Delete
+          </button>
+        </div>
+      </article>
+    );
+  }
+
+  if (review.status === 'paused') {
+    return (
+      <article className="card card-enter" style={style}>
+        <CardTop review={review} />
+        <CardBody review={review} />
+        <div className="row wrap" style={{ marginTop: 'auto', gap: 10 }}>
+          <Link href={reviewHref(review)} className="btn btn-secondary">Open</Link>
+          <button type="button" className="btn btn-ghost" aria-label={`Cancel ${review.title ?? 'review'}`} onClick={() => onCancel(review)}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-ghost" aria-label={`Delete ${review.title ?? 'review'}`} onClick={() => onDelete(review)}>
+            <Icon name="trash" /> Delete
+          </button>
+        </div>
+      </article>
+    );
+  }
+
   if (isRunning(review.status) && review.status !== 'awaiting_input') {
     return (
       <article className="card card-enter" style={style}>
