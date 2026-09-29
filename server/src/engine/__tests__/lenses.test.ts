@@ -49,6 +49,17 @@ describe('lens routing', () => {
     expect(matchLens('completely unrelated text')).toBeUndefined();
   });
 
+  it('matchLens prefers the most specific lens over a prefix hidden in another word', () => {
+    expect(matchLens('Mixed methods')?.prefix).toBe('MIX');
+    expect(matchLens('Mixed-methods')?.prefix).toBe('MIX');
+    expect(matchLens('Qualitative methods')?.prefix).toBe('QUAL');
+    expect(matchLens('Statistical methods')?.prefix).toBe('STAT');
+    expect(matchLens('ethnographic / qualitative')?.prefix).toBe('QUAL');
+    expect(matchLens('REV-MIX')?.prefix).toBe('MIX');
+    expect(matchLens('Ethics')?.prefix).toBe('ETH');
+    expect(matchLens('novel')?.prefix).toBe('NOV');
+  });
+
   it('normalisePreset defaults unknown values to balanced', () => {
     expect(normalisePreset('fast')).toBe('fast');
     expect(normalisePreset(undefined)).toBe('balanced');

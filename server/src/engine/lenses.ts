@@ -53,24 +53,38 @@ function normaliseToken(value: string): string {
   return value.toLowerCase().replace(/[^a-z]/g, '');
 }
 
+// Most specific first. A bare substring test in LENSES order resolved "Mixed methods" and "Statistical
+// methods" to METH (the prefix hides inside "methods") and "ethnographic" to ETH, so an explicit prefix
+// must stand as its own word, an exact name beats a partial one, and the longest partial match wins.
 export function matchLens(raw: string): LensDef | undefined {
   const token = normaliseToken(raw);
   if (token.length === 0) {
     return undefined;
   }
+  const upper = raw.toUpperCase();
+  const byPrefix = LENSES.find((lens) => new RegExp(`(^|[^A-Z])${lens.prefix}([^A-Z]|$)`).test(upper));
+  if (byPrefix !== undefined) {
+    return byPrefix;
+  }
+  const names = (lens: LensDef): string[] => [normaliseToken(lens.key), normaliseToken(lens.display)];
+  const exact = LENSES.find((lens) => names(lens).includes(token));
+  if (exact !== undefined) {
+    return exact;
+  }
+  let best: LensDef | undefined;
+  let bestLength = 0;
   for (const lens of LENSES) {
-    if (token.includes(lens.prefix.toLowerCase()) && raw.toUpperCase().includes(lens.prefix)) {
-      return lens;
+    for (const name of names(lens)) {
+      if (token.includes(name) && name.length > bestLength) {
+        best = lens;
+        bestLength = name.length;
+      }
     }
   }
-  for (const lens of LENSES) {
-    const keyToken = normaliseToken(lens.key);
-    const displayToken = normaliseToken(lens.display);
-    if (token.includes(keyToken) || keyToken.includes(token) || token.includes(displayToken)) {
-      return lens;
-    }
+  if (best !== undefined) {
+    return best;
   }
-  return undefined;
+  return LENSES.find((lens) => normaliseToken(lens.key).includes(token));
 }
 
 export interface ActivationEntry {

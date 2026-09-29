@@ -51,7 +51,7 @@ import { sanitiseSupersedes } from './supersedes';
 import { runAgent } from './dispatch-agent';
 import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
 import { upsertRubricScore } from './rubric';
-import { DispatchPauseError, type EngineDeps } from './phases-shared';
+import { DispatchPauseError, type EngineDeps, StaleDispatchError } from './phases-shared';
 
 export type { EngineDeps } from './phases-shared';
 
@@ -67,12 +67,16 @@ function enterPhase(db: MaraDatabase, reviewId: string, phase: string): void {
   updateReview(db, reviewId, { status: 'running', currentPhase: phase });
 }
 
+const SEVERITY_WEIGHT: Record<string, number> = { none: 0, minor: 1, moderate: 2, major: 3, fatal: 4 };
+
 export interface CoverageGap {
   step: string;
   unit: string;
 }
 
-// A cost-ceiling pause is re-thrown before any gap is recorded, so a resumed run persists none.
+// A cost-ceiling pause is re-thrown before any gap is recorded, so a resumed run persists none. A stale
+// dispatch (timeout or clock jump) is re-thrown too: the supervisor restarts the phase for it, whereas a
+// gap would drop the unit for the rest of the review without it ever being retried.
 export async function settleWithGaps<T>(
   db: MaraDatabase,
   reviewId: string,
@@ -82,7 +86,10 @@ export async function settleWithGaps<T>(
 ): Promise<{ results: T[]; gaps: CoverageGap[] }> {
   const settled = await Promise.allSettled(tasks.map((task) => task.run()));
   for (const outcome of settled) {
-    if (outcome.status === 'rejected' && outcome.reason instanceof DispatchPauseError) {
+    if (
+      outcome.status === 'rejected' &&
+      (outcome.reason instanceof DispatchPauseError || outcome.reason instanceof StaleDispatchError)
+    ) {
       throw outcome.reason;
     }
   }
@@ -944,7 +951,12 @@ export async function runPhase5(deps: EngineDeps, reviewId: string): Promise<voi
       studyDesign: analystB.studyDesign,
       designConfidence: analystB.designConfidence,
     },
-    findings: current.slice(0, 40).map((finding) => ({
+    // getCurrentFindings orders by id, so a plain slice kept whichever lens prefixes sort first and could
+    // drop every major finding from late-alphabet lenses. The swarm sees the most severe forty.
+    findings: [...current]
+      .sort((a, b) => (SEVERITY_WEIGHT[b.severity] ?? 0) - (SEVERITY_WEIGHT[a.severity] ?? 0))
+      .slice(0, 40)
+      .map((finding) => ({
       id: finding.id,
       claim: finding.claim,
       anchor: finding.manuscriptAnchor,

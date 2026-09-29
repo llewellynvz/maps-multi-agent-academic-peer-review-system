@@ -455,6 +455,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     let priorDefect = '';
     let lastShipped: ShippedReportEnvelope | null = null;
     let lastPrivateNotes = '';
+    let lastPrivateNotesRecommendation: Recommendation = currentMeta.recommendation;
 
     const priorCheckpoint = getCheckpoint(db, reviewId, checkpointKey('phase_7'));
     if (priorCheckpoint?.status === 'pending') {
@@ -535,6 +536,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       writeArtefact(reviewId, `p7-private-notes-${cycle}`, privateNotes);
       lastShipped = shipped;
       lastPrivateNotes = privateNotes.markdown;
+      lastPrivateNotesRecommendation = currentMeta.recommendation;
 
       const grounding = validateGrounding({
         authorFacingBody: shipped.bodyMarkdown,
@@ -859,6 +861,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
         if (alignedGrounding.ok || !groundingKindsForceHalt(alignedGrounding.kinds)) {
           lastShipped = aligned;
           lastPrivateNotes = alignedNotes.markdown;
+          lastPrivateNotesRecommendation = narrowed;
         } else {
           alignmentFallbackDetail = `the aligned report failed the deterministic validator: ${alignedGrounding.failures.join('; ')}`;
         }
@@ -925,6 +928,23 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
       recommendation: finalRecommendation,
       recommendationConfidence: finalConfidence,
     });
+
+    // Arbitration can narrow to the category the writer already shipped, which skips alignment and
+    // leaves the notes stating the meta-reviewer's category. The editor's notes follow what shipped.
+    if (lastPrivateNotesRecommendation !== finalRecommendation) {
+      const notesFindings = getCurrentFindings(db, reviewId);
+      lastPrivateNotes = assemblePrivateNotes({
+        recommendation: finalRecommendation,
+        recommendationConfidence: finalConfidence,
+        currentFindings: notesFindings,
+        strongestMinorityReport: swarm.strongestMinorityReport,
+        editorSummaryMarkdown: redactSupersededIds(
+          currentMeta.editorSummaryMarkdown,
+          new Set(notesFindings.map((finding) => finding.id)),
+        ),
+      }).markdown;
+      lastPrivateNotesRecommendation = finalRecommendation;
+    }
 
     if (intake.userPrior !== null) {
       const priorFindings = getCurrentFindings(db, reviewId);

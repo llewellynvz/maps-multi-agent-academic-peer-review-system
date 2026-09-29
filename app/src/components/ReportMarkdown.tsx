@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ID = /REV-[A-Z]{3,4}-\d{4}/g;
-const CLUSTER = /REV-[A-Z]{3,4}-\d{4}(?:[,;\s]+REV-[A-Z]{3,4}-\d{4})*/g;
+const ID = /REV-[A-Z]{3,4}-\d{4,}/g;
+const CLUSTER = /REV-[A-Z]{3,4}-\d{4,}(?:[,;\s]+REV-[A-Z]{3,4}-\d{4,})*/g;
 
 interface HastNode {
   type: string;

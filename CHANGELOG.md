@@ -22,6 +22,24 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Review engine fixes from a code review:
+  - A timed-out specialist or integrity dispatch now restarts its phase through
+    the supervisor, as designed, instead of silently dropping that lens as a
+    coverage gap.
+  - Lens names resolve to the most specific lens: "Mixed methods",
+    "Qualitative methods" and "Statistical methods" no longer route to Methods,
+    and "ethnographic" no longer routes to Ethics.
+  - Tone-risk scoring counts only the banned phrasing column of knowledge/04, so
+    the recommended replacements and required voice ("I have read the
+    manuscript", "you") no longer lower the composite.
+  - The narrative word count no longer stops at a concern heading such as
+    "Reference list accuracy", which failed the word band on every cycle.
+  - The swarm is seeded with the forty most severe findings rather than the
+    first forty by id.
+  - The editor's private notes and the phase 8 lessons record the recommendation
+    that shipped after arbitration, not the pre-arbitration one.
+  - Chi-square and z tests reported with an uppercase P are now checked.
+  - Finding ids past 9999 in a prefix are accepted and matched as whole tokens.
 - Ingest, sanitiser and provider fixes from a code review:
   - Participant-instruction prose such as "you are now going to see…" no longer
     trips the tier-3 role-reassignment pattern and halts the review, and "as an

@@ -852,6 +852,22 @@ describe('phase 7 release gate routing', () => {
     expect(alignEvents.some((event) => event.source === 'arbitration-alignment' && event.verdict === 'aligned')).toBe(true);
   });
 
+  it('states the shipped recommendation in the private notes when arbitration narrows to what the writer already shipped', async () => {
+    const shippedNarrow = { ...shippedObject(), recommendation: 'reject_and_resubmit' };
+    const harness = mockDeps(
+      [critic('revise'), critic('revise')],
+      undefined,
+      undefined,
+      [shippedNarrow, shippedNarrow, shippedNarrow, shippedNarrow],
+    );
+    await runPhase7(harness.deps, reviewId);
+    const review = sqlite.prepare('SELECT recommendation FROM reviews WHERE id = ?').get(reviewId) as { recommendation: string };
+    expect(review.recommendation).toBe('reject_and_resubmit');
+    const notes = readArtefact<{ markdown: string }>(reviewId, 'p7-private-notes-final');
+    expect(notes.markdown.toLowerCase()).toContain('reject and resubmit');
+    expect(notes.markdown.toLowerCase()).not.toContain('major revision');
+  });
+
   it('propagates a cost-ceiling pause at the alignment dispatch instead of blocking the release', async () => {
     const narrowedEnvelope = { ...shippedObject(), recommendation: 'reject_and_resubmit' };
     const harness = mockDeps(

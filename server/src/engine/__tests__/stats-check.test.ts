@@ -22,6 +22,11 @@ describe('distribution recomputation', () => {
 });
 
 describe('extractNhstTests', () => {
+  it('reads chi-square and z tests reported with an uppercase P, as t, F and r already are', () => {
+    const kinds = extractNhstTests('χ2(1) = 3.84, P = .05 and Z = 2.5, P = .01.').map((test) => test.kind).sort();
+    expect(kinds).toEqual(['chi2', 'z']);
+  });
+
   it('parses the five APA test forms', () => {
     const text =
       'We found t(28) = 2.20, p = .036 and F(2, 60) = 3.15, p = .049. ' +

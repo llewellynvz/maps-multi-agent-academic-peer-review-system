@@ -8,7 +8,7 @@ import { getCurrentFindings } from '../ledger';
 import { getReviewOptions } from '../workflow/repo';
 import { requireReview } from './reviews';
 
-const FINDING_ID_PATTERN = /^REV-([A-Z]{3,4})-\d{4}$/;
+const FINDING_ID_PATTERN = /^REV-([A-Z]{3,4})-\d{4,}$/;
 
 export interface EvidenceFinding {
   id: string;

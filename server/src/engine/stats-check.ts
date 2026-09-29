@@ -192,13 +192,13 @@ const TEST_PATTERNS: Array<{ kind: TestKind; pattern: RegExp; dfCount: 0 | 1 | 2
     kind: 'chi2',
     pattern: new RegExp(
       String.raw`(?<![A-Za-z])(?:χ2|χ²|chi[- ]?squared?|chi\s?2|[Xx]2|x²)\s*\(\s*(\d+(?:\.\d+)?)\s*(?:,\s*N\s*=\s*[\d,\s]+)?\)\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`,
-      'g',
+      'gi',
     ),
     dfCount: 1,
   },
   {
     kind: 'z',
-    pattern: new RegExp(String.raw`\b[zZ]\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`, 'g'),
+    pattern: new RegExp(String.raw`\b[zZ]\s*=\s*(${NUMBER})\s*,\s*${P_CLAUSE}`, 'gi'),
     dfCount: 0,
   },
 ];

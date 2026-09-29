@@ -103,5 +103,29 @@ describe('quality composite', () => {
     const banned = loadBannedPhrases();
     expect(banned.length).toBeGreaterThan(0);
     expect(banned).toContain('the authors fail to');
+    expect(banned).toContain('the authors ignore');
+    expect(banned).not.toContain('the manuscript does not yet');
+    expect(banned).not.toContain('you');
+    expect(banned).not.toContain('i have read the manuscript');
+  });
+
+  it('does not count the voice the guide requires as tone risk', () => {
+    const result = computeComposite({
+      currentFindings: [],
+      ledgerIds: new Set<string>(),
+      citedFindingIds: [],
+      bodyMarkdown:
+        'I have read the manuscript. You report a clear design, and Section 3 reports the model. The manuscript does not yet state its contribution. The Reviewer',
+      decisionStability: 1,
+    });
+    expect(result.components.toneRisk).toBe(1);
+    const harsh = computeComposite({
+      currentFindings: [],
+      ledgerIds: new Set<string>(),
+      citedFindingIds: [],
+      bodyMarkdown: 'The authors fail to justify the sample. The paper is poorly written.',
+      decisionStability: 1,
+    });
+    expect(harsh.components.toneRisk).toBeCloseTo(1 - 2 / 5, 6);
   });
 });
