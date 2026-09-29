@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="assets/collegia-hero.jpg" alt="MARA: Multi-Agent Review Architecture, by Psynalytics" width="100%">
+<img src="assets/evidentia-cover.png" alt="Evidentia: the Evidence-Grounded Academic Peer-Review System, by Psynalytics" width="100%">
 
-<h1>MARA</h1>
+<h1>Evidentia</h1>
 
-<h3>Multi-Agent Review Architecture</h3>
+<h3>The Evidence-Grounded Academic Peer-Review System</h3>
 
 **Evidence-grounded, confidential, multi-agent peer review for psychological and wellbeing science.**
 
@@ -40,14 +40,14 @@
 
 ## Executive summary
 
-MARA is a multi-agent system that produces rigorous, developmental peer review of psychology and wellbeing-science manuscripts. It reads a manuscript the way an expert third reviewer would: it establishes the field context, verifies every reference, examines the work through independent specialist lenses, recomputes the reported statistics, stress-tests its own conclusions, and delivers a publication-quality review letter together with confidential notes for the handling editor.
+Evidentia is a multi-agent system that produces rigorous, developmental peer review of psychology and wellbeing-science manuscripts. It reads a manuscript the way an expert third reviewer would: it establishes the field context, verifies every reference, examines the work through independent specialist lenses, recomputes the reported statistics, stress-tests its own conclusions, and delivers a publication-quality review letter together with confidential notes for the handling editor.
 
 Three commitments define the system:
 
 | Commitment | What it means in practice |
 |---|---|
 | **Every claim is evidenced** | Each finding is anchored to a location in the manuscript and recorded in an append-only evidence ledger. A deterministic release gate refuses to ship any letter whose claims do not reconcile with that ledger. |
-| **Nothing confidential leaves the host** | Manuscript text, author identities, reviewer findings, and provider credentials stay on the machine that runs MARA. Outbound literature queries carry construct and method terms only, behind a signed, allowlisted, n-gram-guarded egress. |
+| **Nothing confidential leaves the host** | Manuscript text, author identities, reviewer findings, and provider credentials stay on the machine that runs Evidentia. Outbound literature queries carry construct and method terms only, behind a signed, allowlisted, n-gram-guarded egress. |
 | **Severity is honest, voice is developmental** | Verdicts are stated plainly, and every major concern carries its leanest credible fix and the recommendation it hinges on. Integrity concerns are always editorial signals, never accusations. |
 
 ## Capabilities
@@ -122,10 +122,10 @@ The orchestrator is the only component that merges findings into the ledger, and
 
 ## System architecture
 
-MARA is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach only the services an operator configures.
+Evidentia is a single deployable unit. The web application and the review worker run side by side in one container, share a local SQLite database, and reach only the services an operator configures.
 
 <div align="center">
-<img src="assets/collegia-architecture.png" alt="MARA architecture: the nine-phase pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
+<img src="assets/evidentia-architecture.png" alt="Evidentia architecture: the nine-phase pipeline, seventeen agents, the append-only evidence ledger, and the runtime components inside a single local container, with the confidentiality boundary" width="100%">
 </div>
 
 | Layer | Technology |
@@ -236,6 +236,8 @@ Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Monitoring, failure classes and recovery, backup and restore, retention |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every environment variable, provider routing, and cost controls |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model, confidentiality controls, and responsible disclosure |
+| [docs/REPOSITORY_GOVERNANCE.md](docs/REPOSITORY_GOVERNANCE.md) | Branch protection, code ownership, and collaborator access |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Who may contribute and how changes reach `main` |
 | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | Deliberate scope limits and the approach that would close each |
 | [docs/DATASETS.md](docs/DATASETS.md) | Research notes on peer-review corpora for rating calibration |
 | [knowledge/00_INDEX.md](knowledge/00_INDEX.md) | The knowledge base that governs every agent |
@@ -244,7 +246,7 @@ Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 **Prof. Llewellyn E. van Zyl, PhD** is the Founder and Chief AI Solutions Architect of Psynalytics and works within Optentia at North-West University. His work sits at the intersection of data science, positive psychology, and the governance of artificial-intelligence systems.
 
-MARA is designed, developed, and maintained by Psynalytics B.V.
+Evidentia is designed, developed, and maintained by Psynalytics B.V.
 
 ## Licence and legal
 
@@ -256,4 +258,4 @@ Licensing and permission enquiries: **hello@psynalytics.com**.
 
 ## Disclaimer
 
-MARA produces developmental, pre-submission editorial feedback. It is not affiliated with any journal or publisher, is not a certification of quality, and is not a substitute for human peer review or professional judgement. All outputs are advisory and must be verified by a qualified person before any reliance is placed on them.
+Evidentia produces developmental, pre-submission editorial feedback. It is not affiliated with any journal or publisher, is not a certification of quality, and is not a substitute for human peer review or professional judgement. All outputs are advisory and must be verified by a qualified person before any reliance is placed on them.

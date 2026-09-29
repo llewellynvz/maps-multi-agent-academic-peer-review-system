@@ -279,9 +279,9 @@ export default function RunPage(): ReactNode {
   const pct = terminal === 'complete' ? 100 : Math.round((activeIndex / 9) * 100);
 
   useEffect(() => {
-    document.title = terminal === 'complete' ? 'Review complete · MARA' : `${pct}% · ${phaseLabel(currentPhase)} · MARA`;
+    document.title = terminal === 'complete' ? 'Review complete · Evidentia' : `${pct}% · ${phaseLabel(currentPhase)} · Evidentia`;
     return () => {
-      document.title = 'MARA';
+      document.title = 'Evidentia';
     };
   }, [pct, currentPhase, terminal]);
 

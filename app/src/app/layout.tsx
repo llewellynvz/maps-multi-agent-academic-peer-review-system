@@ -4,7 +4,7 @@ import { AppShell } from '@/components/AppShell';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'MARA',
+  title: 'Evidentia',
   description: 'Multi-agent academic peer review',
   icons: { icon: '/brand/favicon.svg' },
 };

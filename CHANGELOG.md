@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to MARA are recorded here. The format follows
+All notable changes to Evidentia (formerly MARA and Collegia) are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -282,6 +282,16 @@ All notable changes to MARA are recorded here. The format follows
   instance. Server errors return a fixed message rather than internal paths.
 
 ### Changed
+- The platform is renamed **Evidentia: The Evidence-Grounded Academic
+  Peer-Review System** across the application, prompts, documentation, and
+  licence. Environment variables keep their `MARA_` prefix, and package scopes
+  and database file names are unchanged, so existing deployments keep working.
+- New README cover artwork and a redrawn architecture diagram, with their HTML
+  sources kept in `assets/source/` so they can be regenerated.
+- Repository governance: CODEOWNERS makes the owner the required reviewer of
+  every file, an importable ruleset (`.github/rulesets/protect-main.json`)
+  protects `main`, and `CONTRIBUTING.md` and `docs/REPOSITORY_GOVERNANCE.md`
+  document the policy and the settings that enforce it.
 - Documentation rewritten for release: an enterprise README (with the broken hero
   and architecture image paths fixed and stale guidance corrected), a new
   configuration reference (`docs/CONFIGURATION.md`) covering every environment

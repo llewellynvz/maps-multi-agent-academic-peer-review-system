@@ -35,9 +35,9 @@ const rows: DispatchRow[] = [];
 
 function buildSharedPrefix(): string {
   const sentence =
-    'The MARA peer-review pipeline evaluates psychology and wellbeing-science manuscripts against a fifteen-criterion rubric, grounding every recommendation in an append-only evidence ledger anchored to the submitted text. ';
+    'The Evidentia peer-review pipeline evaluates psychology and wellbeing-science manuscripts against a fifteen-criterion rubric, grounding every recommendation in an append-only evidence ledger anchored to the submitted text. ';
   let prefix =
-    'You are a MARA slice-A exercise fixture. Ignore the padding below; it exists only to build a cacheable prompt prefix.\n\n';
+    'You are an Evidentia slice-A exercise fixture. Ignore the padding below; it exists only to build a cacheable prompt prefix.\n\n';
   while (prefix.length < 12000) {
     prefix += sentence;
   }
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
         agent: 'exercise-frontier',
         promptVersion: 'v1',
         role: 'frontier',
-        parts: { system: sharedPrefix, prompt: 'Reply with exactly: MARA slice A frontier one.' },
+        parts: { system: sharedPrefix, prompt: 'Reply with exactly: Evidentia slice A frontier one.' },
       });
       secondFrontier = await record('frontier-prefix-2', {
         reviewId: sessionId,
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
         agent: 'exercise-frontier',
         promptVersion: 'v1',
         role: 'frontier',
-        parts: { system: sharedPrefix, prompt: 'Reply with exactly: MARA slice A frontier two.' },
+        parts: { system: sharedPrefix, prompt: 'Reply with exactly: Evidentia slice A frontier two.' },
       });
       await record('cheap', {
         reviewId: sessionId,

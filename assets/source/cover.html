@@ -1,0 +1,145 @@
+<!doctype html>
+<!-- Source for the README artwork. Open in Chromium and screenshot at the page size (cover: 2400x1000, architecture: 2100x1400) to regenerate the PNG in assets/. -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Inter; src: url(../../app/public/fonts/Inter-Variable.ttf); font-weight: 100 900; }
+@font-face { font-family: JBM; src: url(../../app/public/fonts/JetBrainsMono-Regular.woff2); font-weight: 400; }
+@font-face { font-family: JBM; src: url(../../app/public/fonts/JetBrainsMono-Medium.woff2); font-weight: 500; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 2400px; height: 1000px; overflow: hidden; }
+body {
+  font-family: Inter, sans-serif; color: #FEFCF5;
+  background:
+    radial-gradient(1200px 800px at 78% 50%, rgba(0,141,161,0.22), transparent 60%),
+    radial-gradient(900px 700px at 8% 110%, rgba(167,209,43,0.07), transparent 60%),
+    linear-gradient(135deg, #021E23 0%, #032A30 45%, #04363D 100%);
+  position: relative;
+}
+.grid { position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(254,252,245,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(254,252,245,0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(1400px 900px at 75% 50%, #000 30%, transparent 85%);
+}
+.left { position: absolute; left: 140px; top: 0; bottom: 0; width: 1000px; display: flex; flex-direction: column; justify-content: center; }
+.eyebrow { font-family: JBM; font-size: 22px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(254,252,245,0.62); display: flex; align-items: center; gap: 18px; }
+.eyebrow::before { content: ""; width: 56px; height: 3px; background: #A7D12B; border-radius: 2px; }
+h1 { font-size: 168px; font-weight: 600; letter-spacing: -0.035em; line-height: 1; margin-top: 34px; }
+h1 span { color: #A7D12B; }
+.sub { font-size: 44px; font-weight: 400; line-height: 1.22; margin-top: 26px; color: rgba(254,252,245,0.92); letter-spacing: -0.01em; }
+.rule { width: 100%; max-width: 860px; height: 1px; background: linear-gradient(90deg, rgba(254,252,245,0.28), transparent); margin: 52px 0 38px; }
+.pillars { display: flex; gap: 44px; }
+.pillar { max-width: 260px; }
+.pillar b { display: block; font-family: JBM; font-weight: 500; font-size: 17px; letter-spacing: 0.16em; text-transform: uppercase; color: #5FC3D2; margin-bottom: 10px; }
+.pillar p { font-size: 22px; line-height: 1.38; color: rgba(254,252,245,0.74); }
+.logo { position: absolute; left: 140px; bottom: 64px; height: 38px; opacity: 0.9; }
+.foot { position: absolute; right: 90px; top: 58px; font-family: JBM; font-size: 17px; letter-spacing: 0.14em; color: rgba(254,252,245,0.42); text-transform: uppercase; }
+svg { position: absolute; left: 1140px; top: 0; width: 1260px; height: 1000px; }
+</style></head>
+<body>
+<div class="grid"></div>
+<div class="left">
+  <div class="eyebrow">A Psynalytics AI system</div>
+  <h1>Evidentia<span>.</span></h1>
+  <div class="sub">The Evidence-Grounded<br>Academic Peer-Review System</div>
+  <div class="rule"></div>
+  <div class="pillars">
+    <div class="pillar"><b>Evidence-grounded</b><p>Every finding anchored to the manuscript in an append-only ledger.</p></div>
+    <div class="pillar"><b>Multi-agent</b><p>Seventeen agents across nine phases, eleven specialist lenses.</p></div>
+    <div class="pillar"><b>Confidential</b><p>Manuscripts never leave the host. Guarded, signed egress.</p></div>
+  </div>
+</div>
+<img class="logo" src="../../app/public/brand/psynalytics-logo-white.svg">
+<div class="foot">Proprietary · All rights reserved</div>
+<svg id="sys" viewBox="0 0 1260 1000" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('sys');
+const el = (tag, attrs, parent = svg) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); parent.appendChild(e); return e; };
+const txt = (x, y, s, attrs = {}) => { const t = el('text', { x, y, ...attrs }); t.textContent = s; return t; };
+
+const defs = el('defs', {});
+const g1 = el('radialGradient', { id: 'hub', cx: '50%', cy: '50%', r: '50%' }, defs);
+el('stop', { offset: '0%', 'stop-color': '#0B5561' }, g1); el('stop', { offset: '100%', 'stop-color': '#053A42' }, g1);
+const glow = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+el('feGaussianBlur', { stdDeviation: '10', result: 'b' }, glow);
+const m = el('feMerge', {}, glow); el('feMergeNode', { in: 'b' }, m); el('feMergeNode', { in: 'SourceGraphic' }, m);
+
+const cx = 640, cy = 470, R = 330;
+const phases = ['Sanitise', 'Analyse', 'Context', 'Specialists', 'Integrity', 'Swarm', 'Report', 'Release gate', 'Deliver'];
+// Horseshoe from lower-left (150deg) over the top to lower-right (30deg).
+const start = 145, end = 395;
+const pts = phases.map((_, i) => {
+  const a = (start + (end - start) * i / (phases.length - 1)) * Math.PI / 180;
+  return { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+});
+
+// Orbit rings
+el('circle', { cx, cy, r: R, fill: 'none', stroke: 'rgba(254,252,245,0.10)', 'stroke-width': 1.5, 'stroke-dasharray': '2 10' });
+el('circle', { cx, cy, r: R + 90, fill: 'none', stroke: 'rgba(0,141,161,0.10)', 'stroke-width': 1 });
+el('circle', { cx, cy, r: 205, fill: 'none', stroke: 'rgba(0,141,161,0.16)', 'stroke-width': 1 });
+
+// Pipeline arc path
+const arc = el('path', { d: `M ${pts[0].x} ${pts[0].y} A ${R} ${R} 0 1 1 ${pts[8].x} ${pts[8].y}`, fill: 'none', stroke: 'url(#arcg)', 'stroke-width': 4, 'stroke-linecap': 'round' });
+const lg = el('linearGradient', { id: 'arcg', x1: '0%', y1: '0%', x2: '100%', y2: '0%' }, defs);
+el('stop', { offset: '0%', 'stop-color': '#008DA1' }, lg); el('stop', { offset: '75%', 'stop-color': '#5FC3D2' }, lg); el('stop', { offset: '100%', 'stop-color': '#A7D12B' }, lg);
+
+// Spokes from ledger to the phases that write findings (1, 3, 4) and gate (7)
+for (const i of [1, 3, 4, 7]) {
+  el('line', { x1: cx, y1: cy, x2: pts[i].x, y2: pts[i].y, stroke: i === 7 ? 'rgba(167,209,43,0.55)' : 'rgba(95,195,210,0.45)', 'stroke-width': 1.6, 'stroke-dasharray': '5 7' });
+}
+// Faint spokes to the rest
+for (const i of [0, 2, 5, 6, 8]) {
+  el('line', { x1: cx, y1: cy, x2: pts[i].x, y2: pts[i].y, stroke: 'rgba(254,252,245,0.06)', 'stroke-width': 1 });
+}
+
+// Central ledger hub
+el('circle', { cx, cy, r: 150, fill: 'url(#hub)', stroke: 'rgba(95,195,210,0.55)', 'stroke-width': 2 });
+el('circle', { cx, cy, r: 162, fill: 'none', stroke: 'rgba(95,195,210,0.18)', 'stroke-width': 1 });
+// Ledger rows
+for (let k = 0; k < 5; k++) {
+  const y = cy - 56 + k * 26;
+  el('rect', { x: cx - 84, y, width: 14, height: 14, rx: 3, fill: k === 2 ? '#A7D12B' : '#5FC3D2', opacity: 0.9 });
+  el('rect', { x: cx - 60, y: y + 3, width: 130 - (k % 3) * 22, height: 8, rx: 4, fill: 'rgba(254,252,245,0.30)' });
+}
+txt(cx, cy + 98, 'EVIDENCE LEDGER', { 'text-anchor': 'middle', 'font-family': 'JBM', 'font-size': 15, 'letter-spacing': '3', fill: 'rgba(254,252,245,0.70)' });
+txt(cx, cy - 78, 'append-only', { 'text-anchor': 'middle', 'font-family': 'JBM', 'font-size': 13, fill: 'rgba(95,195,210,0.85)' });
+
+// Phase nodes
+pts.forEach((p, i) => {
+  const gate = i === 7;
+  el('circle', { cx: p.x, cy: p.y, r: 34, fill: gate ? '#A7D12B' : '#053A42', stroke: gate ? '#C9EA5E' : '#008DA1', 'stroke-width': 2.5, filter: gate ? 'url(#glow)' : '' });
+  txt(p.x, p.y + 9, String(i), { 'text-anchor': 'middle', 'font-family': 'Inter', 'font-weight': 600, 'font-size': 26, fill: gate ? '#032A30' : '#FEFCF5' });
+  // Label placed outward from the centre
+  const dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy);
+  const lx = p.x + (dx / d) * 64, ly = p.y + (dy / d) * 64 + 7;
+  const anchor = Math.abs(dx) < 60 ? 'middle' : dx > 0 ? 'start' : 'end';
+  txt(lx, ly, phases[i], { 'text-anchor': anchor, 'font-family': 'Inter', 'font-weight': gate ? 600 : 500, 'font-size': 23, fill: gate ? '#C9EA5E' : 'rgba(254,252,245,0.86)' });
+});
+
+// Input: manuscript document
+const mx = 150, my = 800;
+el('rect', { x: mx - 50, y: my - 64, width: 100, height: 128, rx: 8, fill: 'rgba(254,252,245,0.06)', stroke: 'rgba(254,252,245,0.45)', 'stroke-width': 1.8 });
+for (let k = 0; k < 6; k++) el('rect', { x: mx - 32, y: my - 42 + k * 16, width: k === 5 ? 36 : 64, height: 5, rx: 2.5, fill: 'rgba(254,252,245,0.35)' });
+txt(mx, my + 96, 'Manuscript', { 'text-anchor': 'middle', 'font-size': 20, fill: 'rgba(254,252,245,0.7)' });
+el('path', { d: `M ${mx + 58} ${my - 10} C ${mx + 140} ${my - 30}, ${pts[0].x - 110} ${pts[0].y + 60}, ${pts[0].x - 36} ${pts[0].y + 10}`, fill: 'none', stroke: 'rgba(254,252,245,0.40)', 'stroke-width': 2, 'stroke-dasharray': '6 6' });
+
+// Outputs: letter + editor notes
+const ox = 1075, oy = 790;
+[['Review letter', 0, '#FEFCF5'], ['Editor notes', 1, '#A7D12B']].forEach(([label, k, col]) => {
+  const x = ox - 70 + k * 80, y = oy - 70 + k * 18;
+  el('rect', { x, y, width: 92, height: 118, rx: 8, fill: 'rgba(254,252,245,0.06)', stroke: col, 'stroke-opacity': 0.6, 'stroke-width': 1.8 });
+  for (let r = 0; r < 5; r++) el('rect', { x: x + 16, y: y + 22 + r * 16, width: r === 4 ? 30 : 58, height: 5, rx: 2.5, fill: col, opacity: 0.35 });
+});
+txt(ox - 12, oy + 116, 'Review letter · Editor notes', { 'text-anchor': 'middle', 'font-size': 20, fill: 'rgba(254,252,245,0.7)' });
+el('path', { d: `M ${pts[8].x + 36} ${pts[8].y + 10} C ${pts[8].x + 110} ${pts[8].y + 60}, ${ox - 150} ${oy - 40}, ${ox - 80} ${oy - 12}`, fill: 'none', stroke: 'rgba(167,209,43,0.55)', 'stroke-width': 2, 'stroke-dasharray': '6 6' });
+
+// Scattered particles for depth
+let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+for (let k = 0; k < 70; k++) {
+  const a = rnd() * Math.PI * 2, r = 460 + rnd() * 220;
+  const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a) * 0.8;
+  if (x < 0 || x > 1260 || y < 0 || y > 1000) continue;
+  el('circle', { cx: x, cy: y, r: 1 + rnd() * 2.2, fill: rnd() > 0.8 ? '#A7D12B' : '#5FC3D2', opacity: 0.15 + rnd() * 0.35 });
+}
+</script>
+</body></html>

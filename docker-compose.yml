@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: mara-platform:local
+    image: evidentia-platform:local
     ports:
       # Loopback by default, like GROBID and the native dev server. Set MARA_BIND=0.0.0.0 only behind a
       # passphrase and a network you trust: this exposes manuscripts and reviews to the whole LAN.

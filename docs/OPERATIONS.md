@@ -1,6 +1,6 @@
 # Operations runbook
 
-This runbook covers day-to-day operation of the MARA review platform: watching a
+This runbook covers day-to-day operation of the Evidentia review platform: watching a
 review as it runs, recovering the failure classes the engine can produce, and backing up
 and restoring the durable state. Commands assume you are in the repository root on the
 host that runs the container, the same place you run `docker compose`.
@@ -10,7 +10,7 @@ unique prefix of it.
 
 ## 1. Overview
 
-MARA reviews a manuscript through a nine-phase pipeline (Phases 0 to 8). A single
+Evidentia reviews a manuscript through a nine-phase pipeline (Phases 0 to 8). A single
 worker holds a lease and processes one review at a time. It leases a queued review,
 ingests the manuscript, then runs the engine phases in order: sanitisation and structured
 analysis, field context and citation audit, the specialist lenses with their challenge

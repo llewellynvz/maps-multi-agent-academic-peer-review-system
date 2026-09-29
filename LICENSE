@@ -1,4 +1,4 @@
-MARA: MULTI-AGENT REVIEW ARCHITECTURE
+EVIDENTIA: THE EVIDENCE-GROUNDED ACADEMIC PEER-REVIEW SYSTEM
 PROPRIETARY SOFTWARE LICENCE: ALL RIGHTS RESERVED, NO COMMERCIAL RIGHTS
 
 Copyright (c) 2026 Llewellyn E. van Zyl and Psynalytics B.V.
@@ -14,9 +14,9 @@ EXPRESSLY STATED IN A SEPARATE WRITTEN AGREEMENT SIGNED BY THE OWNER.
 1.1 "Owner" means Llewellyn E. van Zyl and Psynalytics B.V., jointly and
     severally, and their successors and assigns.
 
-1.2 "Software" means the MARA system and every part of it, in any form and in
-    any medium, including without limitation: source code, object code, build
-    and configuration files, database schemas and migrations, agent prompts and
+1.2 "Software" means the Evidentia system (formerly MARA) and every part
+    of it, in any form and in any medium, including without limitation:
+    source code, object code, build and configuration files, database schemas and migrations, agent prompts and
     manifests, the knowledge base, rubrics, scoring methods, schemas, test
     fixtures and golden outputs, datasets, documentation, designs, diagrams,
     images, brand assets, names, and any output, derivative, translation,
@@ -102,8 +102,8 @@ agreement, no person may:
 4.8 circumvent, disable, or interfere with any security, access-control,
     licensing, or confidentiality mechanism of the Software;
 
-4.9 use any name, trade mark, logo, or brand of the Owner, including "MARA"
-    and "Psynalytics", except as required to identify the Owner as the source
+4.9 use any name, trade mark, logo, or brand of the Owner, including "Evidentia",
+    "MARA" and "Psynalytics", except as required to identify the Owner as the source
     of the Software; or
 
 4.10 permit, assist, or enable any other person to do any of the above.

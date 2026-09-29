@@ -55,7 +55,7 @@ export default function SetupPage(): ReactNode {
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader
         eyebrow="First run"
-        title="Set up MARA"
+        title="Set up Evidentia"
         sub="Connect a provider, choose a speed and cost tier, and set your defaults. This takes about a minute."
       />
       <div className="card">

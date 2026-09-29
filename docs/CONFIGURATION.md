@@ -1,6 +1,8 @@
 # Configuration reference
 
-MARA is configured entirely through environment variables. In a container deployment they are read from `.env` (or the file named by `MARA_ENV_FILE`); a native worker reads the same file from the repository root. [`.env.example`](../.env.example) is the annotated template.
+Evidentia is configured entirely through environment variables. In a container deployment they are read from `.env` (or the file named by `MARA_ENV_FILE`); a native worker reads the same file from the repository root. [`.env.example`](../.env.example) is the annotated template.
+
+Variable names keep the `MARA_` prefix from the platform's earlier name. They are deliberately unchanged so existing `.env` files, containers, and databases keep working.
 
 Blank values are treated as unset. An empty `OPENAI_API_KEY=` line from a copied template never shadows a key stored through the application.
 

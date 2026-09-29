@@ -1,0 +1,88 @@
+<!doctype html>
+<!-- Source for the README artwork. Open in Chromium and screenshot at the page size (cover: 2400x1000, architecture: 2100x1400) to regenerate the PNG in assets/. -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Inter; src: url(../../app/public/fonts/Inter-Variable.ttf); font-weight: 100 900; }
+@font-face { font-family: JBM; src: url(../../app/public/fonts/JetBrainsMono-Regular.woff2); font-weight: 400; }
+@font-face { font-family: JBM; src: url(../../app/public/fonts/JetBrainsMono-Medium.woff2); font-weight: 500; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 2100px; height: 1400px; overflow: hidden; }
+body { font-family: Inter, sans-serif; color: #FEFCF5; padding: 64px 70px;
+  background: radial-gradient(1400px 900px at 70% 30%, rgba(0,141,161,0.16), transparent 60%), linear-gradient(160deg, #021E23 0%, #032A30 50%, #064149 100%); }
+.eyebrow { font-family: JBM; font-size: 17px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(254,252,245,0.62); display: flex; align-items: center; gap: 14px; }
+.eyebrow::before { content: ""; width: 40px; height: 3px; background: #A7D12B; border-radius: 2px; }
+h1 { font-size: 64px; font-weight: 600; letter-spacing: -0.03em; margin-top: 16px; }
+h1 span { color: #A7D12B; }
+.lede { font-size: 24px; color: rgba(254,252,245,0.82); margin-top: 8px; }
+h2 { font-size: 24px; font-weight: 500; color: #5FC3D2; margin: 44px 0 6px; }
+.axis { display: flex; justify-content: space-between; font-family: JBM; font-size: 14px; color: rgba(254,252,245,0.6); border-bottom: 1px solid rgba(254,252,245,0.25); padding-bottom: 8px; margin-bottom: 22px; position: relative; }
+.axis::after { content: ""; position: absolute; right: -2px; bottom: -6px; border: 6px solid transparent; border-left: 10px solid rgba(254,252,245,0.5); }
+.phases { display: grid; grid-template-columns: repeat(9, 1fr); gap: 14px; }
+.ph { border: 1px solid rgba(95,195,210,0.35); border-radius: 16px; padding: 18px 14px; background: rgba(5,58,66,0.55); min-height: 290px; }
+.ph.gate { border: 2px solid #A7D12B; background: rgba(167,209,43,0.07); }
+.num { width: 42px; height: 42px; border-radius: 50%; background: #008DA1; display: grid; place-items: center; font-weight: 600; font-size: 21px; }
+.gate .num { background: #A7D12B; color: #032A30; }
+.ph h3 { font-size: 21px; font-weight: 500; line-height: 1.2; margin: 14px 0 6px; min-height: 52px; }
+.ph .what { font-size: 15px; color: rgba(254,252,245,0.62); min-height: 40px; line-height: 1.3; }
+.chip { font-family: JBM; font-size: 12.5px; border: 1px solid rgba(254,252,245,0.18); border-radius: 7px; padding: 6px 8px; margin-top: 8px; background: rgba(2,30,35,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ledger { margin-top: 22px; border: 1px solid rgba(95,195,210,0.55); border-radius: 16px; padding: 16px 24px; background: rgba(0,141,161,0.10); }
+.ledger b { font-size: 21px; font-weight: 500; }
+.ledger p { font-size: 16px; color: rgba(254,252,245,0.72); margin-top: 4px; }
+.cross { font-family: JBM; font-size: 14px; color: rgba(254,252,245,0.62); margin-top: 14px; }
+.runtime { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 50px; margin-top: 8px; }
+.box { border: 1px solid rgba(254,252,245,0.22); border-radius: 18px; padding: 22px; position: relative; }
+.box .tag { font-family: JBM; font-size: 13px; color: #A7D12B; letter-spacing: 0.12em; margin-bottom: 16px; }
+.cells { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.cell { border: 1px solid rgba(95,195,210,0.4); border-radius: 12px; padding: 16px 18px; background: rgba(5,58,66,0.5); }
+.cell.key { border-color: rgba(167,209,43,0.6); }
+.cell b { font-size: 20px; font-weight: 500; display: block; }
+.cell span { font-size: 15px; color: rgba(254,252,245,0.66); }
+.ext { display: flex; flex-direction: column; gap: 14px; }
+.ext .cell { display: flex; justify-content: space-between; align-items: center; }
+.ext .cell.lit { border-color: rgba(167,209,43,0.6); }
+.ext em { font-style: normal; font-family: JBM; font-size: 12px; color: rgba(254,252,245,0.5); }
+.boundary { font-family: JBM; font-size: 14.5px; color: #A7D12B; margin-top: 22px; }
+</style></head>
+<body>
+  <div class="eyebrow">A Psynalytics AI system · System architecture</div>
+  <h1>Evidentia<span>.</span></h1>
+  <div class="lede">The Evidence-Grounded Academic Peer-Review System: seventeen agents, nine phases, and the runtime that carries them.</div>
+
+  <h2>The review pipeline</h2>
+  <div class="axis"><span>manuscript in (PDF / DOCX)</span><span>deliverables out</span></div>
+  <div class="phases">
+    <div class="ph"><div class="num">0</div><h3>Intake and sanitisation</h3><div class="what">parse, quarantine injection</div><div class="chip">manuscript-sanitizer</div></div>
+    <div class="ph"><div class="num">1</div><h3>Structured analysis</h3><div class="what">claims, design, evidence</div><div class="chip">manuscript-analyst</div></div>
+    <div class="ph"><div class="num">2</div><h3>Field context and citations</h3><div class="what">dossier and reference audit</div><div class="chip">field-context-scout</div><div class="chip">citation-auditor</div></div>
+    <div class="ph"><div class="num">3</div><h3>Specialist review</h3><div class="what">11 lenses, then challenge</div><div class="chip">specialist-reviewer</div><div class="chip">per active lens</div></div>
+    <div class="ph"><div class="num">4</div><h3>Integrity screening</h3><div class="what">signals, never verdicts</div><div class="chip">statistics audit</div><div class="chip">integrity-screener</div><div class="chip">ai-content-analyst</div></div>
+    <div class="ph"><div class="num">5</div><h3>Swarm stress-test</h3><div class="what">consensus-robust findings</div><div class="chip">swarm</div></div>
+    <div class="ph"><div class="num">6</div><h3>Internal report</h3><div class="what">assembled from the ledger</div><div class="chip">review-report-writer</div></div>
+    <div class="ph gate"><div class="num">7</div><h3>Release gate</h3><div class="what">score, decide, validate</div><div class="chip">review-meta-reviewer</div><div class="chip">review-report-writer</div><div class="chip">review-final-critic</div></div>
+    <div class="ph"><div class="num">8</div><h3>Deliverables</h3><div class="what">documents and metrics</div><div class="chip">quality-metrics-engine</div><div class="chip">journal-scope-scorer</div><div class="chip">review-calibrator</div></div>
+  </div>
+  <div class="ledger"><b>Append-only evidence ledger</b><p>Every finding is anchored to the manuscript; the orchestrator is the sole merger, at phase boundaries only. Corrections supersede, never overwrite.</p></div>
+  <div class="cross">Cross-cutting: voice-profiler (intake) · phase-critic (after phases 1–6) · prior-stress-test (after the recommendation is set)</div>
+
+  <h2>Runtime and trust boundary</h2>
+  <div class="runtime">
+    <div class="box">
+      <div class="tag">SINGLE HOST · LOOPBACK BY DEFAULT</div>
+      <div class="cells">
+        <div class="cell"><b>Web application</b><span>Next.js: intake, live run view, results, API</span></div>
+        <div class="cell"><b>SQLite (WAL)</b><span>reviews, event trail, evidence ledger</span></div>
+        <div class="cell"><b>Review worker</b><span>durable queue, nine-phase engine, release gate</span></div>
+        <div class="cell key"><b>Key vault</b><span>AES-256-GCM envelope-encrypted provider keys</span></div>
+        <div class="cell key"><b>Injection sanitiser</b><span>quarantine, editor-only REV-SAN signal</span></div>
+        <div class="cell key"><b>Egress guard</b><span>allowlisted, HMAC-signed, 8-gram protected</span></div>
+      </div>
+    </div>
+    <div class="ext">
+      <div class="cell"><div><b>GROBID</b><br><span>PDF structure (bundled, loopback only)</span></div><em>internal</em></div>
+      <div class="cell"><div><b>Model providers</b><br><span>Azure · OpenAI · Anthropic · Google · Ollama, per role</span></div><em>credentials</em></div>
+      <div class="cell lit"><div><b>Literature APIs</b><br><span>Crossref · OpenAlex · Semantic Scholar</span></div><em>signed egress</em></div>
+      <div class="cell"><div><b>Langfuse</b><br><span>optional local tracing</span></div><em>optional</em></div>
+    </div>
+  </div>
+  <div class="boundary">Confidentiality boundary: manuscript text and author identities never leave the host; literature search sends method terms only, behind a signed, allowlisted, n-gram-guarded egress.</div>
+</body></html>

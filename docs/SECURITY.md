@@ -1,6 +1,6 @@
 # Security and data protection
 
-This document describes MARA's security model: what it protects, the threats it is designed against, and the controls that enforce each guarantee. It is maintained alongside the code, and the controls listed here are exercised by the automated test suite.
+This document describes Evidentia's security model: what it protects, the threats it is designed against, and the controls that enforce each guarantee. It is maintained alongside the code, and the controls listed here are exercised by the automated test suite.
 
 ## 1. Assets and guarantees
 
@@ -31,7 +31,7 @@ This document describes MARA's security model: what it protects, the threats it 
 
 ## 3. Access control
 
-MARA is a single-operator system. When an instance passphrase is set in **Settings**, every API route except the health check and the sign-in endpoint requires a valid session. When no passphrase is set, the instance is open to anyone who can reach it. That is safe only on the loopback interface, which is the default binding. Set a passphrase before widening `MARA_BIND`.
+Evidentia is a single-operator system. When an instance passphrase is set in **Settings**, every API route except the health check and the sign-in endpoint requires a valid session. When no passphrase is set, the instance is open to anyone who can reach it. That is safe only on the loopback interface, which is the default binding. Set a passphrase before widening `MARA_BIND`.
 
 ## 4. Data lifecycle
 
@@ -50,4 +50,4 @@ MARA is a single-operator system. When an instance passphrase is set in **Settin
 
 ## 6. Responsible disclosure
 
-Report suspected vulnerabilities privately to **hello@psynalytics.com** with the subject line "MARA security". Do not open a public issue, and do not test against any deployment you do not own.
+Report suspected vulnerabilities privately to **hello@psynalytics.com** with the subject line "Evidentia security". Do not open a public issue, and do not test against any deployment you do not own.
