@@ -152,9 +152,14 @@ export function getReviewDetail(db: MaraDatabase, id: string): ReviewDetail {
 export function purgeReview(client: MaraClient, id: string): void {
   assertSafeReviewId(id);
   const { db, sqlite } = client;
-  if (getReviewRow(db, id) === undefined) {
+  const row = getReviewRow(db, id);
+  if (row === undefined) {
     removeReviewDirectories(id);
     return;
+  }
+  // The worker keeps writing blobs for a live review and would recreate its directory after the purge.
+  if (ACTIVE_STATUSES.has(row.status)) {
+    throw new ApiError('conflict', 'This review is still queued or running. Cancel it before deleting it.');
   }
 
   const purge = sqlite.transaction(() => {

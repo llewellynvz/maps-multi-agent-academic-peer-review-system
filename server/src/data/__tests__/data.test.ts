@@ -12,6 +12,7 @@ import { clearPassphrase, issueToken, passphraseIsSet, setPassphrase, verifyPass
 import { openKey, sealKey } from '../crypto';
 import { addKey, mergeProviderKeyEnv, providerKeyEnv } from '../keys';
 import { submitAnswers } from '../answers';
+import { submitRunControl } from '../commands';
 import { createReview, getReviewDetail, purgeAll, purgeReview } from '../reviews';
 
 let tempDir: string;
@@ -185,6 +186,24 @@ describe('guarded purge (DATA-19..21)', () => {
     expect(existsSync(blobDir(review.id))).toBe(false);
 
     purgeReview(client, review.id);
+  });
+
+  it('refuses to purge a review that is still running', () => {
+    const review = createReview(client.db, { title: 'Live' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'running' WHERE id = ?").run(review.id);
+    expect(() => purgeReview(client, review.id)).toThrow(/still queued or running/);
+    const row = client.sqlite.prepare('SELECT count(*) AS n FROM reviews WHERE id = ?').get(review.id) as { n: number };
+    expect(row.n).toBe(1);
+  });
+
+  it('refuses a phase retry while the review is running', () => {
+    const review = createReview(client.db, { title: 'Live' });
+    const now = new Date().toISOString();
+    client.sqlite.prepare("UPDATE reviews SET status = 'running' WHERE id = ?").run(review.id);
+    client.sqlite
+      .prepare("INSERT INTO phase_checkpoints (id, review_id, phase, status, updated_at) VALUES (?, ?, 'phase_3', 'completed', ?)")
+      .run(randomUUID(), review.id, now);
+    expect(() => submitRunControl(client.db, review.id, 'retry_phase', { phase: 'phase_3' })).toThrow(/still running/);
   });
 
   it('rejects a path-traversal review id before any filesystem or db operation', () => {

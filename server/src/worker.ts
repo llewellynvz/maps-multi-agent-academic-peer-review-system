@@ -87,10 +87,12 @@ async function main(): Promise<void> {
   const egress = createEgressController(defaultFetch);
   const openAlexApiKey = getEnv(process.env, 'OPENALEX_API_KEY');
   const semanticScholarApiKey = getEnv(process.env, 'SEMANTIC_SCHOLAR_API_KEY');
+  // .env.example ships this blank; an empty mailto= is worse than none for the polite pools.
+  const contactEmail = getEnv(process.env, 'MARA_CONTACT_EMAIL');
   const citationClient = createCitationClient({
     fetchImpl: egress.fetch,
     cachePath: citationCachePath(),
-    ...(process.env.MARA_CONTACT_EMAIL !== undefined ? { contactEmail: process.env.MARA_CONTACT_EMAIL } : {}),
+    ...(contactEmail !== undefined ? { contactEmail } : {}),
     ...(openAlexApiKey !== undefined ? { openAlexApiKey } : {}),
     ...(semanticScholarApiKey !== undefined ? { semanticScholarApiKey } : {}),
   });

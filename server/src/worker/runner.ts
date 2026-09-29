@@ -144,6 +144,10 @@ export class WorkerRunner {
         continue;
       }
       const args = safeArgs(command.argsJson);
+      if (command.command === 'retry_phase' && command.reviewId === this.activeReviewId) {
+        // Applied once the current run finishes; resetting phases under the running engine would corrupt it.
+        continue;
+      }
       if (command.command === 'run' || command.command === 'resume' || command.command === 'retry_phase') {
         let retryStart: number | null = null;
         try {
@@ -542,6 +546,11 @@ export class WorkerRunner {
               payload: { reason: 'ingest_snapshot_missing', action: 'restart_ingest' },
             });
             outcome = await this.processors.startIngest(reviewId, this.recoveredArgs(reviewId));
+            // The restarted run suspends at the same questions; feed it the answers the user already gave
+            // rather than asking again.
+            if (outcome === 'suspended' && !this.cancelRequested.has(reviewId)) {
+              outcome = await this.processors.resumeIngest(reviewId, intent.answers ?? {}, intent.preset);
+            }
           }
           this.clearPendingResume(reviewId);
         } else {
@@ -555,7 +564,11 @@ export class WorkerRunner {
           return;
         }
         if (outcome === 'halted') {
-          this.emitTerminal(reviewId, 'failed', { errorClass: 'quarantine_tier_3', phase: 'phase_0' });
+          // The halting step records its own class (tier_3_tampering, parse_failed); make sure the review is
+          // terminal so it is not left looking active, which would block a re-run and purge-all.
+          const errorClass = this.reviewErrorClass(reviewId) ?? 'ingest_halted';
+          updateReview(this.db, reviewId, { status: 'failed', errorClass });
+          this.emitTerminal(reviewId, 'failed', { errorClass, phase: 'phase_0' });
           return;
         }
       }
@@ -831,9 +844,18 @@ export class WorkerRunner {
     if (!this.ensureLease()) {
       this.log('another worker holds the lease; standing by until it goes stale');
     }
+    // A transient failure in one poll (SQLITE_BUSY past the busy timeout, a full disk on the heartbeat)
+    // must not become an unhandled rejection: Node would exit and take the container down mid-phase.
     this.loopTimer = setInterval(() => {
-      writeHeartbeat();
-      void this.tick();
+      const report = (error: unknown): void => {
+        this.log(`poll failed, retrying next tick: ${error instanceof Error ? error.message : String(error)}`);
+      };
+      try {
+        writeHeartbeat();
+      } catch (error) {
+        report(error);
+      }
+      this.tick().catch(report);
     }, this.pollMs);
   }
 

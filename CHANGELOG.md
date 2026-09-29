@@ -22,6 +22,20 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Worker and data fixes from a code review:
+  - A parse halt (for example GROBID unreachable) now marks the review failed
+    with `parse_failed` instead of leaving it stuck as "sanitizing", and a later
+    run ingests normally once the parser is back rather than halting forever on
+    the old checkpoint. Halt terminals carry the real error class.
+  - A failed poll (a busy database, a full disk on the heartbeat) is logged and
+    retried instead of crashing the worker process.
+  - A running review can no longer be deleted or have a phase retried
+    underneath it; a retry that arrives mid-run waits for the run to finish.
+  - Finding ids are never reissued after a gate retry purges the newest ones, so
+    the live stream no longer skips or mislabels the new findings.
+  - When the ingest snapshot is missing on resume, the restarted ingest reuses
+    the answers already given instead of asking again.
+  - A blank `MARA_CONTACT_EMAIL` is no longer sent to the citation services.
 - Review engine fixes from a code review:
   - A timed-out specialist or integrity dispatch now restarts its phase through
     the supervisor, as designed, instead of silently dropping that lens as a

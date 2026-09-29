@@ -187,4 +187,33 @@ describe('ingest workflow', () => {
     expect(recovered.status).toBe('suspended');
     expect(existsSync(sanitizedMapPath)).toBe(true);
   });
+
+  it('marks a parse halt failed and lets a later run ingest once the parser is reachable', async () => {
+    const haltId = `wf-halt-${randomUUID()}`;
+    insertReview(haltId);
+    try {
+      const noGrobid = buildIngestMastra({ db, runDispatch: mockDispatch, mastraDbPath: join(tempDir, 'mastra-halt-1.db') });
+      const first = await startIngest(noGrobid, { reviewId: haltId, filePath: pdfPath, originalFilename: 'a.pdf', mimeType: 'application/pdf' });
+      expect(first.status).toBe('success');
+      const afterHalt = sqlite.prepare('SELECT status, error_class FROM reviews WHERE id = ?').get(haltId) as {
+        status: string;
+        error_class: string | null;
+      };
+      expect(afterHalt).toEqual({ status: 'failed', error_class: 'parse_failed' });
+
+      const withGrobid = buildIngestMastra({
+        db,
+        runDispatch: mockDispatch,
+        ingestOverrides: { grobidExtract: async () => teiXml },
+        mastraDbPath: join(tempDir, 'mastra-halt-2.db'),
+      });
+      const second = await startIngest(withGrobid, { reviewId: haltId, filePath: pdfPath, originalFilename: 'a.pdf', mimeType: 'application/pdf' });
+      expect(second.status).toBe('suspended');
+      const resumed = await resumeIngest(withGrobid, second.runId, { answers: { preset: 'fast' } });
+      expect(resumed.status).toBe('success');
+      expect((resumed.result as { halted: boolean }).halted).toBe(false);
+    } finally {
+      rmSync(blobDir(haltId), { recursive: true, force: true });
+    }
+  });
 });

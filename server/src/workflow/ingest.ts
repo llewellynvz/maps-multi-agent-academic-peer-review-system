@@ -130,6 +130,7 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
       const haltParse = (reason: string): z.infer<typeof parseOutputSchema> => {
         const output = { reviewId: inputData.reviewId, halted: true, parser: 'unpdf' as const, parseQuality: 'degraded' as const };
         upsertCheckpoint(db, { reviewId: inputData.reviewId, phase: 'parse', status: 'failed', snapshot: { ...output, haltReason: reason } });
+        updateReview(db, inputData.reviewId, { status: 'failed', errorClass: 'parse_failed' });
         insertEvent(db, {
           reviewId: inputData.reviewId,
           kind: 'error',
@@ -312,7 +313,9 @@ export function createIngestWorkflow(deps: IngestWorkflowDeps) {
       if (done?.status === 'completed') {
         return { reviewId: inputData.reviewId, halted: false, status: 'ingested' };
       }
-      if (done?.status === 'failed' || inputData.halted) {
+      // Only this run's halt counts. A phase_1 'failed' left by an earlier halt (GROBID down, say) would
+      // otherwise re-halt every later run even after parse and sanitize succeed.
+      if (inputData.halted) {
         upsertCheckpoint(db, { reviewId: inputData.reviewId, phase: 'phase_1', status: 'failed', snapshot: { ingestComplete: false } });
         return { reviewId: inputData.reviewId, halted: true, status: 'halted' };
       }

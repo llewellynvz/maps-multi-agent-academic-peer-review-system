@@ -186,7 +186,7 @@ describe('WorkerRunner lease heartbeat throttling (F10)', () => {
 });
 
 describe('WorkerRunner ingest resume reconciliation (F11)', () => {
-  it('falls back to a fresh ingest when the stored ingest snapshot is missing', async () => {
+  it('falls back to a fresh ingest when the stored ingest snapshot is missing, then replays the saved answers', async () => {
     insertReview('rev-missing', '2026-07-14T00:00:00.000Z');
     insertManuscript('rev-missing', 'application/pdf', 'study.pdf', 'data/blobs/rev-missing/manuscript/original.pdf');
     client.sqlite.prepare("UPDATE reviews SET status = 'awaiting_input' WHERE id = 'rev-missing'").run();
@@ -194,6 +194,7 @@ describe('WorkerRunner ingest resume reconciliation (F11)', () => {
 
     const calls = { start: 0, resume: 0 };
     const seenArgs: Array<Record<string, unknown>> = [];
+    const seenAnswers: Array<Record<string, string>> = [];
     const processors: WorkerProcessors = {
       startIngest: async (_reviewId, args) => {
         calls.start += 1;
@@ -201,8 +202,9 @@ describe('WorkerRunner ingest resume reconciliation (F11)', () => {
         updateReview(client.db, 'rev-missing', { status: 'awaiting_input' });
         return 'suspended';
       },
-      resumeIngest: async () => {
+      resumeIngest: async (_reviewId, answers) => {
         calls.resume += 1;
+        seenAnswers.push(answers);
         return 'ingested';
       },
       runEngine: async () => 'completed',
@@ -214,8 +216,9 @@ describe('WorkerRunner ingest resume reconciliation (F11)', () => {
     await runner.runOnce();
     await runner.settle();
 
-    expect(calls.resume).toBe(0);
     expect(calls.start).toBe(1);
+    expect(calls.resume).toBe(1);
+    expect(seenAnswers[0]).toEqual({ field: 'wellbeing' });
     expect(seenArgs[0]?.filePath).toBe('data/blobs/rev-missing/manuscript/original.pdf');
     const fallbackEvents = client.sqlite
       .prepare("SELECT count(*) AS n FROM review_events WHERE review_id = 'rev-missing' AND kind = 'error'")

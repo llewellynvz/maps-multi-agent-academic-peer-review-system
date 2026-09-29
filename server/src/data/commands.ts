@@ -135,6 +135,11 @@ function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<str
   if (!/^phase_\d+$/.test(phase)) {
     throw new ApiError('unprocessable', `Phase ${phase} is not a retryable engine phase.`, { field: 'phase' });
   }
+  // Retrying under a live run would reset checkpoints (and, after a gate block, delete findings) while
+  // the engine is still using them, and queue a second engine pass behind the first.
+  if (ACTIVE_STATUSES.has(reviewStatus) || reviewStatus === 'queued') {
+    throw new ApiError('conflict', 'This review is still running. Wait for it to finish or cancel it before retrying a phase.');
+  }
   const candidates = [phase, `engine_${phase}`];
   const rows = db.select().from(phaseCheckpoints).where(eq(phaseCheckpoints.reviewId, reviewId)).all();
   const match = rows.find((row) => candidates.includes(row.phase));
