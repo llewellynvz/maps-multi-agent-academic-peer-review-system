@@ -92,4 +92,20 @@ describe('settleWithGaps', () => {
     ).rejects.toBeInstanceOf(StaleDispatchError);
     expect(gapEvents()).toEqual([]);
   });
+
+  it('records a stale unit as a gap on the phase last permitted attempt', async () => {
+    const { results, gaps } = await settleWithGaps(
+      db,
+      reviewId,
+      'phase_3',
+      'test step',
+      [
+        { label: 'A', run: () => Promise.resolve('ok') },
+        { label: 'B', run: () => Promise.reject(new StaleDispatchError('timeout')) },
+      ],
+      { staleAsGap: true },
+    );
+    expect(results).toEqual(['ok']);
+    expect(gaps).toEqual([{ step: 'test step', unit: 'B' }]);
+  });
 });

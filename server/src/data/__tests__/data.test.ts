@@ -10,9 +10,10 @@ import { blobDir } from '../../paths';
 import { writeManuscriptBlob } from '../../workflow/storage';
 import { clearPassphrase, issueToken, passphraseIsSet, setPassphrase, verifyPassphrase, verifyToken } from '../auth';
 import { openKey, sealKey } from '../crypto';
-import { addKey, mergeProviderKeyEnv, providerKeyEnv } from '../keys';
+import { addKey, mergeProviderKeyEnv, providerKeyEnv, providerKeysFingerprint } from '../keys';
 import { submitAnswers } from '../answers';
 import { submitRunControl } from '../commands';
+import { getQuestions } from '../questions';
 import { createReview, getReviewDetail, purgeAll, purgeReview } from '../reviews';
 
 let tempDir: string;
@@ -107,12 +108,17 @@ describe('provider key envelope encryption (SEC-13/17)', () => {
     process.env.MARA_MASTER_KEY = '0'.repeat(64);
     addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-TYPO', persist: 'disk' });
     addKey(client.db, { provider: 'openai', apiKey: 'sk-disk-FIXED', persist: 'disk' });
-    addKey(client.db, { provider: 'google', apiKey: 'g-session-OLD', persist: 'session' });
-    addKey(client.db, { provider: 'google', apiKey: 'g-session-NEW', persist: 'session' });
+    const before = providerKeysFingerprint(client.db);
+    addKey(client.db, { provider: 'google', apiKey: 'g-disk-NEW', persist: 'disk' });
 
     const env = providerKeyEnv(client.db);
     expect(env.OPENAI_API_KEY).toBe('sk-disk-FIXED');
-    expect(env.GOOGLE_API_KEY).toBe('g-session-NEW');
+    expect(env.GOOGLE_API_KEY).toBe('g-disk-NEW');
+    expect(providerKeysFingerprint(client.db)).not.toBe(before);
+  });
+
+  it('refuses a session-only key the worker could never read', () => {
+    expect(() => addKey(client.db, { provider: 'google', apiKey: 'g-session', persist: 'session' })).toThrow(/not visible to the review worker/);
   });
 });
 
@@ -194,6 +200,40 @@ describe('guarded purge (DATA-19..21)', () => {
     expect(() => purgeReview(client, review.id)).toThrow(/still queued or running/);
     const row = client.sqlite.prepare('SELECT count(*) AS n FROM reviews WHERE id = ?').get(review.id) as { n: number };
     expect(row.n).toBe(1);
+  });
+
+  it('drops a placeholder journal so nothing is scored against a journal called "None"', () => {
+    const review = createReview(client.db, { title: 'Journal' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'awaiting_input' WHERE id = ?").run(review.id);
+    writeManuscriptBlob(
+      review.id,
+      'parse/lite-parse.json',
+      JSON.stringify({
+        deterministic: { wordCount: 100, sectionCount: 3, referenceCount: 5 },
+        provisional: { field: 'wellbeing', studyDesign: 'survey', manuscriptType: 'empirical', language: 'en', wordCountEstimate: 100 },
+        questions: [{ id: 'journal', kind: 'metadata', field: 'journal', prompt: 'journal', defaultValue: null }],
+      }),
+    );
+    submitAnswers(client.db, review.id, { answers: [{ questionId: 'journal', value: 'None' }] });
+    const row = client.sqlite.prepare('SELECT args_json FROM run_commands WHERE review_id = ?').get(review.id) as { args_json: string };
+    expect(JSON.parse(row.args_json).answers.journal).toBeUndefined();
+  });
+
+  it('retries an ingest that failed before completing by queueing a fresh ingest run', () => {
+    const review = createReview(client.db, { title: 'Halted' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'failed', error_class = 'parse_failed' WHERE id = ?").run(review.id);
+    const result = submitRunControl(client.db, review.id, 'retry_phase', { phase: 'phase_0' });
+    expect(result.noop).toBeUndefined();
+    const commands = client.sqlite.prepare('SELECT command FROM run_commands WHERE review_id = ?').all(review.id) as Array<{ command: string }>;
+    expect(commands.map((row) => row.command)).toEqual(['run']);
+    const row = client.sqlite.prepare('SELECT error_class FROM reviews WHERE id = ?').get(review.id) as { error_class: string | null };
+    expect(row.error_class).toBeNull();
+  });
+
+  it('stops question polling once the review has failed', () => {
+    const review = createReview(client.db, { title: 'Halted' });
+    client.sqlite.prepare("UPDATE reviews SET status = 'failed', error_class = 'parse_failed' WHERE id = ?").run(review.id);
+    expect(() => getQuestions(client.db, review.id)).toThrow(/could not be structured/);
   });
 
   it('refuses a phase retry while the review is running', () => {

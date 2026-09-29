@@ -75,6 +75,17 @@ export function submitRunControl(
 ): RunControlResult {
   const review = requireReview(db, reviewId);
 
+  // Intake has no engine checkpoint to reset: a review that failed before ingest completed (a parse halt,
+  // a provider error in lite-parse) is retried by running ingest again from the stored manuscript.
+  if (command === 'retry_phase' && ingestRetryApplies(db, reviewId, args, review.status)) {
+    if (pendingCommandExists(db, reviewId, 'run')) {
+      return { accepted: true, command, noop: true, status: review.status };
+    }
+    db.update(reviews).set({ errorClass: null, updatedAt: nowIso() }).where(eq(reviews.id, reviewId)).run();
+    insertRunCommand(db, reviewId, 'run', {});
+    return { accepted: true, command, status: review.status };
+  }
+
   if (command === 'retry_phase') {
     validateRetryPhase(db, reviewId, args, review.status);
   }
@@ -125,6 +136,20 @@ export function submitAutoRetryPhase(db: MaraDatabase, reviewId: string, phase: 
   }
   insertRunCommand(db, reviewId, 'retry_phase', { phase, auto: true });
   return { noop: false };
+}
+
+function ingestRetryApplies(db: MaraDatabase, reviewId: string, args: Record<string, unknown>, reviewStatus: string): boolean {
+  const phase = typeof args.phase === 'string' ? args.phase : '';
+  if ((phase !== 'phase_0' && phase !== 'phase_1') || reviewStatus !== 'failed') {
+    return false;
+  }
+  const ingest = db
+    .select({ status: phaseCheckpoints.status })
+    .from(phaseCheckpoints)
+    .where(and(eq(phaseCheckpoints.reviewId, reviewId), eq(phaseCheckpoints.phase, 'phase_1')))
+    .limit(1)
+    .all()[0];
+  return ingest?.status !== 'completed';
 }
 
 function validateRetryPhase(db: MaraDatabase, reviewId: string, args: Record<string, unknown>, reviewStatus: string): void {

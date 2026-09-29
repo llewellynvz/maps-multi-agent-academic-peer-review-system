@@ -15,6 +15,7 @@ export interface SubmitAnswersInput {
 }
 
 const PRESETS = new Set(['fast', 'balanced', 'thorough']);
+const NO_JOURNAL = /^(|none|n\/?a|not sure|unknown|no journal|-)$/i;
 
 function flatten(value: string | string[]): string {
   return Array.isArray(value) ? value.join(', ') : value;
@@ -43,6 +44,12 @@ export function submitAnswers(db: MaraDatabase, reviewId: string, input: SubmitA
       const question = byId.get(submitted.questionId);
       const key = question?.field ?? submitted.questionId;
       answers[key] = flatten(submitted.value);
+    }
+
+    // "None" (what older clients sent for a blank journal) or an empty answer means no target journal;
+    // storing it would score scope fit and journal calibration against a journal called "None".
+    if (typeof answers.journal === 'string' && NO_JOURNAL.test(answers.journal.trim())) {
+      delete answers.journal;
     }
 
     if (typeof answers.reviewTitle === 'string' && answers.reviewTitle.trim().length > 0) {

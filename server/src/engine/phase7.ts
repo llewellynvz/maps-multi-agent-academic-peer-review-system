@@ -44,9 +44,9 @@ import {
   validateGrounding,
   type GroundingFailureKind,
 } from './grounding';
-import { matchLens, paperTypeNote } from './lenses';
+import { matchLens, paperTypeNote, SEVERITY_WEIGHT } from './lenses';
 import { mergeFindingsOnce } from './merge';
-import { readIntakeOptions } from './options';
+import { readIntakeOptions, requesterGuidanceNote } from './options';
 import { assemblePrivateNotes, RECOMMENDATION_LABEL } from './private-notes';
 import { upsertFinalRubricScore } from './rubric';
 
@@ -395,6 +395,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   const options = getReviewOptions(db, reviewId);
   const intake = readIntakeOptions(options);
   const typeNote = paperTypeNote(intake.paperType);
+  const guidanceNote = requesterGuidanceNote(intake);
   const report = readArtefact<FullReportEnvelope>(reviewId, 'p6-report');
   const swarm = readArtefact<SwarmEvaluation>(reviewId, 'p5-swarm');
   const dossierContent = fieldDossierContent(reviewId);
@@ -508,7 +509,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
               : []),
           ],
           routingNote:
-            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
+            `Mode B shipped seven-part peer-review report. Author-and-editor facing, anonymous, no editor-only content. The report body carries no finding ids and no machine tokens: write the recommendation and confidence as natural reviewer prose per the knowledge/06 register. Ground every 4A point and 4B subsection through evidenceMap entries whose findingIds come only from the author-facing ledger above and whose label matches the bold problem label in the body verbatim; citedFindingIds is exactly the union of evidenceMap ids. Any id shown as [EDITOR-ONLY] or [SUPERSEDED] in the other artefacts is off limits everywhere. Assert editorOnlyLeak false. Apply the swarm report critique. Use the recommendation and confidence from the recommendation package.${typeNote !== null ? ` ${typeNote}` : ''}${guidanceNote !== null ? ` ${guidanceNote}` : ''}${priorDefect.length > 0 ? ` The prior attempt was routed back: ${priorDefect}` : ''}`,
         },
       });
 
@@ -1038,7 +1039,6 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
   });
 }
 
-const PRIOR_SEVERITY_WEIGHT: Record<string, number> = { none: 0, minor: 1, moderate: 2, major: 3, fatal: 4 };
 
 async function runPriorStressTest(
   deps: EngineDeps,
@@ -1054,7 +1054,7 @@ async function runPriorStressTest(
 ): Promise<PriorStressTestOutput | null> {
   try {
     const topFindings = [...input.findings]
-      .sort((a, b) => (PRIOR_SEVERITY_WEIGHT[b.severity] ?? 0) - (PRIOR_SEVERITY_WEIGHT[a.severity] ?? 0))
+      .sort((a, b) => (SEVERITY_WEIGHT[b.severity] ?? 0) - (SEVERITY_WEIGHT[a.severity] ?? 0))
       .slice(0, 20)
       .map((finding) => ({
         id: finding.id,

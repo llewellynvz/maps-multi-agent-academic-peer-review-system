@@ -13,10 +13,25 @@ export interface RoleConfig {
 
 const DEFAULT_LOCAL_MODEL = 'qwen2:7b';
 
+const ROLE_PROVIDERS = new Set<DispatchProvider>(['azure', 'openai', 'anthropic', 'google', 'local']);
+
+// Azure stays the default, but a role can be pointed at any provider with MARA_<ROLE>_PROVIDER and
+// MARA_<ROLE>_MODEL, so a key added in Settings (OpenAI, Anthropic, Google) can actually carry a review.
+function roleConfig(env: EnvSource, role: 'FRONTIER' | 'CHEAP'): RoleConfig {
+  const provider = (getEnv(env, `MARA_${role}_PROVIDER`) ?? 'azure').toLowerCase() as DispatchProvider;
+  if (!ROLE_PROVIDERS.has(provider)) {
+    throw new Error(`MARA_${role}_PROVIDER must be one of ${[...ROLE_PROVIDERS].join(', ')}; got ${provider}`);
+  }
+  const model =
+    getEnv(env, `MARA_${role}_MODEL`) ??
+    (provider === 'azure' ? requireEnv(env, `AZURE_${role}_DEPLOYMENT`) : requireEnv(env, `MARA_${role}_MODEL`));
+  return { provider, model };
+}
+
 export function readRoleConfigs(env: EnvSource): Record<Role, RoleConfig> {
   return {
-    frontier: { provider: 'azure', model: requireEnv(env, 'AZURE_FRONTIER_DEPLOYMENT') },
-    cheap: { provider: 'azure', model: requireEnv(env, 'AZURE_CHEAP_DEPLOYMENT') },
+    frontier: roleConfig(env, 'FRONTIER'),
+    cheap: roleConfig(env, 'CHEAP'),
     local: { provider: 'local', model: getEnv(env, 'OLLAMA_MODEL') ?? DEFAULT_LOCAL_MODEL },
   };
 }
@@ -94,5 +109,25 @@ export function createRegistry(options: CreateRegistryOptions): Registry {
       const config = roleConfigs[role];
       return { role, ...resolveModel(config.provider, config.model) };
     },
+  };
+}
+
+// Rebuilds the registry when its environment changes, so a provider key saved in Settings reaches the
+// long-running worker on the next dispatch instead of waiting for a restart. `fingerprint` must be cheap.
+export function createRefreshingRegistry(options: {
+  fingerprint: () => string;
+  env: () => EnvSource;
+}): Registry {
+  let current: { fingerprint: string; registry: Registry } | null = null;
+  const registry = (): Registry => {
+    const fingerprint = options.fingerprint();
+    if (current === null || current.fingerprint !== fingerprint) {
+      current = { fingerprint, registry: createRegistry({ env: options.env() }) };
+    }
+    return current.registry;
+  };
+  return {
+    resolveRole: (role) => registry().resolveRole(role),
+    resolveModel: (provider, model) => registry().resolveModel(provider, model),
   };
 }

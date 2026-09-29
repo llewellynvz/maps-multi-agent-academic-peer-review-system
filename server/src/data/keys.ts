@@ -34,8 +34,6 @@ export interface AddKeyInput {
   persist: 'disk' | 'session';
 }
 
-const sessionKeys = new Map<string, { provider: string; label: string | null; apiKey: string; baseUrl: string | null }>();
-
 export function addKey(db: MaraDatabase, input: AddKeyInput): ProviderKeyView {
   if (!PROVIDERS.has(input.provider)) {
     throw new ApiError('unprocessable', 'Unknown provider.', { field: 'provider' });
@@ -44,24 +42,15 @@ export function addKey(db: MaraDatabase, input: AddKeyInput): ProviderKeyView {
     throw new ApiError('unprocessable', 'An API key is required.', { field: 'apiKey' });
   }
 
+  // A session key would live only in this web process's memory. The review worker is a separate process
+  // and could never read it, so accepting one would report success for a key no review can use.
   if (input.persist === 'session') {
-    const id = randomUUID();
-    sessionKeys.set(id, {
-      provider: input.provider,
-      label: input.label ?? null,
-      apiKey: input.apiKey,
-      baseUrl: input.baseUrl ?? null,
-    });
-    return {
-      id,
-      provider: input.provider,
-      label: input.label ?? null,
-      maskedKey: maskKey(input.apiKey),
-      baseUrl: input.baseUrl ?? null,
-      persist: 'session',
-    };
+    throw new ApiError(
+      'unprocessable',
+      'Session-only keys are not visible to the review worker. Save the key to disk (this needs MARA_MASTER_KEY), or set it in .env.',
+      { field: 'persist' },
+    );
   }
-
   const sealed = sealKey(input.apiKey);
   const id = randomUUID();
   const ts = nowIso();
@@ -104,16 +93,18 @@ const PROVIDER_ENV_VAR: Record<string, string> = {
 // Providers read their credentials from the environment. Without this, a key added through the UI is
 // sealed to disk or held in memory and never consulted, so the pipeline still fails on a missing env var.
 // Environment values win: a deployment's own configuration is never overridden by a stored key.
-// Within a source the newest key wins, so adding a corrected or rotated key takes effect without first
+// The newest stored key wins, so adding a corrected or rotated key takes effect without first
 // deleting the one it replaces.
+// Changes whenever a key is added, rotated or deleted, without decrypting anything.
+export function providerKeysFingerprint(db: MaraDatabase): string {
+  const row = db.get(sql`SELECT count(*) AS n, coalesce(max(created_at), '') AS latest, coalesce(group_concat(id), '') AS ids FROM provider_keys`) as
+    | { n: number; latest: string; ids: string }
+    | undefined;
+  return row === undefined ? '' : `${row.n}:${row.latest}:${row.ids}`;
+}
+
 export function providerKeyEnv(db: MaraDatabase): Record<string, string> {
   const resolved: Record<string, string> = {};
-  for (const entry of [...sessionKeys.values()].reverse()) {
-    const name = PROVIDER_ENV_VAR[entry.provider];
-    if (name !== undefined && resolved[name] === undefined) {
-      resolved[name] = entry.apiKey;
-    }
-  }
   for (const row of db.select().from(providerKeys).orderBy(desc(providerKeys.createdAt), sql`rowid desc`).all()) {
     const name = PROVIDER_ENV_VAR[row.provider];
     if (name === undefined || resolved[name] !== undefined) {
@@ -152,9 +143,6 @@ export function mergeProviderKeyEnv(
 }
 
 export function deleteKey(db: MaraDatabase, id: string): void {
-  if (sessionKeys.delete(id)) {
-    return;
-  }
   const existing = db.select().from(providerKeys).where(eq(providerKeys.id, id)).limit(1).all()[0];
   if (existing === undefined) {
     throw new ApiError('not_found', `No provider key with id ${id}.`);

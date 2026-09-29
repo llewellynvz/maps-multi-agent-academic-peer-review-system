@@ -544,6 +544,9 @@ describe('narrativeWordCount reference stripping', () => {
     const concern = 'One two three four five.\n\n### Reference list accuracy\nSix seven eight.\n\n## References\nSmith, J. (2020).';
     expect(narrativeWordCount(concern)).toBe(11);
     expect(narrativeWordCount(body('### 5. References:'))).toBe(5);
+    expect(narrativeWordCount(body('# References (APA 7)'))).toBe(5);
+    expect(narrativeWordCount(body('## References cited'))).toBe(5);
+    expect(narrativeWordCount(body('# References and further reading'))).toBe(5);
   });
 });
 

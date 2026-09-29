@@ -95,6 +95,12 @@ describe('SSE persisted replay (API-22/26)', () => {
     expect(replayEvents(client.db, 'rev-4', 0)[0]?.event).toBe('run_failed');
   });
 
+  it('maps a tampering halt terminal that carries no outcome to run_failed, never run_complete', () => {
+    insertReview('rev-t3');
+    insertEvent('rev-t3', 1, 'run_terminal', { reason: 'tier_3_tampering', tier: 3, spans: 1 }, 'phase_0');
+    expect(replayEvents(client.db, 'rev-t3', 0)[0]?.event).toBe('run_failed');
+  });
+
   it('carries the failing phase on run_failed so recovery can target it', () => {
     insertReview('rev-5');
     insertEvent('rev-5', 1, 'run_terminal', { released: false, reason: 'halt' }, 'phase_7');

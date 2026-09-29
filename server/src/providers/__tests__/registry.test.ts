@@ -4,7 +4,7 @@ import { createAnthropicProvider } from '../anthropic';
 import { createGoogleProvider } from '../google';
 import { createOllamaProvider } from '../ollama';
 import { createOpenAiProvider } from '../openai';
-import { createRegistry, isReasoningModel, maxReasoningEffort, type ProviderFactories } from '../registry';
+import { createRefreshingRegistry, createRegistry, isReasoningModel, maxReasoningEffort, readRoleConfigs, type ProviderFactories } from '../registry';
 import type { DispatchProvider } from '../types';
 
 function sentinelModel(id: string): LanguageModel {
@@ -82,6 +82,36 @@ describe('createRegistry role resolution', () => {
     const registry = createRegistry({ env: { ...env, OLLAMA_MODEL: 'llama3.2:3b' }, factories });
 
     expect(registry.resolveRole('local').model).toBe('llama3.2:3b');
+  });
+});
+
+describe('role provider configuration', () => {
+  it('defaults to the Azure deployments and can point a role at another provider', () => {
+    expect(readRoleConfigs(env).frontier).toEqual({ provider: 'azure', model: 'gpt-5.1' });
+    const routed = readRoleConfigs({ ...env, MARA_FRONTIER_PROVIDER: 'anthropic', MARA_FRONTIER_MODEL: 'claude-opus-5-5' });
+    expect(routed.frontier).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
+    expect(routed.cheap.provider).toBe('azure');
+  });
+
+  it('requires a model for a non-Azure role and rejects an unknown provider', () => {
+    expect(() => readRoleConfigs({ ...env, MARA_CHEAP_PROVIDER: 'openai' })).toThrow(/MARA_CHEAP_MODEL/);
+    expect(() => readRoleConfigs({ ...env, MARA_CHEAP_PROVIDER: 'bogus', MARA_CHEAP_MODEL: 'x' })).toThrow(/must be one of/);
+  });
+
+  it('rebuilds the registry only when its fingerprint changes', () => {
+    let fingerprint = 'a';
+    let builds = 0;
+    const registry = createRefreshingRegistry({
+      fingerprint: () => fingerprint,
+      env: () => {
+        builds += 1;
+        return { ...env, OLLAMA_BASE_URL: 'http://127.0.0.1:11434', OLLAMA_MODEL: `model-${builds}` };
+      },
+    });
+    expect(registry.resolveRole('local').model).toBe('model-1');
+    expect(registry.resolveRole('local').model).toBe('model-1');
+    fingerprint = 'b';
+    expect(registry.resolveRole('local').model).toBe('model-2');
   });
 });
 

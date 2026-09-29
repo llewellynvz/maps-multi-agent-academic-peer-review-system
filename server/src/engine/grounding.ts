@@ -296,11 +296,13 @@ export function labelAppearsInBody(body: string, label: string): boolean {
 
 const TABLE_LINE = /^\s*\|/;
 const REFERENCE_WORDS = 'references|reference list|bibliography|works cited';
-// A references section opens either as a heading or as a standalone bold label line. Both arms are
-// anchored to end of line: an inline "**References** to prior work are thin" is not one, and neither is a
-// concern heading such as "### Reference list accuracy", which would otherwise cut the count off there.
+// A references section opens either as a heading or as a standalone bold label line. The heading may
+// carry a qualifier ("# References (APA 7)", "## References cited", "# References and further reading"),
+// but nothing else: a concern heading such as "### Reference list accuracy" is body, and so is an inline
+// "**References** to prior work are thin".
+const REFERENCE_QUALIFIER = String.raw`(?:\s+(?:cited|and\s+further\s+reading|and\s+notes))?(?:\s*\([^)\n]*\))?`;
 const REFERENCES_HEADING = new RegExp(
-  `^(?:#{1,6}\\s*(?:\\d+[.)]\\s*)?(?:\\*\\*)?\\s*(?:${REFERENCE_WORDS})\\s*(?:\\*\\*)?[.:]?|\\*\\*\\s*(?:${REFERENCE_WORDS})\\s*\\*\\*[.:]?)\\s*$`,
+  String.raw`^(?:#{1,6}\s*(?:\d+[.)]\s*)?(?:\*\*)?\s*(?:${REFERENCE_WORDS})${REFERENCE_QUALIFIER}\s*(?:\*\*)?[.:]?|\*\*\s*(?:${REFERENCE_WORDS})${REFERENCE_QUALIFIER}\s*\*\*[.:]?)\s*$`,
   'im',
 );
 const PROSE_WORD = /[A-Za-z0-9][A-Za-z0-9'-]*/g;

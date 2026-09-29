@@ -46,4 +46,7 @@ export interface EngineDeps {
   citationClient?: CitationClient;
   egress?: EgressController;
   preDispatch?: PreDispatchGate;
+  // Set by the supervisor on a phase's last permitted attempt: a unit that times out again is recorded as
+  // a coverage gap rather than failing the whole review.
+  staleAsGap?: boolean;
 }

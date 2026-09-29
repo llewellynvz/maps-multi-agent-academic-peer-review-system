@@ -26,6 +26,7 @@ export { createOllamaProvider, type ModelFactory } from './ollama';
 export { createOpenAiProvider } from './openai';
 export {
   createDefaultProviderFactories,
+  createRefreshingRegistry,
   createRegistry,
   type CreateRegistryOptions,
   isReasoningModel,

@@ -120,6 +120,30 @@ describe('runEnginePhases', () => {
     expect(completedSubSteps.has('phase_1')).toBe(true);
   });
 
+  it('hands the phase last-attempt deps once its restarts are spent', async () => {
+    const seen: boolean[] = [];
+    const outcome = await runEnginePhases({
+      deps: { lastAttempt: false },
+      reviewId: 'r1',
+      maxRestartsPerPhase: 2,
+      phases: [
+        {
+          name: 'phase_3',
+          run: async (deps: { lastAttempt: boolean }) => {
+            seen.push(deps.lastAttempt);
+            if (!deps.lastAttempt) {
+              throw new StaleDispatchError('timeout');
+            }
+          },
+        },
+      ],
+      shouldStop: () => null,
+      lastAttemptDeps: (deps) => ({ ...deps, lastAttempt: true }),
+    });
+    expect(outcome).toBe('completed');
+    expect(seen).toEqual([false, false, true]);
+  });
+
   it('halts at a pause boundary before the next phase', async () => {
     const runOrder: string[] = [];
     let stop: StopSignal = null;

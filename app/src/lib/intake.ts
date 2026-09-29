@@ -82,7 +82,9 @@ export function buildAnswersPayload(
     if (question.id === 'preset') {
       payload.push({ questionId: 'preset', value: context.preset });
     } else if (question.id === 'journal') {
-      payload.push({ questionId: 'journal', value: context.journal.length > 0 ? context.journal : 'None' });
+      if (context.journal.trim().length > 0) {
+        payload.push({ questionId: 'journal', value: context.journal.trim() });
+      }
     } else if (NEW_INTAKE_IDS.has(question.id)) {
       const resolved = resolveAnswer(question, context.answers);
       if (resolved.length > 0) {

@@ -9,7 +9,7 @@ import { deleteArtefactsByPrefix, readArtefactsByPrefix } from '../engine/artefa
 import { writeHeartbeat } from '../data/heartbeat';
 import type { StopSignal } from './supervisor';
 
-export type IngestOutcome = 'suspended' | 'ingested' | 'halted';
+export type IngestOutcome = 'suspended' | 'ingested' | 'halted' | 'failed';
 export type EngineResult = 'completed' | 'paused' | 'cancelled' | 'stopped' | 'failed';
 
 const WORKER_LEASE_KEY = 'worker_lease';
@@ -17,6 +17,23 @@ const QUEUEABLE_STATUSES = new Set(['created', 'awaiting_input', 'paused']);
 const RESUMABLE_STATUSES = new Set(['awaiting_input', 'paused']);
 const MAX_AUTO_RETRIES = 2;
 const AUTO_RETRY_CLASSES = new Set(['release_gate_block', 'engine_error']);
+
+// Only a successful run with an unhalted result is an ingest. A failed workflow (a provider error in
+// lite-parse, say) returns a null result and must not be read as success, or the engine runs on an
+// intake that never happened and the user is never asked the clarifying questions.
+export function mapIngest(summary: { status: string; result: unknown }): IngestOutcome {
+  if (summary.status === 'suspended') {
+    return 'suspended';
+  }
+  if (summary.status !== 'success') {
+    return 'failed';
+  }
+  const result = summary.result as { halted?: boolean } | null;
+  if (result === null || result === undefined) {
+    return 'failed';
+  }
+  return result.halted === true ? 'halted' : 'ingested';
+}
 
 interface WorkerLease {
   workerId: string;
@@ -554,13 +571,21 @@ export class WorkerRunner {
           }
           this.clearPendingResume(reviewId);
         } else {
-          outcome = await this.processors.startIngest(reviewId, intent.args);
+          // A retried or recovered ingest carries no upload args; take the stored manuscript's name and type
+          // rather than letting a DOCX default to application/pdf.
+          const args = typeof intent.args.filePath === 'string' ? intent.args : this.recoveredArgs(reviewId);
+          outcome = await this.processors.startIngest(reviewId, args);
         }
         if (outcome === 'suspended') {
           if (this.cancelRequested.has(reviewId)) {
             updateReview(this.db, reviewId, { status: 'cancelled' });
             this.emitTerminal(reviewId, 'cancelled', {});
           }
+          return;
+        }
+        if (outcome === 'failed') {
+          updateReview(this.db, reviewId, { status: 'failed', errorClass: 'ingest_failed' });
+          this.emitTerminal(reviewId, 'failed', { errorClass: 'ingest_failed', phase: 'phase_0' });
           return;
         }
         if (outcome === 'halted') {

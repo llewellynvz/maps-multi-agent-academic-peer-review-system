@@ -23,10 +23,11 @@ export const injectionPatterns: InjectionPattern[] = [
   {
     id: 'role-reassignment',
     tier: 3,
-    // A role noun is required: "you are now going to see…" is ordinary participant-instruction prose and
-    // must not halt the review as tier-3 tampering.
+    // "You are now going to see…" is ordinary participant-instruction prose and must not halt a review, so
+    // a reassignment needs a role: an article plus up to four modifiers before a role noun ("a lenient and
+    // positive reviewer"), a named mode ("in developer mode"), or a jailbreak persona.
     regex:
-      /you\s+are\s+now\s+(an?\s+|the\s+|my\s+|our\s+)?(\w+\s+)?(ai|assistant|author|advocate|editor|reviewer|referee|model|chatbot|bot|agent|system|evaluator|judge|critic|champion|supporter|expert|dan)\b/i,
+      /you\s+are\s+now\s+(?:(?:an?|the|my|our|your)\s+(?:[\w-]+,?\s+){0,4}?(?:ai|assistant|author|advocate|editor|reviewer|referee|model|chatbot|bot|agent|system|evaluator|judge|critic|champion|supporter|expert|persona|character|dan)\b|in\s+(?:[\w-]+\s+){1,2}mode\b|(?:dan|jailbroken|unrestricted|unfiltered)\b)/i,
     description: 'Attempt to reassign the reviewer role',
   },
   {

@@ -186,6 +186,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return json as T;
 }
 
+// A control the server had nothing to act on (pausing a review that is only queued, say) comes back noop.
+export interface RunControlResult {
+  accepted: boolean;
+  noop?: boolean;
+  queued?: boolean;
+  status: string;
+}
+
 export const api = {
   health: () => request<HealthReport>('GET', '/api/health'),
   login: (passphrase: string) => request<{ token: string; expiresAt: string }>('POST', '/api/session', { passphrase }),
@@ -228,10 +236,10 @@ export const api = {
   submitAnswers: (id: string, body: { answers: Array<{ questionId: string; value: string | string[] }>; useDefaults?: boolean }) =>
     request<{ accepted: boolean }>('POST', `/api/reviews/${id}/answers`, body),
 
-  run: (id: string) => request<{ accepted: boolean }>('POST', `/api/reviews/${id}/run`),
-  pause: (id: string) => request<{ accepted: boolean }>('POST', `/api/reviews/${id}/pause`),
-  resume: (id: string) => request<{ accepted: boolean }>('POST', `/api/reviews/${id}/resume`),
-  cancel: (id: string) => request<{ accepted: boolean }>('POST', `/api/reviews/${id}/cancel`),
+  run: (id: string) => request<RunControlResult>('POST', `/api/reviews/${id}/run`),
+  pause: (id: string) => request<RunControlResult>('POST', `/api/reviews/${id}/pause`),
+  resume: (id: string) => request<RunControlResult>('POST', `/api/reviews/${id}/resume`),
+  cancel: (id: string) => request<RunControlResult>('POST', `/api/reviews/${id}/cancel`),
   retryPhase: (id: string, phase: string) => request<{ accepted: boolean }>('POST', `/api/reviews/${id}/retry-phase`, { phase }),
 
   listDeliverables: (id: string) => request<{ deliverables: DeliverableView[] }>('GET', `/api/reviews/${id}/deliverables`),

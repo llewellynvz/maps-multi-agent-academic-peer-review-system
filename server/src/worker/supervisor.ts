@@ -70,6 +70,8 @@ export interface RunEnginePhasesParams<D> {
   onStale?: (info: { phase: string; restart: number; reason: string }) => void;
   onPause?: (info: { phase: string; reason: string; detail?: Record<string, unknown> }) => void;
   afterPhase?: (name: string) => void;
+  // Deps for a phase's last permitted attempt, so it can degrade instead of failing when it goes stale again.
+  lastAttemptDeps?: (deps: D) => D;
 }
 
 export type EngineOutcome = 'completed' | 'paused' | 'cancelled' | 'stopped';
@@ -91,7 +93,8 @@ export async function runEnginePhases<D>(params: RunEnginePhasesParams<D>): Prom
     let restarts = 0;
     for (;;) {
       try {
-        await phase.run(params.deps, params.reviewId);
+        const deps = restarts >= max && params.lastAttemptDeps !== undefined ? params.lastAttemptDeps(params.deps) : params.deps;
+        await phase.run(deps, params.reviewId);
         break;
       } catch (error) {
         if (error instanceof DispatchPauseError) {

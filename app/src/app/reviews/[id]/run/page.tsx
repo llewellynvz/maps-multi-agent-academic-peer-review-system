@@ -62,7 +62,11 @@ export default function RunPage(): ReactNode {
   const control = async (action: () => Promise<unknown>, onSuccess?: () => void): Promise<void> => {
     setControlError(null);
     try {
-      await action();
+      const result = await action();
+      if (typeof result === 'object' && result !== null && (result as { noop?: boolean }).noop === true) {
+        setControlError(`Nothing to change: the review is ${(result as { status?: string }).status ?? 'not active'}.`);
+        return;
+      }
       onSuccess?.();
     } catch (err) {
       setControlError(err instanceof Error ? err.message : 'The request did not go through.');

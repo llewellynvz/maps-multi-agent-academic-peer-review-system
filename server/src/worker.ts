@@ -19,14 +19,14 @@ import {
   runPhase8,
 } from './engine';
 import { createGrobidClient } from './ingest';
-import { createDispatchRunner, createRegistry, getEnv } from './providers';
+import { createDispatchRunner, createRefreshingRegistry, getEnv } from './providers';
 import { contentCaptureAllowed, initTracing, startRun } from './tracing';
 import { getManuscript, getReviewOptions, maxEventSeq, mergeReviewOptions, pauseReview, recordEngineFailure } from './workflow/repo';
 import { buildIngestMastra, resumeIngest, startIngest } from './workflow';
 import { readSetting } from './data/settings-store';
-import { mergeProviderKeyEnv, providerKeyEnv } from './data/keys';
+import { mergeProviderKeyEnv, providerKeyEnv, providerKeysFingerprint } from './data/keys';
 import { announceFindings, announcedFindingIds } from './worker/announce';
-import { WorkerRunner, type EngineResult, type IngestOutcome } from './worker/runner';
+import { mapIngest, WorkerRunner, type EngineResult, type IngestOutcome } from './worker/runner';
 import { type EngineOutcome, type EnginePhaseStep, runEnginePhases, superviseDispatch } from './worker/supervisor';
 
 const ENGINE_PHASES: Array<EnginePhaseStep<EngineDeps>> = [
@@ -56,21 +56,16 @@ function log(message: string): void {
   fileLog.write('info', 'worker', message);
 }
 
-function mapIngest(summary: { status: string; result: unknown }): IngestOutcome {
-  if (summary.status === 'suspended') {
-    return 'suspended';
-  }
-  const result = summary.result as { halted?: boolean } | null;
-  return result?.halted === true ? 'halted' : 'ingested';
-}
-
 async function main(): Promise<void> {
   loadEnv();
   const tracing = initTracing({ env: process.env });
   const { db, sqlite } = createDb(maraDbPath());
   runMigrations(db);
 
-  const registry = createRegistry({ env: mergeProviderKeyEnv(process.env, providerKeyEnv(db)) });
+  const registry = createRefreshingRegistry({
+    fingerprint: () => providerKeysFingerprint(db),
+    env: () => mergeProviderKeyEnv(process.env, providerKeyEnv(db)),
+  });
   const contentAllowed = await contentCaptureAllowed(process.env);
   log(
     contentAllowed
@@ -177,6 +172,7 @@ async function main(): Promise<void> {
                 pauseReview(db, reviewId, { reason: info.reason, phase: info.phase, ...(info.detail !== undefined ? { detail: info.detail } : {}) });
               },
               afterPhase: () => announceFindings(db, reviewId, announced),
+              lastAttemptDeps: (deps) => ({ ...deps, staleAsGap: true }),
             });
           });
           return outcome;

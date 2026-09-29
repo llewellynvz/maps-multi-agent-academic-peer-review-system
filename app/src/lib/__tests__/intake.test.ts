@@ -92,10 +92,9 @@ describe('resolveIntake', () => {
 describe('buildAnswersPayload', () => {
   const untouched = { answers: {}, preset: 'balanced', journal: '', focus: [], notes: '' };
 
-  it('posts the same shape as before on the legacy payload', () => {
+  it('omits a blank journal rather than naming a journal "None"', () => {
     expect(buildAnswersPayload(TODAY, untouched)).toEqual([
       { questionId: 'preset', value: 'balanced' },
-      { questionId: 'journal', value: 'None' },
       { questionId: 'feedback_focus', value: [] },
     ]);
   });

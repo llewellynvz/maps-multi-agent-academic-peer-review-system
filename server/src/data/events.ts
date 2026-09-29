@@ -33,9 +33,10 @@ function mapPersisted(row: typeof reviewEvents.$inferSelect): PersistedEvent | n
     case 'finding_recorded':
       return { seq: row.seq, event: 'finding_headline', data: payload };
     case 'run_terminal': {
-      const outcome = (payload as { outcome?: string; released?: boolean }).outcome;
-      const released = (payload as { released?: boolean }).released;
-      const failed = outcome === 'failed' || outcome === 'cancelled' || released === false;
+      // A terminal is a completion only when it says so. Anything else (a failure, a cancel, an unreleased
+      // gate block, a halt carrying an error class) is a failure, so a tampering halt never reads as done.
+      const { outcome, released, errorClass } = payload as { outcome?: string; released?: boolean; errorClass?: string };
+      const failed = outcome !== 'complete' && (outcome !== undefined || released !== true || errorClass !== undefined);
       return {
         seq: row.seq,
         event: failed ? 'run_failed' : 'run_complete',

@@ -53,6 +53,22 @@ function normaliseToken(value: string): string {
   return value.toLowerCase().replace(/[^a-z]/g, '');
 }
 
+// Word stems catch the everyday names agents use for a lens ("Statistics", "Methodology", "Theory",
+// "Ethical"). Longest match still wins, so "Mixed methods" beats the METH stem "method".
+const LENS_STEMS: Record<string, string[]> = {
+  NOV: ['novel'],
+  ARG: ['argument'],
+  THEO: ['theor'],
+  METH: ['method', 'design'],
+  PRAC: ['practical', 'implication'],
+  ETH: ['ethic', 'equity'],
+  STAT: ['statistic'],
+  MEAS: ['measur', 'psychometric'],
+  QUAL: ['qualitative'],
+  MIX: ['mixedmethod'],
+  CAUS: ['causal', 'causation'],
+};
+
 // Most specific first. A bare substring test in LENSES order resolved "Mixed methods" and "Statistical
 // methods" to METH (the prefix hides inside "methods") and "ethnographic" to ETH, so an explicit prefix
 // must stand as its own word, an exact name beats a partial one, and the longest partial match wins.
@@ -66,7 +82,11 @@ export function matchLens(raw: string): LensDef | undefined {
   if (byPrefix !== undefined) {
     return byPrefix;
   }
-  const names = (lens: LensDef): string[] => [normaliseToken(lens.key), normaliseToken(lens.display)];
+  const names = (lens: LensDef): string[] => [
+    normaliseToken(lens.key),
+    normaliseToken(lens.display),
+    ...(LENS_STEMS[lens.prefix] ?? []),
+  ];
   const exact = LENSES.find((lens) => names(lens).includes(token));
   if (exact !== undefined) {
     return exact;
@@ -308,7 +328,7 @@ export function paperTypeNote(paperType: PaperType | null): string | null {
   return paperType === null ? null : PAPER_TYPE_NOTE[paperType];
 }
 
-const SEVERITY_WEIGHT: Record<string, number> = {
+export const SEVERITY_WEIGHT: Record<string, number> = {
   none: 0,
   minor: 1,
   moderate: 2,

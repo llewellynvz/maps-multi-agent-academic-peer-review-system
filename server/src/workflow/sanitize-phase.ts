@@ -45,7 +45,13 @@ export async function sanitizePhase(options: SanitizePhaseOptions): Promise<Sani
       reviewId: options.reviewId,
       kind: 'run_terminal',
       phase: 'phase_0',
-      payload: { reason: 'tier_3_tampering', tier: result.tier, spans: result.quarantineLog.length },
+      payload: {
+        outcome: 'failed',
+        errorClass: 'tier_3_tampering',
+        reason: 'tier_3_tampering',
+        tier: result.tier,
+        spans: result.quarantineLog.length,
+      },
     });
     updateReview(options.db, options.reviewId, { status: 'failed', errorClass: 'tier_3_tampering' });
   } else if (result.status === 'quarantined') {

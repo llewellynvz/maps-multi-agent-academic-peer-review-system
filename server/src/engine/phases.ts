@@ -42,11 +42,12 @@ import {
   paperTypeNote,
   qualitativeRigourNote,
   selectActiveLenses,
+  SEVERITY_WEIGHT,
   selectChallengeLenses,
   studyDesignAffirmsData,
   swarmProfile,
 } from './lenses';
-import { readIntakeOptions } from './options';
+import { readIntakeOptions, requesterGuidanceNote } from './options';
 import { sanitiseSupersedes } from './supersedes';
 import { runAgent } from './dispatch-agent';
 import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
@@ -67,28 +68,28 @@ function enterPhase(db: MaraDatabase, reviewId: string, phase: string): void {
   updateReview(db, reviewId, { status: 'running', currentPhase: phase });
 }
 
-const SEVERITY_WEIGHT: Record<string, number> = { none: 0, minor: 1, moderate: 2, major: 3, fatal: 4 };
-
 export interface CoverageGap {
   step: string;
   unit: string;
 }
 
 // A cost-ceiling pause is re-thrown before any gap is recorded, so a resumed run persists none. A stale
-// dispatch (timeout or clock jump) is re-thrown too: the supervisor restarts the phase for it, whereas a
-// gap would drop the unit for the rest of the review without it ever being retried.
+// dispatch (timeout or clock jump) is re-thrown too, so the supervisor restarts the phase for it, unless
+// this is the phase's last permitted attempt: then the unit becomes a gap and the review still ships.
 export async function settleWithGaps<T>(
   db: MaraDatabase,
   reviewId: string,
   phase: string,
   step: string,
   tasks: Array<{ label: string; run: () => Promise<T> }>,
+  options: { staleAsGap?: boolean } = {},
 ): Promise<{ results: T[]; gaps: CoverageGap[] }> {
   const settled = await Promise.allSettled(tasks.map((task) => task.run()));
   for (const outcome of settled) {
     if (
       outcome.status === 'rejected' &&
-      (outcome.reason instanceof DispatchPauseError || outcome.reason instanceof StaleDispatchError)
+      (outcome.reason instanceof DispatchPauseError ||
+        (outcome.reason instanceof StaleDispatchError && options.staleAsGap !== true))
     ) {
       throw outcome.reason;
     }
@@ -584,6 +585,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
     analystB.studyDesign,
   );
   const typeNote = qualitativeRigourNote(analystB.studyDesign) ?? paperTypeNote(intake.paperType);
+  const guidanceNote = requesterGuidanceNote(intake);
 
   const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (engage these works by name)');
 
@@ -612,10 +614,11 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
                 { label: 'Claim-evidence matrix', content: matrixJson },
                 ...(dossierArtefact !== null ? [dossierArtefact] : []),
               ],
-              routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.${typeNote !== null ? ` ${typeNote}` : ''}`,
+              routingNote: `First pass, blind. Your lens is ${lens.display} (REV-${lens.prefix}); run only that lens's rubric. Prefix findings REV-${lens.prefix}. challengeRound must be null on the first pass. You have none of the other lenses' findings.${typeNote !== null ? ` ${typeNote}` : ''}${guidanceNote !== null ? ` ${guidanceNote}` : ''}`,
             },
           }).then((result) => ({ lens, result })),
       })),
+      { staleAsGap: deps.staleAsGap === true },
     );
     if (active.length > 0 && firstPass.length === 0) {
       throw new Error('every specialist lens failed in phase 3; a review needs at least one completed specialist pass');
@@ -681,6 +684,7 @@ export async function runPhase3(deps: EngineDeps, reviewId: string): Promise<voi
           }).then((result) => ({ lens, result }));
         },
       })),
+      { staleAsGap: deps.staleAsGap === true },
     );
 
     const dissentPreserved: Array<{ lens: string; id: string; whyItHolds: string }> = [];
@@ -832,6 +836,7 @@ export async function runPhase4(deps: EngineDeps, reviewId: string): Promise<voi
           }).then((result) => ({ cluster, result }));
         },
       })),
+      { staleAsGap: deps.staleAsGap === true },
     );
     if (clusters.length > 0 && results.length === 0) {
       throw new Error('every integrity cluster failed in phase 4; integrity screening is required and the run halts for retry');
@@ -1062,7 +1067,9 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
   };
 
   const dossierArtefact = fieldDossierArtefact(reviewId, 'Field dossier (the only literature you may name)');
-  const typeNote = paperTypeNote(readIntakeOptions(getReviewOptions(db, reviewId)).paperType);
+  const reportIntake = readIntakeOptions(getReviewOptions(db, reviewId));
+  const typeNote = paperTypeNote(reportIntake.paperType);
+  const guidanceNote = requesterGuidanceNote(reportIntake);
 
   await withPhase('phase_6', async () => {
     enterPhase(db, reviewId, 'phase_6');
@@ -1085,7 +1092,7 @@ export async function runPhase6(deps: EngineDeps, reviewId: string): Promise<voi
           ...(dossierArtefact !== null ? [dossierArtefact] : []),
         ],
         routingNote:
-          `Mode A full internal report. Every claim in bodyMarkdown and every provisional rubric row must cite Finding IDs that exist in the ledger above; list every id you cite in citedFindingIds. Order concerns by severity then fixability. Provide provisional 15-criterion scores each citing at least one Finding ID, the provisional average, and the three lowest criteria as bottlenecks.${typeNote !== null ? ` ${typeNote}` : ''}`,
+          `Mode A full internal report. Every claim in bodyMarkdown and every provisional rubric row must cite Finding IDs that exist in the ledger above; list every id you cite in citedFindingIds. Order concerns by severity then fixability. Provide provisional 15-criterion scores each citing at least one Finding ID, the provisional average, and the three lowest criteria as bottlenecks.${typeNote !== null ? ` ${typeNote}` : ''}${guidanceNote !== null ? ` ${guidanceNote}` : ''}`,
       },
     });
 

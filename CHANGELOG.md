@@ -22,6 +22,35 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Second review pass:
+  - A failed ingest workflow (a provider error during lite-parse, say) is now a
+    failed review (`ingest_failed`) instead of being read as a completed ingest
+    that ran the full engine without ever asking the intake questions.
+  - A tier-3 tampering halt now reads as a failure on the run page instead of
+    "Review complete".
+  - The intake and new-review pages stop polling and explain why once a review
+    has failed before its questions were ready, and "Retry" on an intake failure
+    re-runs ingest from the stored manuscript (with its real file type).
+  - The role-reassignment screen again catches phrasings such as "a lenient and
+    positive reviewer" and "in developer mode", without flagging participant
+    instructions.
+  - The post-login redirect resolves the destination and requires this origin, so
+    tab- or newline-smuggled paths cannot leave the site.
+  - Lens names such as "Statistics", "Methodology", "Theory" and "Ethical"
+    resolve again, and "# References (APA 7)" ends the narrative word count.
+  - A unit that times out on the last permitted phase attempt becomes a coverage
+    gap instead of failing the whole review.
+  - A pause or other control the server had nothing to act on no longer shows as
+    applied.
+  - Provider keys saved in Settings reach the running worker without a restart,
+    and each role can be routed to OpenAI, Anthropic, Google or a local model
+    with `MARA_<ROLE>_PROVIDER` / `MARA_<ROLE>_MODEL`. Session-only keys, which
+    the worker could never read, are refused with an explanation.
+  - The default tier chosen in Setup or Settings applies to new reviews without
+    restarting the worker.
+  - The clarify page's focus chips and notes now reach the specialists and the
+    report writer as emphasis-only guidance; previously they were discarded.
+  - A blank journal is no longer stored as a journal named "None".
 - Worker and data fixes from a code review:
   - A parse halt (for example GROBID unreachable) now marks the review failed
     with `parse_failed` instead of leaving it stuck as "sanitizing", and a later
