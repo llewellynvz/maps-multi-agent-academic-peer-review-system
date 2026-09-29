@@ -22,6 +22,17 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Statistics and accounting:
+  - A sample size written with a thousands separator ("N = 1,234") is read as
+    one number, instead of n = 1 raising a false granularity finding.
+  - A correlation above 1 in absolute value is recorded as the impossible result
+    knowledge/02 defines (major, editor-only) instead of being skipped.
+  - The recomputed p range reads "between .03 and .04" (or "of .04").
+  - gpt-5.1 is priced at its list rate rather than the Batch/Flex rate, so the
+    cost ceiling no longer under-counts frontier spend by half. Discounted
+    deployments can still set `MARA_PRICING_GPT_5_1`.
+  - Worker logs keep `inputTokens`, `outputTokens` and reasoning-token counts
+    instead of redacting them as secrets.
 - Agent and knowledge consistency:
   - The final critic is now given the manuscript's reference list it is told to
     check named works against, so it no longer blocks legitimate citations as

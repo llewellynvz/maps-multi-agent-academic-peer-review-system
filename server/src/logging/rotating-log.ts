@@ -9,7 +9,7 @@ export interface RotatingLog {
 }
 
 const SECRET_KEY =
-  /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|tokens?(?!s|[_-]?(?:in|out|cached))|credential|bearer|cookie|client[_-]?cert|_pem)/i;
+  /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|(?<!input|output|cached|reasoning|max|total)tokens?(?!s|[_-]?(?:in|out|cached|reasoning|count|used))|credential|bearer|cookie|client[_-]?cert|_pem)/i;
 
 const SECRET_ASSIGNMENT =
   /(api[_-]?key|secret|passphrase|password|master[_-]?key|wrapped[_-]?key|authorization|bearer|credential|token|cookie)(\s*[=:]\s*)(\S+)/gi;

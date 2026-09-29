@@ -38,6 +38,10 @@ describe('createRotatingLog', () => {
       tokensOut: 78,
       tokensCached: 56,
       tokens_in: 90,
+      inputTokens: 11,
+      outputTokens: 12,
+      tokensReasoning: 13,
+      accessToken: 'at-secret-2',
       provider: 'azure',
     });
     const file = resolve(root, 'data', 'logs', 'worker.log');
@@ -57,6 +61,10 @@ describe('createRotatingLog', () => {
     expect(line.tokensOut).toBe(78);
     expect(line.tokensCached).toBe(56);
     expect(line.tokens_in).toBe(90);
+    expect(line.inputTokens).toBe(11);
+    expect(line.outputTokens).toBe(12);
+    expect(line.tokensReasoning).toBe(13);
+    expect(line.accessToken).toBe('[redacted]');
     expect(line.provider).toBe('azure');
   });
 

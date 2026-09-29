@@ -124,6 +124,20 @@ describe('extractGrimCandidates', () => {
     expect(candidates[0]?.mean).toBeCloseTo(5.19, 10);
     expect(candidates[0]?.n).toBe(28);
   });
+
+  it('reads a sample size written with a thousands separator as one number', () => {
+    expect(extractGrimCandidates('(M = 3.47, SD = 1.2, N = 1,234)')[0]?.n).toBe(1234);
+    expect(extractGrimCandidates('(M = 3.47, SD = 1.2, N = 1 234)')[0]?.n).toBe(1234);
+    expect(deterministicStatsFindings(sectionMapWith('Scores were stable (M = 3.47, SD = 1.2, N = 1,234).'))).toEqual([]);
+  });
+
+  it('flags a correlation above 1 as an impossible result instead of skipping it', () => {
+    const findings = deterministicStatsFindings(sectionMapWith('The scales correlated, r(30) = 1.20, p = .04.'));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.severity).toBe('major');
+    expect(findings[0]?.scope).toBe('editor-only');
+    expect(findingSchema.safeParse(findings[0]).success).toBe(true);
+  });
 });
 
 function sectionMapWith(text: string): SectionMap {
