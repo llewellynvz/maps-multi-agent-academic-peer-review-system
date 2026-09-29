@@ -159,6 +159,26 @@ export class ApiError extends Error {
   }
 }
 
+// A 401 means the session lapsed: send the user to sign in and bring them back to the same page. The
+// login call itself is exempt, because its 401 is "wrong passphrase" and belongs on the form, and a page
+// already on /login never redirects to itself.
+function redirectToLogin(path: string): boolean {
+  if (typeof window === 'undefined' || path === '/api/session' || window.location.pathname === '/login') {
+    return false;
+  }
+  const from = `${window.location.pathname}${window.location.search}`;
+  window.location.href = `/login?from=${encodeURIComponent(from)}`;
+  return true;
+}
+
+async function parseError(response: Response, path: string, fallback: string): Promise<ApiError> {
+  const json = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+  if (response.status === 401) {
+    redirectToLogin(path);
+  }
+  return new ApiError(response.status, json?.error?.code ?? 'error', json?.error?.message ?? fallback);
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const init: RequestInit = { method, credentials: 'include', headers: {} };
   if (body !== undefined) {
@@ -166,8 +186,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     init.body = JSON.stringify(body);
   }
   const response = await fetch(path, init);
-  if (response.status === 401 && typeof window !== 'undefined') {
-    window.location.href = `/login?from=${encodeURIComponent(window.location.pathname)}`;
+  if (response.status === 401 && redirectToLogin(path)) {
     throw new ApiError(401, 'unauthorized', 'A session is required.');
   }
   const text = await response.text();
@@ -211,25 +230,23 @@ export const api = {
   uploadManuscript: async (id: string, file: File): Promise<{ manuscriptId: string; sha256: string; byteSize: number }> => {
     const form = new FormData();
     form.append('file', file);
-    const response = await fetch(`/api/reviews/${id}/manuscript`, { method: 'POST', body: form, credentials: 'include' });
-    const json = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | Record<string, unknown> | null;
+    const path = `/api/reviews/${id}/manuscript`;
+    const response = await fetch(path, { method: 'POST', body: form, credentials: 'include' });
     if (!response.ok) {
-      const error = (json as { error?: { code?: string; message?: string } } | null)?.error;
-      throw new ApiError(response.status, error?.code ?? 'error', error?.message ?? 'Upload failed.');
+      throw await parseError(response, path, 'Upload failed.');
     }
-    return json as { manuscriptId: string; sha256: string; byteSize: number };
+    return (await response.json()) as { manuscriptId: string; sha256: string; byteSize: number };
   },
 
   uploadVoiceSample: async (id: string, file: File): Promise<{ voiceSampleId: string; count: number }> => {
     const form = new FormData();
     form.append('file', file);
-    const response = await fetch(`/api/reviews/${id}/voice`, { method: 'POST', body: form, credentials: 'include' });
-    const json = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | Record<string, unknown> | null;
+    const path = `/api/reviews/${id}/voice`;
+    const response = await fetch(path, { method: 'POST', body: form, credentials: 'include' });
     if (!response.ok) {
-      const error = (json as { error?: { code?: string; message?: string } } | null)?.error;
-      throw new ApiError(response.status, error?.code ?? 'error', error?.message ?? 'Voice sample upload failed.');
+      throw await parseError(response, path, 'Voice sample upload failed.');
     }
-    return json as { voiceSampleId: string; count: number };
+    return (await response.json()) as { voiceSampleId: string; count: number };
   },
 
   getQuestions: (id: string) => request<QuestionsResponse>('GET', `/api/reviews/${id}/questions`),

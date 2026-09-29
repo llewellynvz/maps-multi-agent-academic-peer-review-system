@@ -6,6 +6,8 @@ describe('prefixOf', () => {
     expect(prefixOf('NOV-001')).toBe('NOV');
     expect(prefixOf('METH-12')).toBe('METH');
     expect(prefixOf('aic-3')).toBe('AIC');
+    expect(prefixOf('REV-NOV-0001')).toBe('NOV');
+    expect(lensInfo('REV-STAT-0012')).toEqual(LENS_INFO.STAT);
   });
 
   it('returns an empty string when there is no letter prefix', () => {

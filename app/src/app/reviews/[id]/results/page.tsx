@@ -9,6 +9,7 @@ import {
   formatBytes,
   formatDuration,
   formatUsd,
+  phaseLabel,
   RECOMMENDATION_EXPLANATION,
   RECOMMENDATION_LABEL,
 } from '@/lib/format';
@@ -118,8 +119,10 @@ export default function ResultsPage(): ReactNode {
         actions={
           <a
             className="btn btn-primary"
-            href={api.deliverableUrl(id, 'peer_review_report', 'docx')}
+            // Without an href an unreleased link is inert to the keyboard as well as the mouse.
+            href={reportReleased ? api.deliverableUrl(id, 'peer_review_report', 'docx') : undefined}
             aria-disabled={!reportReleased}
+            tabIndex={reportReleased ? undefined : -1}
             style={reportReleased ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
           >
             <Icon name="download" /> Download letter (.docx)
@@ -281,7 +284,7 @@ export default function ResultsPage(): ReactNode {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
               {Object.entries(runStats.costByPhase).map(([phase, cost]) => (
                 <span key={phase} className="pill pill-neutral" style={{ fontSize: 11 }}>
-                  {phase} <span className="mono">{formatUsd(cost)}</span>
+                  {phaseLabel(phase)} <span className="mono">{formatUsd(cost)}</span>
                 </span>
               ))}
             </div>
@@ -297,8 +300,9 @@ export default function ResultsPage(): ReactNode {
               <a
                 key={`${d.kind}-${d.format}`}
                 className="card-inset spread"
-                href={api.deliverableUrl(id, d.kind, d.format)}
+                href={d.released ? api.deliverableUrl(id, d.kind, d.format) : undefined}
                 aria-disabled={!d.released}
+                tabIndex={d.released ? undefined : -1}
                 style={d.released ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
               >
                 <div className="stack-8">

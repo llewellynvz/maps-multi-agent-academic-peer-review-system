@@ -230,6 +230,12 @@ main.page { flex: 1; padding: 40px 0 80px; }
 }
 .field input:hover, .field textarea:hover { border-color: rgba(254,252,245,0.30); }
 .field input::placeholder, .field textarea::placeholder { color: var(--fg-disabled); }
+/* The field reset above drops the outline, so give keyboard focus its own visible ring. */
+.field input:focus-visible, .field textarea:focus-visible, .field select:focus-visible {
+  outline: 2px solid rgba(254, 252, 245, 0.92); outline-offset: 2px; border-color: rgba(254,252,245,0.45);
+}
+/* Native option popups inherit the select's near-white text; give them a dark surface to sit on. */
+.field select option { background: var(--psy-base); color: var(--fg-1); }
 
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }

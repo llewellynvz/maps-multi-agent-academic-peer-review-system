@@ -22,6 +22,32 @@ All notable changes to Collegia are recorded here. The format follows
   discarded once with an error event rather than re-polling forever.
 
 ### Fixed
+- Web app:
+  - A wrong passphrase shows its error on the login form instead of reloading
+    the page, and a lapsed session returns you to the exact page (with its query)
+    after sign-in. Uploads now share that sign-in handling.
+  - A lapsed session on the run page leads to sign-in instead of "Reconnecting"
+    forever.
+  - The run page shows each phase as it starts rather than once it has
+    finished, the release-gate pill names revise-specialist, block and
+    arbitration correctly and counts cycles from 1, per-lens counts use the
+    server's totals rather than the capped headline list, "Complete" reads as
+    success, and the time remaining is shown in minutes.
+  - "Partially supported" prior assessments show their sentence (the server's
+    `partially_supported` spelling was not recognised).
+  - The depth chosen on the intake screen is always sent, the intake screen
+    polls immediately without overlapping requests, and both preset screens
+    quote the same time estimates.
+  - A second file dropped mid-upload is ignored, a failed upload no longer
+    leaves an orphan review, re-selecting the same file works, and Space opens
+    the file picker.
+  - Library cards for a review with no manuscript or a paused review can be
+    deleted (and a paused one cancelled).
+  - Unreleased downloads cannot be activated from the keyboard, Settings shows
+    failures as failures, form fields have a visible keyboard focus ring and
+    linked labels, select menus are readable, the side drawer keeps focus
+    inside it, the activity log shows local time, and the browser asks for
+    notification permission on your first interaction instead of on load.
 - Statistics and accounting:
   - A sample size written with a thousands separator ("N = 1,234") is read as
     one number, instead of n = 1 raising a false granularity finding.

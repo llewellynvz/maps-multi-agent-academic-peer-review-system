@@ -116,6 +116,12 @@ describe('buildAnswersPayload', () => {
     ]);
   });
 
+  it('sends the chosen depth even when the lite-parse asked no preset question', () => {
+    const noPreset = TODAY.filter((question) => question.id !== 'preset');
+    const payload = buildAnswersPayload(noPreset, { ...untouched, preset: 'thorough' });
+    expect(payload[0]).toEqual({ questionId: 'preset', value: 'thorough' });
+  });
+
   it('records the detected or default value for every new id even when untouched', () => {
     const payload = buildAnswersPayload(ENRICHED, untouched);
     const byId = new Map(payload.map((entry) => [entry.questionId, entry.value]));
@@ -192,6 +198,7 @@ describe('alignmentSentence', () => {
     expect(alignmentSentence('supported')).toMatch(/supports/);
     expect(alignmentSentence('partially-supported')).toMatch(/partly supports/);
     expect(alignmentSentence('partially supported')).toMatch(/partly supports/);
+    expect(alignmentSentence('partially_supported')).toMatch(/partly supports/);
     expect(alignmentSentence('Contradicted')).toMatch(/runs against/);
     expect(alignmentSentence('unknown-label')).toMatch(/weighed against/);
   });

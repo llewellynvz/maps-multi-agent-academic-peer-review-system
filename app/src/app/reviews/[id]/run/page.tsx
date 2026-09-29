@@ -3,9 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type EvidenceData } from '@/lib/api';
-import { PHASE_DESCRIPTIONS, PHASES, phaseIndex, phaseLabel } from '@/lib/format';
+import { formatDuration, PHASE_DESCRIPTIONS, PHASES, phaseIndex, phaseLabel } from '@/lib/format';
 import { LENS_FALLBACK, LENS_INFO, prefixOf } from '@/lib/lenses';
-import { parseRetrySignal, retryLogMessage, retryPillLabel, type RetrySignal } from '@/lib/runEvents';
+import { gatePillLabel, parseRetrySignal, retryLogMessage, retryPillLabel, type RetrySignal } from '@/lib/runEvents';
 import type { RunDrawerState } from '@/lib/runDrawer';
 import { Icon, Meter, Pill, StatTile } from '@/components/ui';
 import { PageHeader } from '@/components/PageHeader';
@@ -109,12 +109,28 @@ export default function RunPage(): ReactNode {
   }, [terminal]);
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      void Notification.requestPermission();
-    }
+    // Browsers ignore a permission prompt that no user gesture triggered, so ask on the first interaction.
+    const askNotify = (): void => {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        void Notification.requestPermission();
+      }
+    };
+    window.addEventListener('pointerdown', askNotify, { once: true });
+
     const source = new EventSource(`/api/reviews/${id}/events`, { withCredentials: true });
     source.onopen = () => setConnected(true);
-    source.onerror = () => setConnected(false);
+    // EventSource hides the HTTP status, so a lapsed session looks like a dropped connection and retries
+    // forever. Probe with an ordinary request, which redirects to sign-in on a 401.
+    let lastProbe = 0;
+    source.onerror = () => {
+      setConnected(false);
+      const now = Date.now();
+      if (now - lastProbe > 10_000) {
+        lastProbe = now;
+        void api.getReview(id).catch(() => undefined);
+      }
+    };
+    const seenPhases = new Set<string>();
 
     const LOG_CAP = 400;
     const addLog = (key: string, ts: string | undefined, message: string, phase: string): void => {
@@ -154,9 +170,13 @@ export default function RunPage(): ReactNode {
         } else {
           setCurrentPhase((prev) => (phaseIndex(data.phase) >= phaseIndex(prev) ? (data.phase as string) : prev));
         }
-        if (retry === null) {
+        // Phases announce themselves when they start ({started: true}) and again when they finish, with
+        // results. Only the start (or, for older runs, the first sighting) is a "Started" entry.
+        const started = (data as { started?: boolean }).started === true;
+        if (retry === null && (started || !seenPhases.has(data.phase))) {
           addLog(`phase-${data.phase}-${data.ts ?? ''}`, data.ts, `Started ${phaseLabel(data.phase)}`, data.phase);
         }
+        seenPhases.add(data.phase);
       }
     });
     source.addEventListener('run_paused', (event) => {
@@ -206,14 +226,14 @@ export default function RunPage(): ReactNode {
     });
     source.addEventListener('gate_verdict', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as { verdict: string; cycle: number; source?: string; ts?: string; phase?: string };
-      setGate(data.verdict === 'pass' ? null : { verdict: data.verdict, cycle: data.cycle });
+      setGate(gatePillLabel(data.verdict, data.cycle) === null ? null : { verdict: data.verdict, cycle: data.cycle });
       if (data.verdict !== 'pass') {
         evidenceStale.current = true;
       }
       addLog(
         `gate-${data.cycle}-${data.source ?? 'gate'}-${data.verdict}`,
         data.ts,
-        `Release gate ${data.verdict}${data.source !== undefined ? ` (${data.source}, cycle ${data.cycle})` : ` (cycle ${data.cycle})`}`,
+        `Release gate ${data.verdict}${data.source !== undefined ? ` (${data.source}, cycle ${data.cycle + 1})` : ` (cycle ${data.cycle + 1})`}`,
         data.phase ?? phaseRef.current,
       );
     });
@@ -248,7 +268,10 @@ export default function RunPage(): ReactNode {
       setFailedPhase(data.phase ?? phaseRef.current);
     });
 
-    return () => source.close();
+    return () => {
+      source.close();
+      window.removeEventListener('pointerdown', askNotify);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -304,7 +327,8 @@ export default function RunPage(): ReactNode {
       .map((prefix) => {
         const info = LENS_INFO[prefix] ?? LENS_FALLBACK;
         const reported = lenses[prefix]?.status;
-        const count = findings.filter((f) => f.lensPrefix === prefix).length;
+        // The headline list is capped for display, so the server's per-lens count is the true figure.
+        const count = lenses[prefix]?.count ?? findings.filter((f) => f.lensPrefix === prefix).length;
         const status: LensStatus =
           reported === 'done' ? 'done' : reported === 'active' || reported === 'running' ? 'running' : count > 0 ? 'running' : 'pending';
         return { prefix, display: info.display, purpose: info.purpose, status, count };
@@ -335,17 +359,9 @@ export default function RunPage(): ReactNode {
             {paused && terminal === null ? <Pill tone="warn" label="Paused" icon="pause" /> : null}
             {retrying !== null && terminal === null ? <Pill tone="warn" icon="clock" label={retryPillLabel(retrying)} /> : null}
             {gate !== null && terminal === null ? (
-              <Pill
-                tone="neutral"
-                label={
-                  gate.verdict === 'revise' || gate.verdict === 'revise_specialist'
-                    ? `Release gate requested revisions, cycle ${gate.cycle} of 2`
-                    : `Release gate escalated to arbitration, cycle ${gate.cycle}`
-                }
-                icon="clock"
-              />
+              <Pill tone="neutral" label={gatePillLabel(gate.verdict, gate.cycle) ?? ''} icon="clock" />
             ) : null}
-            {terminal === 'complete' ? <Pill tone="info" label="Complete" /> : null}
+            {terminal === 'complete' ? <Pill tone="success" label="Complete" /> : null}
             {terminal === 'failed' ? <Pill tone="fail" label="Halted" /> : null}
           </>
         }
@@ -355,7 +371,7 @@ export default function RunPage(): ReactNode {
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           <StatTile label="Cost" value={cost !== null ? `$${cost.total.toFixed(4)}` : '--'} />
           <StatTile label="Tokens in / out" value={cost !== null ? `${cost.tokensIn} / ${cost.tokensOut}` : '--'} />
-          <StatTile label="Estimated remaining" value={eta !== null && terminal === null ? `~${eta.seconds}s` : '--'} />
+          <StatTile label="Estimated remaining" value={eta !== null && terminal === null ? `~${formatDuration(eta.seconds * 1000)}` : '--'} />
           <div style={{ flex: 1, minWidth: 180 }}>
             <Meter value={pct / 100} error={terminal === 'failed'} />
           </div>

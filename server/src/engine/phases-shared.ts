@@ -1,5 +1,6 @@
 import type { CitationClient } from '../citations';
 import type { MaraDatabase } from '../db/client';
+import { insertEvent, updateReview } from '../workflow/repo';
 import type { DispatchRunner } from '../providers';
 import type { EgressController } from '../security';
 
@@ -49,4 +50,12 @@ export interface EngineDeps {
   // Set by the supervisor on a phase's last permitted attempt: a unit that times out again is recorded as
   // a coverage gap rather than failing the whole review.
   staleAsGap?: boolean;
+}
+
+// Marks a phase as running and tells the live view it has started. The phase_transition events the phases
+// write when they finish carry their results, so without this the run page showed each phase only once it
+// was already over, a full phase behind the work.
+export function enterPhase(db: MaraDatabase, reviewId: string, phase: string): void {
+  updateReview(db, reviewId, { status: 'running', currentPhase: phase });
+  insertEvent(db, { reviewId, kind: 'phase_transition', phase, payload: { started: true } });
 }

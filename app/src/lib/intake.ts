@@ -94,6 +94,11 @@ export function buildAnswersPayload(
       payload.push({ questionId: question.id, value: context.answers[question.id] ?? '' });
     }
   }
+  // The depth chips are always on screen, so the choice is always sent, even for a lite-parse that did not
+  // ask a preset question; otherwise the user's pick was silently dropped.
+  if (!questions.some((question) => question.id === 'preset')) {
+    payload.unshift({ questionId: 'preset', value: context.preset });
+  }
   payload.push({ questionId: 'feedback_focus', value: context.focus });
   if (context.notes.length > 0) {
     payload.push({ questionId: 'notes', value: context.notes });
@@ -126,7 +131,8 @@ export function parseQualitySentence(quality: 'good' | 'degraded'): string {
 }
 
 export function alignmentSentence(alignment: string): string {
-  const key = alignment.trim().replace(/\s+/g, '-').toLowerCase();
+  // The server sends snake_case (partially_supported); accept spaces and hyphens too.
+  const key = alignment.trim().replace(/[\s_]+/g, '-').toLowerCase();
   if (key === 'supported') {
     return 'The review evidence supports your preliminary assessment.';
   }

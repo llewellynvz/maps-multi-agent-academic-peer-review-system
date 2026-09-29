@@ -3,6 +3,8 @@
 import { type ReactNode, useEffect, useRef } from 'react';
 import { Icon } from './ui';
 
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function SideDrawer({
   open,
   title,
@@ -31,6 +33,28 @@ export function SideDrawer({
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         onCloseRef.current();
+        return;
+      }
+      // aria-modal promises focus stays in the dialog, so Tab and Shift+Tab wrap inside the panel.
+      const panel = panelRef.current;
+      if (event.key !== 'Tab' || panel === null) {
+        return;
+      }
+      const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.hasAttribute('disabled'));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === panel)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+        event.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -54,7 +78,7 @@ export function SideDrawer({
           <h2 className="h2" style={{ margin: 0 }}>
             {title}
           </h2>
-          <button className="btn btn-ghost" onClick={onClose} aria-label="Close">
+          <button type="button" className="btn btn-ghost" onClick={onClose} aria-label="Close">
             <Icon name="x" />
           </button>
         </div>

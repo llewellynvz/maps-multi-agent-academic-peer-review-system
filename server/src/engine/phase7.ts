@@ -25,7 +25,7 @@ import {
   updateReview,
   upsertCheckpoint,
 } from '../workflow/repo';
-import { DispatchPauseError, type EngineDeps } from './phases-shared';
+import { DispatchPauseError, type EngineDeps, enterPhase } from './phases-shared';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { loadEngineContext, manuscriptDigest, SYNTHESIS_DIGEST_CHARS } from './context';
 import { runAgent } from './dispatch-agent';
@@ -403,7 +403,7 @@ export async function runPhase7(deps: EngineDeps, reviewId: string): Promise<voi
     ctx.sectionMap.references.length > 0 ? knownCitationsFor(reviewId, ctx.sectionMap.references) : [];
 
   await withPhase('phase_7', async () => {
-    updateReview(db, reviewId, { status: 'running', currentPhase: 'phase_7' });
+    enterPhase(db, reviewId, 'phase_7');
 
     const voiceProfileContent = await deriveVoiceProfile(deps, reviewId);
 

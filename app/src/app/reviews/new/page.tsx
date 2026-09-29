@@ -66,6 +66,10 @@ export default function NewReviewPage(): ReactNode {
   }, [phase, reviewId]);
 
   const accept = async (file: File): Promise<void> => {
+    // One manuscript per review: a second drop mid-upload would create an orphan review and lose the first.
+    if (phase === 'uploading' || phase === 'parsing') {
+      return;
+    }
     if (!/\.(pdf|docx)$/i.test(file.name)) {
       setPhase('error');
       setMessage('Upload a PDF or DOCX manuscript.');
@@ -73,12 +77,19 @@ export default function NewReviewPage(): ReactNode {
     }
     setPhase('uploading');
     setMessage('');
+    let createdId: string | null = null;
     try {
       const review = await api.createReview({ title: file.name.replace(/\.[^.]+$/, '') });
+      createdId = review.id;
       setReviewId(review.id);
       await api.uploadManuscript(review.id, file);
       setPhase('parsing');
     } catch (err) {
+      // A review whose upload failed can never progress; remove it rather than leave a stuck library entry.
+      if (createdId !== null) {
+        void api.deleteReview(createdId).catch(() => undefined);
+        setReviewId(null);
+      }
       setPhase('error');
       setMessage(err instanceof Error ? err.message : 'The upload failed.');
     }
@@ -126,15 +137,21 @@ export default function NewReviewPage(): ReactNode {
             onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
-            onClick={() => inputRef.current?.click()}
+            onClick={() => { if (!working) inputRef.current?.click(); }}
             role="button"
             tabIndex={0}
-            onKeyDown={(event) => { if (event.key === 'Enter') inputRef.current?.click(); }}
+            aria-disabled={working}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                inputRef.current?.click();
+              }
+            }}
           >
             <Icon name="upload" className="ico-teal" />
             <h2 className="h3" style={{ marginTop: 12 }}>Drop a manuscript here</h2>
             <p className="sub muted" style={{ margin: '4px auto 0' }}>PDF or DOCX, up to 50 MB</p>
-            <input ref={inputRef} type="file" accept=".pdf,.docx" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file !== undefined) void accept(file); }} />
+            <input ref={inputRef} type="file" accept=".pdf,.docx" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file !== undefined) void accept(file); }} />
             {working ? (
               <div className="stack-12" style={{ marginTop: 20, alignItems: 'stretch', textAlign: 'left' }}>
                 <Meter indeterminate />

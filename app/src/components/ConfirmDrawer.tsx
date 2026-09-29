@@ -34,8 +34,8 @@ export function ConfirmDrawer({
         {warning} Type <span className="mono">{phrase}</span> to confirm.
       </p>
       <div className="field">
-        <label>Confirmation</label>
-        <input value={typed} onChange={(event) => setTyped(event.target.value)} />
+        <label htmlFor="confirm-typed">Confirmation</label>
+        <input id="confirm-typed" value={typed} onChange={(event) => setTyped(event.target.value)} />
       </div>
       <button
         className="btn btn-danger"

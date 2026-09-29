@@ -25,7 +25,7 @@ import {
 import { getCurrentFindings } from '../ledger';
 import { buildProtectedCorpus } from '../security';
 import { withPhase } from '../tracing';
-import { getCheckpoint, getReviewOptions, insertEvent, updateReview, upsertCheckpoint } from '../workflow/repo';
+import { getCheckpoint, getReviewOptions, insertEvent, upsertCheckpoint } from '../workflow/repo';
 import { artefactExists, readArtefact, writeArtefact } from './artefacts';
 import { computeComposite } from './composite';
 import { mergeFindingsOnce } from './merge';
@@ -52,7 +52,7 @@ import { sanitiseSupersedes } from './supersedes';
 import { runAgent } from './dispatch-agent';
 import { type PhaseCritiqueInput, runPhaseCritique } from './phase-critique';
 import { upsertRubricScore } from './rubric';
-import { DispatchPauseError, type EngineDeps, StaleDispatchError } from './phases-shared';
+import { DispatchPauseError, type EngineDeps, enterPhase, StaleDispatchError } from './phases-shared';
 
 export type { EngineDeps } from './phases-shared';
 
@@ -64,9 +64,6 @@ function phaseDone(db: MaraDatabase, reviewId: string, phase: string): boolean {
   return getCheckpoint(db, reviewId, checkpointKey(phase))?.status === 'completed';
 }
 
-function enterPhase(db: MaraDatabase, reviewId: string, phase: string): void {
-  updateReview(db, reviewId, { status: 'running', currentPhase: phase });
-}
 
 export interface CoverageGap {
   step: string;
