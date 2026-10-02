@@ -9,7 +9,7 @@
 **Evidence-grounded, confidential, multi-agent peer review for psychological and wellbeing science.**
 
 <p>
-  <img src="https://img.shields.io/badge/licence-proprietary%20%C2%B7%20all%20rights%20reserved-B42318?style=flat-square" alt="Licence: proprietary, all rights reserved">
+  <img src="https://img.shields.io/badge/licence-PolyForm%20Strict%201.0.0-B42318?style=flat-square" alt="Licence: PolyForm Strict 1.0.0">
   <img src="https://img.shields.io/badge/commercial%20use-prohibited-B42318?style=flat-square" alt="Commercial use prohibited">
   <img src="https://img.shields.io/badge/version-1.3.0-008DA1?style=flat-square" alt="Version 1.3.0">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript strict">
@@ -35,8 +35,8 @@
 ---
 
 > [!IMPORTANT]
-> **Proprietary and confidential software.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V. All rights reserved.
-> No licence of any kind is granted by access to this repository. Use, execution, copying, modification, redistribution, evaluation, benchmarking, and any commercial or AI-training use are prohibited without a prior written agreement signed by the owner. See [LICENSE](LICENSE).
+> **Free for noncommercial research, with citation.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
+> MAPS is licensed under the [PolyForm Strict License 1.0.0](LICENSE) with additional terms. Researchers, students and educational or public research institutions may use it free of charge for noncommercial purposes and must cite it. Commercial use, modification, redistribution, AI training, and use by journals, publishers or funders to screen submissions are not permitted. See [LICENSE](LICENSE) and [How to cite MAPS](#how-to-cite-maps).
 
 ## Executive summary
 
@@ -183,7 +183,7 @@ Confidentiality is an architectural constraint, not a configuration option. The 
 
 ### Installation
 
-Deployment is available only to licensed parties under a written agreement with the owner.
+You may install and run MAPS for any noncommercial purpose under the terms in [LICENSE](LICENSE). Commercial deployment needs a written agreement with the owner.
 
 ```bash
 cp .env.example .env
@@ -250,9 +250,17 @@ MAPS is designed, developed, and maintained by Psynalytics B.V.
 
 ## Licence and legal
 
-**Proprietary. All rights reserved.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
+**PolyForm Strict License 1.0.0, with additional terms.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
 
-This repository is made visible for reference only. No right or licence is granted to use, run, install, copy, reproduce, modify, translate, adapt, fork, distribute, publish, sublicense, sell, host, benchmark, evaluate, reverse engineer, or create derivative works of the software, its prompts, its knowledge base, or its documentation, in whole or in part. **Commercial use of any kind is prohibited.** Use of any part of this repository to train, fine-tune, evaluate, or prompt a machine-learning or artificial-intelligence system is prohibited. The full and binding terms are in [LICENSE](LICENSE).
+You may use MAPS free of charge for any noncommercial purpose, including academic research, teaching and personal study. Charities, educational and public research institutions and the other bodies listed in the licence may use it regardless of how their work is funded. You may not use it commercially, change it, build new works on it, redistribute it, or use any part of it to train, fine-tune, distil, prompt or ground another AI system. Running MAPS itself with the model providers it supports is allowed. Journals, publishers and funders may not use MAPS or its outputs to screen, assess or decide on manuscripts, grants or candidates without a written agreement. Individual authors may use it on their own work, and invited reviewers may use it where the journal, publisher or funder that invited them allows it. Forking on GitHub is allowed only as GitHub's terms require, and a fork gives no further rights. The full and binding terms are in [LICENSE](LICENSE).
+
+### How to cite MAPS
+
+If MAPS contributed to a paper, preprint, thesis, report, review, presentation, dataset or other output, you must cite it:
+
+> van Zyl, L. E. (2026). *MAPS: The Multi-Agent Academic Peer-Review System* [Computer software]. Psynalytics B.V. https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system
+
+[CITATION.cff](CITATION.cff) holds this reference in machine-readable form for GitHub's **Cite this repository** button.
 
 Licensing and permission enquiries: **hello@psynalytics.com**.
 

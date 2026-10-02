@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If MAPS contributed to your work, you must cite it as below. See LICENSE, term A1."
+type: software
+title: "MAPS: The Multi-Agent Academic Peer-Review System"
+authors:
+  - family-names: van Zyl
+    given-names: Llewellyn E.
+    affiliation: Psynalytics B.V.
+repository-code: "https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system"
+license-url: "https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system/blob/main/LICENSE"
+preferred-citation:
+  type: software
+  title: "MAPS: The Multi-Agent Academic Peer-Review System"
+  authors:
+    - family-names: van Zyl
+      given-names: Llewellyn E.
+  year: 2026
+  publisher:
+    name: Psynalytics B.V.
+  url: "https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system"

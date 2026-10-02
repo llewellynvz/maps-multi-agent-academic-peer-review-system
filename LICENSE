@@ -1,229 +1,146 @@
-MAPS: THE MULTI-AGENT ACADEMIC PEER-REVIEW SYSTEM
-PROPRIETARY SOFTWARE LICENCE: ALL RIGHTS RESERVED, NO COMMERCIAL RIGHTS
+MAPS: The Multi-Agent Academic Peer-Review System
 
-Copyright (c) 2026 Llewellyn E. van Zyl and Psynalytics B.V.
-All rights reserved.
+Required Notice: Copyright (c) 2026 Llewellyn E. van Zyl and Psynalytics B.V. (https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system)
 
-READ THIS LICENCE CAREFULLY. BY ACCESSING, VIEWING, CLONING, DOWNLOADING, OR
-OTHERWISE OBTAINING ANY PART OF THE SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ
-AND UNDERSTOOD THIS LICENCE AND THAT NO RIGHTS ARE GRANTED TO YOU EXCEPT AS
-EXPRESSLY STATED IN A SEPARATE WRITTEN AGREEMENT SIGNED BY THE OWNER.
+MAPS is licensed under the PolyForm Strict License 1.0.0, reproduced in full
+below without changes, together with the additional terms in Part A. The
+additional terms add conditions to your licenses. Apart from term A4, they do
+not grant any right that the PolyForm Strict License 1.0.0 does not grant.
+Where Part A and Part B conflict, Part A applies.
 
-1. DEFINITIONS
+In short: you may use MAPS free of charge for any noncommercial purpose,
+including academic research and teaching. You must cite it whenever it
+contributes to your work. You may not sell it, use it commercially, change it,
+build on it, redistribute it, use it to train artificial-intelligence
+systems, or use it for editorial or funding decisions on behalf of a journal,
+publisher or funder. Anything else needs a written agreement with the
+licensor. This summary is not part of the licence.
 
-1.1 "Owner" means Llewellyn E. van Zyl and Psynalytics B.V., jointly and
-    severally, and their successors and assigns.
+-------------------------------------------------------------------------------
 
-1.2 "Software" means the MAPS system (formerly MARA) and every part
-    of it, in any form and in any medium, including without limitation:
-    source code, object code, build and configuration files, database schemas and migrations, agent prompts and
-    manifests, the knowledge base, rubrics, scoring methods, schemas, test
-    fixtures and golden outputs, datasets, documentation, designs, diagrams,
-    images, brand assets, names, and any output, derivative, translation,
-    adaptation, or modification of any of the foregoing.
+PART A. ADDITIONAL TERMS
 
-1.3 "Commercial Use" means any use that is intended for, directed toward, or
-    results in commercial advantage or monetary compensation, directly or
-    indirectly, whether or not a fee is charged, including without limitation
-    use in or for any product, service, platform, consultancy, editorial or
-    publishing workflow, paid or grant-funded research, training, teaching for
-    a fee, or the internal operations of any business, institution, publisher,
-    journal, or other organisation.
+A1. Attribution. Any publication, preprint, thesis, report, presentation,
+    review, dataset, or other output that MAPS contributed to must cite MAPS
+    as follows, or in an equivalent form required by the venue:
 
-1.4 "AI Use" means any use of the Software, in whole or in part, to train,
-    pre-train, fine-tune, distil, evaluate, benchmark, align, prompt, ground,
-    retrieve into, or otherwise develop or improve any machine-learning model,
-    artificial-intelligence system, dataset, or corpus, including by scraping,
-    crawling, indexing, or ingestion.
+      van Zyl, L. E. (2026). MAPS: The Multi-Agent Academic Peer-Review System
+      [Computer software]. Psynalytics B.V.
+      https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system
 
-2. OWNERSHIP
+    Machine-readable citation metadata is in CITATION.cff. Every copy of the
+    software you hold must keep this LICENSE file and the Required Notice
+    above.
 
-2.1 The Software is the proprietary and confidential property of the Owner and
-    is protected by copyright, database right, trade secret, and other
-    intellectual-property laws and international treaties. The Software is not
-    sold. No title to or ownership of the Software, or of any intellectual
-    property in it, is transferred to any person.
+A2. No AI training. As a condition of all your licenses, whatever your
+    purpose or organization, you must not use the software, its source code,
+    prompts, knowledge base, rubrics, or documentation, in whole or in part,
+    to train, pre-train, fine-tune, distil, align, prompt, ground, or
+    retrieve into any machine-learning model or artificial-intelligence
+    system other than MAPS itself, or scrape, crawl, or index it to build any
+    dataset or corpus for that purpose. Running MAPS as
+    released, with the model providers it supports, is not prohibited by this
+    term.
 
-2.2 All rights not expressly granted in a separate written agreement signed by
-    the Owner are reserved by the Owner.
+A3. No editorial or funder screening. As a condition of all your licenses,
+    whatever your organization, you must not use the software or its outputs
+    to screen, assess, rank, or decide on manuscripts, grant applications,
+    or candidates for or on behalf of a journal, publisher, or funder, without
+    a written agreement signed by the licensor. An individual researcher or
+    author using MAPS on their own work is not prohibited by this term. A
+    reviewer using MAPS on a review they were personally invited to write is
+    not prohibited by this term where the journal, publisher, or funder that
+    invited the review allows it.
 
-3. NO LICENCE GRANTED
+A4. GitHub forks. Creating a fork of this repository through GitHub's fork
+    feature is allowed to the extent that GitHub's Terms of Service require. A
+    fork grants no license beyond this licence. A fork may not be changed,
+    and may not be distributed outside GitHub.
 
-3.1 No right or licence, express or implied, by estoppel or otherwise, is
-    granted to any person or entity to use, run, execute, install, deploy,
-    host, copy, reproduce, store, modify, adapt, translate, port, fork, merge,
-    create derivative works of, compile, decompile, publish, display, perform,
-    distribute, redistribute, disclose, transmit, sublicense, sell, resell,
-    lease, rent, lend, or otherwise make available or exploit the Software or
-    any part of it, for any purpose, without the prior written agreement of
-    the Owner, signed by the Owner.
+A5. Contributions. Any suggestion, issue report, pull request, patch, or other
+    feedback or contribution relating to the software that you give the
+    licensor may be used by the licensor without restriction or obligation. To
+    the fullest extent permitted by law, you assign to the licensor all right,
+    title, and interest in it, waive any moral rights in it to the extent
+    waivable, and confirm that it is your original work and does not infringe
+    the rights of any third party. Contributing confers no further license.
 
-3.2 Visibility of the Software on a public or shared code-hosting service
-    confers no licence. To the limited extent that the terms of service of such
-    a hosting service grant other users of that service a right to view or fork
-    the repository through the service's own functionality, that right is
-    confined strictly to what those terms require. It includes no right to
-    download, clone for use, run, modify, copy outside the service, or exploit
-    the Software, and any fork remains subject to every restriction in this
-    Licence.
+A6. Third-party components. Third-party open-source components used by the
+    software remain under their own licences. Nothing in this licence
+    restricts rights granted under those licences in those components alone.
 
-4. EXPRESSLY PROHIBITED ACTS
+A7. Governing law. This licence and any dispute arising out of or in
+    connection with it or the software are governed by the laws of the
+    Netherlands, excluding its conflict-of-laws rules and the United Nations
+    Convention on Contracts for the International Sale of Goods. The competent
+    courts of the Netherlands have exclusive jurisdiction.
 
-Without limiting section 3, and without the Owner's prior signed written
-agreement, no person may:
+A8. Other permissions. Commercial licences and any permission beyond these
+    terms require a written agreement signed by the licensor. Contact:
+    hello@psynalytics.com
 
-4.1 make any Commercial Use of the Software. COMMERCIAL USE IS PROHIBITED
-    WITHOUT EXCEPTION, and no permission for Commercial Use shall be implied
-    from any permission granted for any other purpose;
+The licensor is Llewellyn E. van Zyl and Psynalytics B.V.
 
-4.2 make any AI Use of the Software;
+-------------------------------------------------------------------------------
 
-4.3 use the Software, or any output generated by it, to review, assess, rank,
-    screen, or decide upon any manuscript, grant, candidate, or submission for
-    any journal, publisher, funder, institution, or other third party;
+PART B. POLYFORM STRICT LICENSE 1.0.0
 
-4.4 reverse engineer, decompile, disassemble, or otherwise attempt to derive
-    the source code, prompts, knowledge base, methods, or trade secrets of the
-    Software, except to the extent that such restriction is expressly
-    prohibited by mandatory applicable law;
+# PolyForm Strict License 1.0.0
 
-4.5 copy, extract, reuse, or reproduce the agent prompts, knowledge base,
-    rubrics, review templates, scoring methods, or architecture of the
-    Software, in whole or in substantial part, or use them as a reference to
-    build a competing or substantially similar system;
+<https://polyformproject.org/licenses/strict/1.0.0>
 
-4.6 benchmark the Software, or publish, disclose, or share any evaluation,
-    comparison, performance result, review output, screenshot, or description
-    of its internal operation;
+## Acceptance
 
-4.7 remove, alter, or obscure any copyright notice, licence notice,
-    proprietary legend, attribution, or brand mark in or on the Software;
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
 
-4.8 circumvent, disable, or interfere with any security, access-control,
-    licensing, or confidentiality mechanism of the Software;
+## Copyright License
 
-4.9 use any name, trade mark, logo, or brand of the Owner, including "MAPS",
-    "MARA" and "Psynalytics", except as required to identify the Owner as the source
-    of the Software; or
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose, other than distributing the software or making changes or new works based on the software.
 
-4.10 permit, assist, or enable any other person to do any of the above.
+## Patent License
 
-5. CONFIDENTIALITY
+The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
 
-5.1 The Software, including its prompts, knowledge base, methods, and
-    architecture, constitutes confidential information and trade secrets of
-    the Owner. Any person who obtains access to the Software shall keep it
-    strictly confidential, shall not disclose it to any third party, and shall
-    protect it with at least the degree of care that person uses for their own
-    most sensitive information, and in no event less than reasonable care.
+## Noncommercial Purposes
 
-5.2 These obligations continue after any access ends and after any termination
-    under section 8.
+Any noncommercial purpose is a permitted purpose.
 
-6. WRITTEN AGREEMENTS AND PERMISSIONS
+## Personal Uses
 
-6.1 Any permission to use the Software must be set out in a separate written
-    agreement signed by the Owner. Enquiries may be directed to
-    hello@psynalytics.com.
+Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
 
-6.2 Any permission granted is personal, non-exclusive, non-transferable,
-    non-sublicensable, limited to its express scope, purpose, and duration, and
-    revocable by the Owner at any time on notice. Any permission that does not
-    expressly authorise Commercial Use or AI Use excludes them.
+## Noncommercial Organizations
 
-6.3 Any permission granted to one individual does not extend to any other
-    individual, employer, institution, or entity.
+Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
 
-7. FEEDBACK AND CONTRIBUTIONS
+## Fair Use
 
-7.1 Any suggestion, comment, issue report, pull request, patch, or other
-    feedback or contribution relating to the Software that is provided to the
-    Owner may be used by the Owner without restriction or obligation. To the
-    fullest extent permitted by law, the contributor assigns to the Owner all
-    right, title, and interest in it, waives any moral rights in it to the
-    extent waivable, and confirms that it is their original work and does not
-    infringe the rights of any third party.
+You may have "fair use" rights for the software under the law. These terms do not limit them.
 
-7.2 Submitting a contribution confers no licence to the Software.
+## No Other Rights
 
-8. TERMINATION
+These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
 
-8.1 Any unauthorised act in relation to the Software, and any breach of this
-    Licence or of any written agreement with the Owner, immediately and
-    automatically terminates any permission that may have been granted, without
-    notice.
+## Patent Defense
 
-8.2 On termination, or on the Owner's request at any time, the person
-    concerned shall immediately cease all use of the Software, permanently
-    delete and destroy every copy of it in their possession or control
-    (including backups, forks, derivatives, and any model, dataset, or corpus
-    into which it was incorporated), and certify that destruction to the Owner
-    in writing within seven (7) days.
+If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
 
-9. REMEDIES
+## Violations
 
-9.1 Any unauthorised use or disclosure of the Software would cause the Owner
-    irreparable harm for which damages would not be an adequate remedy. The
-    Owner is entitled to seek injunctive or other equitable relief in any
-    competent jurisdiction, without posting a bond, in addition to any other
-    remedy available at law, including damages, an account of profits, and
-    recovery of legal costs.
+The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
 
-9.2 Unauthorised use, reproduction, or distribution of the Software may give
-    rise to civil liability and to criminal penalties, and will be pursued to
-    the fullest extent permitted by law.
+## No Liability
 
-10. NO WARRANTY
+***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
 
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
-KIND, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING WITHOUT LIMITATION ANY WARRANTY
-OF MERCHANTABILITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE,
-ACCURACY, NON-INFRINGEMENT, OR THAT THE SOFTWARE WILL BE ERROR-FREE,
-UNINTERRUPTED, OR SECURE.
+## Definitions
 
-11. LIMITATION OF LIABILITY
+The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE OWNER
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
-EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA,
-REPUTATION, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
-ANY USE OF OR INABILITY TO USE IT, HOWEVER CAUSED AND UNDER ANY THEORY OF
-LIABILITY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+**You** refers to the individual or entity agreeing to these terms.
 
-12. NATURE OF THE SOFTWARE
+**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
 
-The Software produces developmental, pre-submission editorial feedback. It is
-not affiliated with any journal or publisher, is not a certification of
-quality, and is not a substitute for human peer review or professional
-judgement. All outputs are advisory and must be verified by a qualified person
-before any reliance is placed on them.
+**Your licenses** are all the licenses granted to you for the software under these terms.
 
-13. GENERAL
-
-13.1 Governing law. This Licence and any dispute or claim arising out of or in
-     connection with it or the Software, including non-contractual disputes or
-     claims, are governed by the laws of the Netherlands, excluding its
-     conflict-of-laws rules and the United Nations Convention on Contracts for
-     the International Sale of Goods.
-
-13.2 Jurisdiction. The competent courts of the Netherlands have exclusive
-     jurisdiction over any such dispute or claim, without prejudice to the
-     Owner's right to seek injunctive relief in any other jurisdiction.
-
-13.3 Severability. If any provision of this Licence is held invalid or
-     unenforceable, it shall be enforced to the maximum extent permissible and
-     the remaining provisions shall remain in full force and effect.
-
-13.4 No waiver. No failure or delay by the Owner in exercising any right shall
-     operate as a waiver of it.
-
-13.5 Precedence. This Licence prevails over any other licence notice, file,
-     badge, or metadata in or accompanying the Software, and over any terms
-     proposed by any other person. Only a written agreement signed by the Owner
-     may vary it.
-
-13.6 Third-party components. Third-party open-source components used by the
-     Software remain subject to their own licences. Nothing in this Licence
-     restricts rights granted under those licences in those components alone.
-
-Contact for permissions and notices: hello@psynalytics.com
+**Use** means anything you do with the software requiring one of your licenses.

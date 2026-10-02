@@ -282,9 +282,32 @@ All notable changes to MAPS (formerly MARA and Collegia) are recorded here. The 
   instance. Server errors return a fixed message rather than internal paths.
 
 ### Changed
-- The repository is renamed to `maps-multi-agent-academic-peer-review-system`, and a
-  `CLAUDE.md` records the product name, its history, and the rename's
-  compatibility rules for future work.
+- MAPS is now licensed under the PolyForm Strict License 1.0.0 with additional
+  terms. Noncommercial research, teaching and personal use are free, and any
+  work MAPS contributed to must cite it. Commercial use, modification,
+  redistribution and AI training remain prohibited, and journals, publishers
+  and funders may not use MAPS to screen submissions without a written
+  agreement. Charities, educational and public research institutions and the
+  other bodies listed in the licence may now use it whatever their funding,
+  and benchmarking and published
+  evaluations are allowed. The AI restriction covers training, fine-tuning,
+  distilling, prompting, grounding or retrieving into other AI systems, other
+  than running MAPS with the model providers it supports, and building
+  datasets for those uses. Not carried over from the earlier licence:
+  the bans on reverse engineering, on reusing the prompts or architecture as a
+  reference for another system, and on using MAPS outputs for decisions by
+  institutions other than journals, publishers and funders, the bans on
+  circumventing security or licensing mechanisms and on helping others breach
+  the licence, the clause on the MAPS, MARA and Psynalytics names, which the
+  licence no longer covers, and the
+  notice that MAPS output is advisory, which remains in the README. The earlier
+  confidentiality clause is dropped. The termination clause is replaced by the
+  PolyForm Violations term, which gives a 32-day cure period, and the duty to
+  destroy copies and certify destruction is dropped. The remedies clause, the
+  severability, no-waiver and precedence clauses, and the right to seek
+  injunctions outside the Netherlands are dropped. A CITATION.cff file holds
+  the citation, and every package now points to the root LICENSE.
+- The repository is renamed to `maps-multi-agent-academic-peer-review-system`.
 - The platform is renamed **MAPS: the Multi-Agent Academic Peer-Review
   System**, everywhere: the application, prompts, documentation, licence,
   artwork, package scopes (`@maps/*`), Compose service and image, tracing
@@ -309,7 +332,8 @@ All notable changes to MAPS (formerly MARA and Collegia) are recorded here. The 
   express prohibitions on AI training and evaluation use, benchmarking, reverse
   engineering, reuse of prompts and the knowledge base, and use of outputs for
   third-party decisions, with confidentiality, termination, remedies, and Dutch
-  governing law. Every package is marked `UNLICENSED`.
+  governing law. Every package is marked `UNLICENSED`. Superseded before
+  release by the PolyForm Strict licence described earlier in this list.
 - Injection handling now follows knowledge/01: instructional text aimed at the
   reviewer ("ignore previous instructions", role reassignment, forced
   acceptance, suppressed weaknesses) is Tier 2, so it is quarantined and the
