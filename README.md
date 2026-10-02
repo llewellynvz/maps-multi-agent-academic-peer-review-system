@@ -77,32 +77,78 @@ Phase 8  Deliverables              Render branded documents and record calibrati
 
 ```mermaid
 flowchart TD
-    M([Manuscript]) --> P0[Phase 0 · Intake and sanitisation]
-    P0 --> P1[Phase 1 · Structured analysis]
-    P1 --> P2[Phase 2 · Field context and citation audit]
-    P2 --> P3[Phase 3 · Specialist lenses and challenge round]
-    P3 --> P4[Phase 4 · Integrity screening]
-    P4 --> P5[Phase 5 · Swarm stress-test]
-    P5 --> P6[Phase 6 · Internal report]
-    P6 --> G
+    M([Manuscript, PDF or DOCX]) --> PARSE
 
-    subgraph G [Phase 7 · Release gate]
-      direction LR
-      W[Meta-reviewer and report writer] --> V{Deterministic validator}
-      V -- revise --> W
-      V -- pass --> C{Final critic}
-      C -- revise --> W
-      C -- pass --> R([Release])
-      C -- unresolved --> A[Logged arbitration] --> R
+    subgraph P0 [Phase 0 · Intake and sanitisation]
+      PARSE[GROBID and Mammoth parsing] --> SAN[Manuscript sanitiser]
     end
 
-    G --> P8[Phase 8 · Deliverables]
-    P8 --> OUT([Review letter · Editor notes · Evidence ledger])
+    subgraph P1 [Phase 1 · Structured analysis]
+      MA[Manuscript analyst]
+    end
+
+    subgraph P2 [Phase 2 · Field context and citation audit]
+      FCS[Field context scout]
+      CA[Citation auditor]
+    end
+
+    subgraph P3 [Phase 3 · Specialist review]
+      SR["Specialist reviewer × 11 lenses<br/>blind pass, then challenge round"]
+    end
+
+    subgraph P4 [Phase 4 · Integrity screening]
+      STAT["Statistics audit<br/>t, F, r, χ², z and GRIM"]
+      IS[Integrity screener]
+      AIC[AI-content analyst]
+    end
+
+    subgraph P5 [Phase 5 · Swarm stress-test]
+      SW[Swarm of reviewer profiles]
+    end
+
+    subgraph P6 [Phase 6 · Internal report]
+      IR[Report writer, internal report]
+    end
+
+    subgraph P7 [Phase 7 · Release gate]
+      VP[Voice profiler, optional] --> RW
+      MR[Meta-reviewer] --> RW[Report writer]
+      SWR[Swarm critique of the draft] --> RW
+      RW --> V{Grounding validator}
+      V -- revise --> RW
+      V -- pass --> FC{Final critic}
+      FC -- revise --> RW
+      FC -- re-run a lens, then re-meta-review --> MR
+      FC -- pass --> PST[Prior stress-test]
+      FC -- unresolved --> ARB[Logged arbitration] --> PST
+      PST --> R([Release])
+    end
+
+    subgraph P8 [Phase 8 · Deliverables and calibration]
+      DOC[Branded Word and Markdown renderer]
+      QM[Quality metrics engine]
+      JSS[Journal scope scorer]
+      CAL[Review calibrator]
+    end
+
+    SAN --> MA --> FCS & CA
+    FCS & CA --> SR --> STAT & IS & AIC
+    STAT & IS & AIC --> SW --> IR --> MR & SWR
+    R --> DOC & QM & JSS & CAL
+    DOC --> OUT([Review letter · Editor notes · Evidence ledger])
+
+    PC[Phase critic, after Phases 1 to 6] -. can re-dispatch a lens .-> SR
+
+    EG[(Guarded egress<br/>Crossref · OpenAlex · Semantic Scholar)]
+    FCS <-.-> EG
+    CA <-.-> EG
 
     L[(Append-only evidence ledger)]
-    P1 -. findings .-> L
-    P3 -. findings .-> L
-    P4 -. findings .-> L
+    MA -. findings .-> L
+    SR -. findings .-> L
+    STAT -. findings .-> L
+    IS -. findings .-> L
+    L -. grounds .-> V
 ```
 
 The orchestrator is the only component that merges findings into the ledger, and only at phase boundaries. A per-phase critic runs after Phases 1 to 6 and can re-dispatch a specialist lens when it finds a material gap. When the reviewer supplies a preliminary assessment at intake, it is withheld from every agent until the recommendation is set, and only then stress-tested against the evidence.
