@@ -26,7 +26,7 @@
   <a href="#operations">Operations</a> ·
   <a href="#quality-assurance">Quality</a> ·
   <a href="#documentation">Docs</a> ·
-  <a href="#licence-and-legal">Licence</a>
+  <a href="#licence">Licence</a>
 </p>
 
 </div>
@@ -243,11 +243,9 @@ Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 MAPS is designed, developed, and maintained by Psynalytics B.V.
 
-## Licence and legal
+## Licence
 
-**PolyForm Strict License 1.0.0, with additional terms.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
-
-You may use MAPS free of charge for any noncommercial purpose, including academic research, teaching and personal study. Charities, educational and public research institutions and the other bodies listed in the licence may use it regardless of how their work is funded. You may not use it commercially, change it, build new works on it, redistribute it, or use any part of it to train, fine-tune, distil, prompt or ground another AI system. Running MAPS itself with the model providers it supports is allowed. Journals, publishers and funders may not use MAPS or its outputs to screen, assess or decide on manuscripts, grants or candidates without a written agreement. Individual authors may use it on their own work, and invited reviewers may use it where the journal, publisher or funder that invited them allows it. Forking on GitHub is allowed only as GitHub's terms require, and a fork gives no further rights. The full and binding terms are in [LICENSE](LICENSE).
+MAPS is free for noncommercial research and teaching, with citation. See the [LICENSE](LICENSE) for the full terms. Commercial licensing: **hello@psynalytics.com**.
 
 ### How to cite MAPS
 
@@ -256,8 +254,6 @@ If MAPS contributed to a paper, preprint, thesis, report, review, presentation, 
 > van Zyl, L. E. (2026). *MAPS: The Multi-Agent Academic Peer-Review System* [Computer software]. Psynalytics B.V. https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system
 
 [CITATION.cff](CITATION.cff) holds this reference in machine-readable form for GitHub's **Cite this repository** button.
-
-Licensing and permission enquiries: **hello@psynalytics.com**.
 
 ## Disclaimer
 
