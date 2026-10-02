@@ -17,7 +17,7 @@ This document records how the MAPS repository is controlled, so that only the ow
 
 1. Open **Settings → General**.
 2. Under **Repository name**, enter `maps-multi-agent-academic-peer-review-system`, then select **Rename**. (Done: the repository now lives at `llewellynvz/maps-multi-agent-academic-peer-review-system`.)
-3. Under **Description**, enter: *MAPS: the Multi-Agent Academic Peer-Review System. Free for noncommercial research, with citation.*
+3. Under **Description**, enter: *MAPS: the Multi-Agent Academic Peer-Review System. Evidence-grounded, developmental peer review for psychology and wellbeing science.*
 
 GitHub redirects the old URL, but update every local clone:
 

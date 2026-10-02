@@ -9,8 +9,7 @@
 **Evidence-grounded, confidential, multi-agent peer review for psychological and wellbeing science.**
 
 <p>
-  <img src="https://img.shields.io/badge/licence-PolyForm%20Strict%201.0.0-B42318?style=flat-square" alt="Licence: PolyForm Strict 1.0.0">
-  <img src="https://img.shields.io/badge/commercial%20use-prohibited-B42318?style=flat-square" alt="Commercial use prohibited">
+  <img src="https://img.shields.io/badge/licence-PolyForm%20Strict%201.0.0-008DA1?style=flat-square" alt="Licence: PolyForm Strict 1.0.0">
   <img src="https://img.shields.io/badge/version-1.3.0-008DA1?style=flat-square" alt="Version 1.3.0">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript strict">
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 22.13 or newer">
@@ -33,10 +32,6 @@
 </div>
 
 ---
-
-> [!IMPORTANT]
-> **Free for noncommercial research, with citation.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
-> MAPS is licensed under the [PolyForm Strict License 1.0.0](LICENSE) with additional terms. Researchers, students and educational or public research institutions may use it free of charge for noncommercial purposes and must cite it. Commercial use, modification, redistribution, AI training, and use by journals, publishers or funders to screen submissions are not permitted. See [LICENSE](LICENSE) and [How to cite MAPS](#how-to-cite-maps).
 
 ## Executive summary
 
