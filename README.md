@@ -9,8 +9,7 @@
 **Evidence-grounded, confidential, multi-agent peer review for psychological and wellbeing science.**
 
 <p>
-  <img src="https://img.shields.io/badge/licence-proprietary%20%C2%B7%20all%20rights%20reserved-B42318?style=flat-square" alt="Licence: proprietary, all rights reserved">
-  <img src="https://img.shields.io/badge/commercial%20use-prohibited-B42318?style=flat-square" alt="Commercial use prohibited">
+  <img src="https://img.shields.io/badge/licence-PolyForm%20Strict%201.0.0-008DA1?style=flat-square" alt="Licence: PolyForm Strict 1.0.0">
   <img src="https://img.shields.io/badge/version-1.3.0-008DA1?style=flat-square" alt="Version 1.3.0">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript strict">
   <img src="https://img.shields.io/badge/Node.js-22.13%2B-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 22.13 or newer">
@@ -27,16 +26,12 @@
   <a href="#operations">Operations</a> ·
   <a href="#quality-assurance">Quality</a> ·
   <a href="#documentation">Docs</a> ·
-  <a href="#licence-and-legal">Licence</a>
+  <a href="#licence">Licence</a>
 </p>
 
 </div>
 
 ---
-
-> [!IMPORTANT]
-> **Proprietary and confidential software.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V. All rights reserved.
-> No licence of any kind is granted by access to this repository. Use, execution, copying, modification, redistribution, evaluation, benchmarking, and any commercial or AI-training use are prohibited without a prior written agreement signed by the owner. See [LICENSE](LICENSE).
 
 ## Executive summary
 
@@ -82,32 +77,78 @@ Phase 8  Deliverables              Render branded documents and record calibrati
 
 ```mermaid
 flowchart TD
-    M([Manuscript]) --> P0[Phase 0 · Intake and sanitisation]
-    P0 --> P1[Phase 1 · Structured analysis]
-    P1 --> P2[Phase 2 · Field context and citation audit]
-    P2 --> P3[Phase 3 · Specialist lenses and challenge round]
-    P3 --> P4[Phase 4 · Integrity screening]
-    P4 --> P5[Phase 5 · Swarm stress-test]
-    P5 --> P6[Phase 6 · Internal report]
-    P6 --> G
+    M([Manuscript, PDF or DOCX]) --> PARSE
 
-    subgraph G [Phase 7 · Release gate]
-      direction LR
-      W[Meta-reviewer and report writer] --> V{Deterministic validator}
-      V -- revise --> W
-      V -- pass --> C{Final critic}
-      C -- revise --> W
-      C -- pass --> R([Release])
-      C -- unresolved --> A[Logged arbitration] --> R
+    subgraph P0 [Phase 0 · Intake and sanitisation]
+      PARSE[GROBID and Mammoth parsing] --> SAN[Manuscript sanitiser]
     end
 
-    G --> P8[Phase 8 · Deliverables]
-    P8 --> OUT([Review letter · Editor notes · Evidence ledger])
+    subgraph P1 [Phase 1 · Structured analysis]
+      MA[Manuscript analyst]
+    end
+
+    subgraph P2 [Phase 2 · Field context and citation audit]
+      FCS[Field context scout]
+      CA[Citation auditor]
+    end
+
+    subgraph P3 [Phase 3 · Specialist review]
+      SR["Specialist reviewer × 11 lenses<br/>blind pass, then challenge round"]
+    end
+
+    subgraph P4 [Phase 4 · Integrity screening]
+      STAT["Statistics audit<br/>t, F, r, χ², z and GRIM"]
+      IS[Integrity screener]
+      AIC[AI-content analyst]
+    end
+
+    subgraph P5 [Phase 5 · Swarm stress-test]
+      SW[Swarm of reviewer profiles]
+    end
+
+    subgraph P6 [Phase 6 · Internal report]
+      IR[Report writer, internal report]
+    end
+
+    subgraph P7 [Phase 7 · Release gate]
+      VP[Voice profiler, optional] --> RW
+      MR[Meta-reviewer] --> RW[Report writer]
+      SWR[Swarm critique of the draft] --> RW
+      RW --> V{Grounding validator}
+      V -- revise --> RW
+      V -- pass --> FC{Final critic}
+      FC -- revise --> RW
+      FC -- re-run a lens, then re-meta-review --> MR
+      FC -- pass --> PST[Prior stress-test]
+      FC -- unresolved --> ARB[Logged arbitration] --> PST
+      PST --> R([Release])
+    end
+
+    subgraph P8 [Phase 8 · Deliverables and calibration]
+      DOC[Branded Word and Markdown renderer]
+      QM[Quality metrics engine]
+      JSS[Journal scope scorer]
+      CAL[Review calibrator]
+    end
+
+    SAN --> MA --> FCS & CA
+    FCS & CA --> SR --> STAT & IS & AIC
+    STAT & IS & AIC --> SW --> IR --> MR & SWR
+    R --> DOC & QM & JSS & CAL
+    DOC --> OUT([Review letter · Editor notes · Evidence ledger])
+
+    PC[Phase critic, after Phases 1 to 6] -. can re-dispatch a lens .-> SR
+
+    EG[(Guarded egress<br/>Crossref · OpenAlex · Semantic Scholar)]
+    FCS <-.-> EG
+    CA <-.-> EG
 
     L[(Append-only evidence ledger)]
-    P1 -. findings .-> L
-    P3 -. findings .-> L
-    P4 -. findings .-> L
+    MA -. findings .-> L
+    SR -. findings .-> L
+    STAT -. findings .-> L
+    IS -. findings .-> L
+    L -. grounds .-> V
 ```
 
 The orchestrator is the only component that merges findings into the ledger, and only at phase boundaries. A per-phase critic runs after Phases 1 to 6 and can re-dispatch a specialist lens when it finds a material gap. When the reviewer supplies a preliminary assessment at intake, it is withheld from every agent until the recommendation is set, and only then stress-tested against the evidence.
@@ -183,7 +224,7 @@ Confidentiality is an architectural constraint, not a configuration option. The 
 
 ### Installation
 
-Deployment is available only to licensed parties under a written agreement with the owner.
+You may install and run MAPS for any noncommercial purpose under the terms in [LICENSE](LICENSE). Commercial deployment needs a written agreement with the owner.
 
 ```bash
 cp .env.example .env
@@ -248,13 +289,17 @@ Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 MAPS is designed, developed, and maintained by Psynalytics B.V.
 
-## Licence and legal
+## Licence
 
-**Proprietary. All rights reserved.** Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
+MAPS is free for noncommercial research and teaching, with citation. See the [LICENSE](LICENSE) for the full terms. Commercial licensing: **hello@psynalytics.com**.
 
-This repository is made visible for reference only. No right or licence is granted to use, run, install, copy, reproduce, modify, translate, adapt, fork, distribute, publish, sublicense, sell, host, benchmark, evaluate, reverse engineer, or create derivative works of the software, its prompts, its knowledge base, or its documentation, in whole or in part. **Commercial use of any kind is prohibited.** Use of any part of this repository to train, fine-tune, evaluate, or prompt a machine-learning or artificial-intelligence system is prohibited. The full and binding terms are in [LICENSE](LICENSE).
+### How to cite MAPS
 
-Licensing and permission enquiries: **hello@psynalytics.com**.
+If MAPS contributed to a paper, preprint, thesis, report, review, presentation, dataset or other output, you must cite it:
+
+> van Zyl, L. E. (2026). *MAPS: The Multi-Agent Academic Peer-Review System* [Computer software]. Psynalytics B.V. https://github.com/llewellynvz/maps-multi-agent-academic-peer-review-system
+
+[CITATION.cff](CITATION.cff) holds this reference in machine-readable form for GitHub's **Cite this repository** button.
 
 ## Disclaimer
 

@@ -11,13 +11,13 @@ This document records how the MAPS repository is controlled, so that only the ow
 | History cannot be rewritten | Force-pushes and branch deletion on `main` are blocked. History is linear. |
 | Broken or leaking code cannot merge | The `verify` and `secrets` checks must pass on the latest commit. |
 | Approvals cannot be gamed | Approvals are dismissed on new pushes, the last push must be approved by someone other than its author, and every review thread must be resolved. |
-| Forks confer no rights | The [LICENSE](../LICENSE) prohibits any use of forks. Pull requests from forks are closed unreviewed (see [CONTRIBUTING](../CONTRIBUTING.md)). |
+| Forks confer no rights | A fork gives no rights beyond the [LICENSE](../LICENSE), which forbids changing it or distributing it outside GitHub. Pull requests from forks are closed unreviewed (see [CONTRIBUTING](../CONTRIBUTING.md)). |
 
 ## 1. Rename the repository (GitHub setting)
 
 1. Open **Settings → General**.
 2. Under **Repository name**, enter `maps-multi-agent-academic-peer-review-system`, then select **Rename**. (Done: the repository now lives at `llewellynvz/maps-multi-agent-academic-peer-review-system`.)
-3. Under **Description**, enter: *MAPS: the Multi-Agent Academic Peer-Review System. A proprietary Psynalytics AI system.*
+3. Under **Description**, enter: *MAPS: the Multi-Agent Academic Peer-Review System. Evidence-grounded, developmental peer review for psychology and wellbeing science.*
 
 GitHub redirects the old URL, but update every local clone:
 
@@ -58,7 +58,7 @@ Open **Settings → Actions → General**.
 
 ## 5. Forking and visibility
 
-The repository is public, and GitHub does not allow forking to be disabled on a public repository in a personal account. The protections above ensure that a fork can never change this repository. The [LICENSE](../LICENSE) removes any right to use, run, or distribute a fork.
+The repository is public, and GitHub does not allow forking to be disabled on a public repository in a personal account. The protections above ensure that a fork can never change this repository. The [LICENSE](../LICENSE) allows noncommercial use but forbids changing a fork or distributing it outside GitHub.
 
 To stop viewing and forking entirely, change the visibility to private under **Settings → General → Danger Zone → Change repository visibility**. Existing public forks are not deleted when you do this; they are detached into separate repositories.
 

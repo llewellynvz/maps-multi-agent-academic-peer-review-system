@@ -1,10 +1,10 @@
 # Contributing
 
-MAPS is proprietary software. Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V. All rights reserved.
+MAPS is licensed under the PolyForm Strict License 1.0.0 with additional terms. Copyright © 2026 Llewellyn E. van Zyl and Psynalytics B.V.
 
 ## Who may contribute
 
-Contributions are accepted only from collaborators invited by the owner. Unsolicited pull requests, including pull requests from forks, are closed without review. Access to this repository, or the ability to fork it on GitHub, grants no licence of any kind; see [LICENSE](LICENSE).
+Contributions are accepted only from collaborators invited by the owner. Unsolicited pull requests, including pull requests from forks, are closed without review. Access to this repository, or a fork of it on GitHub, grants no rights beyond those in [LICENSE](LICENSE).
 
 ## How changes reach `main`
 
@@ -26,4 +26,14 @@ pnpm lint
 pnpm test
 ```
 
-By submitting a contribution you agree to the terms in section 7 of the [LICENSE](LICENSE).
+## Names that must not change
+
+MAPS was renamed from MARA. These identifiers keep their old names, because changing them breaks existing installations:
+
+- the key-vault salt `mara-master-key-derivation` in `server/src/security/vault.ts` (stored provider keys would stop decrypting)
+- the ingest store id `mara-ingest-storage`
+- the session cookie `mara_session`
+
+Legacy `MARA_*` environment variables are still honoured through `server/src/env-aliases.ts`, and `mapsDbPath()` falls back to an existing `data/mara.db`.
+
+By submitting a contribution you agree to term A5 of the [LICENSE](LICENSE).
