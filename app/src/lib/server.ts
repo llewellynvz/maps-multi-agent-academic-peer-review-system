@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import type { z } from 'zod';
-import { accessDenied, ApiError, getClient, isApiError, SESSION_COOKIE } from 'server/src/data';
+import { accessDenied, ApiError, getClient, isApiError, passphraseIsSet, SESSION_COOKIE } from 'server/src/data';
+import { isLoopbackHost } from './host';
 
 export function client() {
   return getClient();
@@ -43,7 +44,28 @@ export function tokenFrom(req: NextRequest): string | null {
   return req.cookies.get(SESSION_COOKIE)?.value ?? null;
 }
 
+// Without a passphrase every request is authorised, so only loopback names are served. Only Host is
+// trusted: a DNS-rebinding page can set X-Forwarded-Host itself but never Host.
+export function hostDenied(req: NextRequest): NextResponse | null {
+  if (isLoopbackHost(req.headers.get('host')) || passphraseIsSet(getClient().db)) {
+    return null;
+  }
+  return NextResponse.json(
+    {
+      error: {
+        code: 'forbidden',
+        message: 'Open MAPS on localhost and set a passphrase in Settings to use it on any other address.',
+      },
+    },
+    { status: 403 },
+  );
+}
+
 export function authDenied(req: NextRequest): NextResponse | null {
+  const badHost = hostDenied(req);
+  if (badHost !== null) {
+    return badHost;
+  }
   const { db } = getClient();
   if (!accessDenied(db, tokenFrom(req))) {
     return null;
@@ -69,7 +91,7 @@ export function crossSiteDenied(req: NextRequest): NextResponse | null {
     foreign = site !== 'same-origin' && site !== 'none';
   } else {
     const origin = req.headers.get('origin');
-    const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
+    const host = req.headers.get('host');
     if (origin !== null && host !== null) {
       try {
         foreign = new URL(origin).host !== host;
@@ -87,13 +109,17 @@ export function crossSiteDenied(req: NextRequest): NextResponse | null {
   );
 }
 
+export function originDenied(req: NextRequest): NextResponse | null {
+  return hostDenied(req) ?? crossSiteDenied(req);
+}
+
 export async function guarded(
   req: NextRequest,
   handler: () => Promise<NextResponse> | NextResponse,
 ): Promise<NextResponse> {
-  const crossSite = crossSiteDenied(req);
-  if (crossSite !== null) {
-    return crossSite;
+  const foreign = originDenied(req);
+  if (foreign !== null) {
+    return foreign;
   }
   const denied = authDenied(req);
   if (denied !== null) {

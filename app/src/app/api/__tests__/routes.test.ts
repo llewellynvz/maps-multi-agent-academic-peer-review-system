@@ -17,7 +17,11 @@ let tempDir: string;
 type NextInit = ConstructorParameters<typeof NextRequest>[1];
 
 function req(url: string, init?: NextInit): NextRequest {
-  return new NextRequest(`http://127.0.0.1${url}`, init);
+  const headers = new Headers(init?.headers);
+  if (!headers.has('host')) {
+    headers.set('host', '127.0.0.1:3100');
+  }
+  return new NextRequest(`http://127.0.0.1${url}`, { ...init, headers });
 }
 
 beforeEach(() => {
@@ -34,7 +38,7 @@ afterEach(() => {
 
 describe('health and reviews routes', () => {
   it('reports health and creates then lists a review', async () => {
-    const health = await healthGET();
+    const health = await healthGET(req('/api/health'));
     const healthBody = (await health.json()) as { status: string; worker: string; db: string };
     expect(healthBody.status).toBe('ok');
     expect(healthBody.db).toBe('ok');
@@ -145,7 +149,7 @@ describe('SSE events route (API-22)', () => {
       .run(randomUUID(), 'rev-sse', now, 'phase_transition', 'phase_1', '{"status":"active"}');
 
     const controller = new AbortController();
-    const request = new NextRequest('http://127.0.0.1/api/reviews/rev-sse/events', { signal: controller.signal });
+    const request = req('/api/reviews/rev-sse/events', { signal: controller.signal });
     const res = await eventsGET(request, { params: Promise.resolve({ id: 'rev-sse' }) });
     expect(res.headers.get('content-type')).toContain('text/event-stream');
 
@@ -185,6 +189,35 @@ describe('cross-site request guard', () => {
       req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'http://127.0.0.1', host: '127.0.0.1' } }),
     );
     expect(same.status).toBe(201);
+    const spoofed = await reviewsPOST(
+      req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'http://evil.example', host: '127.0.0.1:3100', 'x-forwarded-host': 'evil.example' } }),
+    );
+    expect(spoofed.status).toBe(403);
+  });
+
+  it('refuses reads and sign-in addressed to a foreign host, as a DNS-rebinding page sends them', async () => {
+    const read = await reviewsGET(req('/api/reviews', { headers: { host: 'evil.example:3100' } }));
+    expect(read.status).toBe(403);
+    const signIn = await sessionPOST(
+      req('/api/session', { method: 'POST', body: JSON.stringify({ passphrase: 'x' }), headers: { host: 'evil.example:3100' } }),
+    );
+    expect(signIn.status).toBe(403);
+    const health = await healthGET(req('/api/health', { headers: { host: 'evil.example:3100' } }));
+    expect(health.status).toBe(403);
+  });
+
+  it('serves any host once a passphrase is set, and still requires the passphrase there', async () => {
+    await settingsPUT(req('/api/settings', { method: 'PUT', body: JSON.stringify({ passphrase: 'letmein' }) }));
+    const lan = { host: 'maps.lab.example:8443' };
+    const anonymous = await reviewsGET(req('/api/reviews', { headers: lan }));
+    expect(anonymous.status).toBe(401);
+    const session = await sessionPOST(req('/api/session', { method: 'POST', body: JSON.stringify({ passphrase: 'letmein' }), headers: lan }));
+    expect(session.status).toBe(200);
+    const { token } = (await session.json()) as { token: string };
+    const signedIn = await reviewsGET(req('/api/reviews', { headers: { ...lan, authorization: `Bearer ${token}` } }));
+    expect(signedIn.status).toBe(200);
+    const health = await healthGET(req('/api/health', { headers: lan }));
+    expect(health.status).toBe(200);
   });
 
   it('leaves reads alone', async () => {

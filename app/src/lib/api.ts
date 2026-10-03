@@ -149,6 +149,10 @@ export interface HealthReport {
   db: 'ok' | 'error';
 }
 
+export function hostRefusal(error: unknown): string | null {
+  return error instanceof ApiError && error.status === 403 ? error.message : null;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;

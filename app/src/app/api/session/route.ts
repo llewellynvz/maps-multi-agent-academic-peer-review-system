@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { getClient, issueToken, passphraseIsSet, SESSION_COOKIE, verifyPassphrase } from 'server/src/data';
-import { crossSiteDenied, jsonError } from '@/lib/server';
+import { jsonError, originDenied } from '@/lib/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,9 +30,9 @@ function pruneExpired(now: number): void {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const crossSite = crossSiteDenied(req);
-  if (crossSite !== null) {
-    return crossSite;
+  const foreign = originDenied(req);
+  if (foreign !== null) {
+    return foreign;
   }
   try {
     const body = (await req.json().catch(() => ({}))) as { passphrase?: string };

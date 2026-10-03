@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type EvidenceData } from '@/lib/api';
+import { api, type EvidenceData, hostRefusal } from '@/lib/api';
 import { formatDuration, PHASE_DESCRIPTIONS, PHASES, phaseIndex, phaseLabel } from '@/lib/format';
 import { LENS_FALLBACK, LENS_INFO, prefixOf } from '@/lib/lenses';
 import { gatePillLabel, parseRetrySignal, retryLogMessage, retryPillLabel, type RetrySignal } from '@/lib/runEvents';
@@ -127,7 +127,12 @@ export default function RunPage(): ReactNode {
       const now = Date.now();
       if (now - lastProbe > 10_000) {
         lastProbe = now;
-        void api.getReview(id).catch(() => undefined);
+        void api.getReview(id).catch((error: unknown) => {
+          const refusal = hostRefusal(error);
+          if (refusal !== null) {
+            setControlError(refusal);
+          }
+        });
       }
     };
     const seenPhases = new Set<string>();

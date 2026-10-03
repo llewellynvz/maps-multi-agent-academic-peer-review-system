@@ -6,6 +6,21 @@ All notable changes to MAPS (formerly MARA and Collegia) are recorded here. The 
 
 ## [Unreleased]
 
+### Security
+- Until a passphrase is set, the API refuses requests addressed to any host
+  other than `localhost`, `127.0.0.1` or `::1`. Without this, a website open in
+  the same browser could re-point its DNS at the machine and read, change or
+  delete reviews on an instance with no passphrase. Once a passphrase is set,
+  MAPS answers on any address, so serving it on a LAN or behind a reverse proxy
+  needs no extra setting.
+- The results screen no longer loads images in reports and private notes, and
+  shows their alt text as plain text instead. An image link written into model
+  output made the browser fetch a remote URL when the results were opened, which
+  could reveal the reviewer's IP address and the time they read the review. The
+  downloadable Markdown files still contain the text exactly as written.
+- When the browser reaches MAPS through a host that is not allowed, the run
+  screen now shows why the server refused the connection.
+
 ### Added
 - Live findings are now clickable while a review runs. Selecting a row in the
   findings ticker opens a drawer with the finding's claim, its place in the

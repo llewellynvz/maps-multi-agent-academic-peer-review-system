@@ -25,7 +25,7 @@ This document describes MAPS's security model: what it protects, the threats it 
 | **Passphrase guessing** | scrypt-hashed passphrase, per-client and global failure throttling, and a slow global drip past the limit so an attacker cannot lock the owner out. |
 | **Oversized or malformed requests** | Schema validation on every JSON body (422 on mismatch); uploads refused on declared length before buffering; per-type size caps; a DOCX size limit enforced before conversion. |
 | **Credential disclosure** | AES-256-GCM envelope encryption under an operator-held master key; secret-shaped values and secret-named fields redacted from logs. |
-| **Network exposure** | Docker publishes the application on `127.0.0.1` by default; GROBID is loopback-only and reached over the internal compose network. |
+| **Network exposure** | Docker publishes the application on `127.0.0.1` by default. GROBID is loopback-only and reached over the internal compose network. Until a passphrase is set, the API refuses requests addressed to any host other than the loopback names, so a website that re-points its DNS at the machine (DNS rebinding) cannot reach an open instance. The check relies on the Host header the browser sent, so it does not protect an instance without a passphrase behind a proxy that rewrites Host to a loopback address, or from other machines when the app is bound beyond loopback. Once a passphrase is set, every address is served and the passphrase protects it. |
 | **Container compromise** | The container drops to an unprivileged user with `no-new-privs` after taking ownership of its data volume. |
 | **Supply-chain risk** | Frozen lockfile installs, a high-severity dependency audit, and a full-history secret scan in continuous integration. |
 
