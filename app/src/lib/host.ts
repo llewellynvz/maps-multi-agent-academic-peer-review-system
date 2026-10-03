@@ -1,18 +1,10 @@
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1'];
 
-function hostname(hostHeader: string): string {
+export function isLoopbackHost(hostHeader: string | null): boolean {
   try {
-    return new URL(`http://${hostHeader}`).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
+    const name = new URL(`http://${(hostHeader ?? '').trim()}`).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
+    return LOOPBACK_HOSTS.includes(name);
   } catch {
-    return '';
-  }
-}
-
-export function hostAllowed(hostHeader: string | null, extraHosts: string | undefined): boolean {
-  if (hostHeader === null || hostHeader === '') {
     return false;
   }
-  const allowed = [...LOOPBACK_HOSTS, ...(extraHosts ?? '').split(',').map((h) => h.trim().toLowerCase())];
-  const name = hostname(hostHeader);
-  return name !== '' && allowed.includes(name);
 }
