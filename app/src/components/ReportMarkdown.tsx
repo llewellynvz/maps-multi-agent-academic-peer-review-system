@@ -64,6 +64,7 @@ export function ReportMarkdown({ text, onFinding }: { text: string; onFinding?: 
               <table className="table">{children}</table>
             </div>
           ),
+          img: () => null,
           a: ({ href, children }) => (
             <a href={href} target="_blank" rel="noreferrer noopener">
               {children}

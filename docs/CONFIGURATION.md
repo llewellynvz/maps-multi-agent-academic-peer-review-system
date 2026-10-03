@@ -60,6 +60,7 @@ For reasoning models (the `gpt-5` family and the `o` series), the dispatcher req
 | `MAPS_MASTER_KEY` | none | 32-byte key (64 hex characters) for AES-256-GCM envelope encryption of stored provider keys. Generate with `openssl rand -hex 32`. Required only to store keys through the application. Never commit it. |
 | `MAPS_BIND` | `127.0.0.1` | Host interface Docker publishes the application on. Set `0.0.0.0` only behind an instance passphrase and on a network you trust. |
 | `MAPS_PORT` | `3100` | Host port for the web application |
+| `MAPS_ALLOWED_HOSTS` | none | Comma-separated host names, besides `localhost`, `127.0.0.1` and `::1`, that browsers may use to reach the API, for example `maps.lab.example,192.168.1.20`. Requests addressed to any other host are refused, which blocks DNS-rebinding attacks from other websites. Set it when serving MAPS on a LAN address or behind a reverse proxy. |
 
 The instance passphrase itself is set in **Settings**, not in the environment.
 

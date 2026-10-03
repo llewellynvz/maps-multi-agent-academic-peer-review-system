@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import type { z } from 'zod';
 import { accessDenied, ApiError, getClient, isApiError, SESSION_COOKIE } from 'server/src/data';
+import { hostAllowed } from './host';
 
 export function client() {
   return getClient();
@@ -43,7 +44,22 @@ export function tokenFrom(req: NextRequest): string | null {
   return req.cookies.get(SESSION_COOKIE)?.value ?? null;
 }
 
+// Only Host is trusted: a DNS-rebinding page can set X-Forwarded-Host itself but never Host.
+export function hostDenied(req: NextRequest): NextResponse | null {
+  if (hostAllowed(req.headers.get('host'), process.env.MAPS_ALLOWED_HOSTS)) {
+    return null;
+  }
+  return NextResponse.json(
+    { error: { code: 'forbidden', message: 'This host name is not allowed. Add it to MAPS_ALLOWED_HOSTS.' } },
+    { status: 403 },
+  );
+}
+
 export function authDenied(req: NextRequest): NextResponse | null {
+  const badHost = hostDenied(req);
+  if (badHost !== null) {
+    return badHost;
+  }
   const { db } = getClient();
   if (!accessDenied(db, tokenFrom(req))) {
     return null;

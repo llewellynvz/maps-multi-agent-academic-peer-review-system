@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(here, 'src') },
   },
+  oxc: { jsx: { runtime: 'automatic' } },
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',

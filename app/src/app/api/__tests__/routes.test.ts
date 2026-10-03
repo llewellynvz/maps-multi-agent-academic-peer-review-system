@@ -17,7 +17,11 @@ let tempDir: string;
 type NextInit = ConstructorParameters<typeof NextRequest>[1];
 
 function req(url: string, init?: NextInit): NextRequest {
-  return new NextRequest(`http://127.0.0.1${url}`, init);
+  const headers = new Headers(init?.headers);
+  if (!headers.has('host')) {
+    headers.set('host', '127.0.0.1:3100');
+  }
+  return new NextRequest(`http://127.0.0.1${url}`, { ...init, headers });
 }
 
 beforeEach(() => {
@@ -145,7 +149,7 @@ describe('SSE events route (API-22)', () => {
       .run(randomUUID(), 'rev-sse', now, 'phase_transition', 'phase_1', '{"status":"active"}');
 
     const controller = new AbortController();
-    const request = new NextRequest('http://127.0.0.1/api/reviews/rev-sse/events', { signal: controller.signal });
+    const request = req('/api/reviews/rev-sse/events', { signal: controller.signal });
     const res = await eventsGET(request, { params: Promise.resolve({ id: 'rev-sse' }) });
     expect(res.headers.get('content-type')).toContain('text/event-stream');
 
@@ -185,6 +189,15 @@ describe('cross-site request guard', () => {
       req('/api/reviews', { method: 'POST', body: JSON.stringify({ title: 'x' }), headers: { origin: 'http://127.0.0.1', host: '127.0.0.1' } }),
     );
     expect(same.status).toBe(201);
+  });
+
+  it('refuses reads and sign-in addressed to a foreign host, as a DNS-rebinding page sends them', async () => {
+    const read = await reviewsGET(req('/api/reviews', { headers: { host: 'evil.example:3100' } }));
+    expect(read.status).toBe(403);
+    const signIn = await sessionPOST(
+      req('/api/session', { method: 'POST', body: JSON.stringify({ passphrase: 'x' }), headers: { host: 'evil.example:3100' } }),
+    );
+    expect(signIn.status).toBe(403);
   });
 
   it('leaves reads alone', async () => {

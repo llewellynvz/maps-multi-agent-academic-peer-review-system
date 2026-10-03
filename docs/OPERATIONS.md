@@ -332,4 +332,5 @@ docker compose start
 
 The container publishes on `127.0.0.1` by default. To serve other machines, set a
 passphrase first, then set `MAPS_BIND=0.0.0.0` (or a specific interface) and place a
-TLS-terminating reverse proxy in front. See [SECURITY.md](SECURITY.md).
+TLS-terminating reverse proxy in front. Add the host name or address that browsers will
+use to `MAPS_ALLOWED_HOSTS`, or the API refuses their requests. See [SECURITY.md](SECURITY.md).
